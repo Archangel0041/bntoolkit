@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCompare } from "@/contexts/CompareContext";
 import { UnitImage } from "./UnitImage";
+import { getClassDisplayName, getClassIcon } from "@/lib/battleConfig";
 import type { ParsedUnit } from "@/types/units";
 import { Heart, Zap, Shield, Plus, Check, Swords, Eye, Target } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -23,6 +24,9 @@ export function UnitCard({ unit }: UnitCardProps) {
   
   // Check if unit costs nanopods
   const isNanopodUnit = unit.requirements?.cost?.nanopods && unit.requirements.cost.nanopods > 0;
+  
+  // Get class display name
+  const classDisplayName = t(getClassDisplayName(unit.identity.class_name));
 
   const handleCompareClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -73,6 +77,9 @@ export function UnitCard({ unit }: UnitCardProps) {
                     #{unit.id}
                   </Badge>
                 </div>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                  {classDisplayName}
+                </p>
               </div>
               <Button
                 variant={inCompare ? "default" : "outline"}

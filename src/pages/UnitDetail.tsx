@@ -17,6 +17,7 @@ import { getAbilityById } from "@/lib/abilities";
 import { getStatusEffectDisplayName, getStatusEffectColor } from "@/lib/statusEffects";
 import { getClassDisplayName } from "@/lib/battleConfig";
 import { getAbilityImageUrl } from "@/lib/abilityImages";
+import { getDamageTypeName, getDamageTypeIconUrl } from "@/lib/damageImages";
 import { statIcons } from "@/lib/statIcons";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCompare } from "@/contexts/CompareContext";
@@ -250,6 +251,10 @@ export default function UnitDetail() {
                     const ability = getAbilityById(abilId);
                     if (!ability) return null;
                     const abilityIconUrl = getAbilityImageUrl(ability.icon);
+                    const damageType = ability.stats.damage_type;
+                    const damageTypeName = getDamageTypeName(damageType);
+                    const damageTypeIconUrl = getDamageTypeIconUrl(damageType);
+                    
                     return (
                       <div key={`${weaponKey}-${abilId}`} className="p-4 bg-muted/50 rounded-lg">
                         <div className="flex items-center gap-3 mb-3">
@@ -261,7 +266,20 @@ export default function UnitDetail() {
                               onError={(e) => { e.currentTarget.style.display = 'none'; }}
                             />
                           )}
-                          <h4 className="font-medium">{t(ability.name)}</h4>
+                          <div className="flex-1">
+                            <h4 className="font-medium">{t(ability.name)}</h4>
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                              {damageTypeIconUrl && (
+                                <img 
+                                  src={damageTypeIconUrl} 
+                                  alt="" 
+                                  className="h-4 w-4 object-contain"
+                                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                />
+                              )}
+                              <span>{damageTypeName} Damage</span>
+                            </div>
+                          </div>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
                           <StatRow label="Attack" value={ability.stats.attack} />
