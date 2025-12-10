@@ -1,11 +1,13 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Search } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { EncounterViewer } from "./EncounterViewer";
-import { getEncounterById, getAllEncounterIds } from "@/lib/encounters";
+import { getEncounterById, getAllEncounterIds, getEncounterWaves } from "@/lib/encounters";
+import { getEncounterIconUrl } from "@/lib/resourceImages";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -99,22 +101,39 @@ export function EncounterLookup() {
               {visibleEncounters.map(({ id, encounter }) => {
                 const encounterName = encounter?.name ? t(encounter.name) : null;
                 const displayName = encounterName && encounterName !== encounter?.name ? encounterName : null;
+                const encounterIcon = encounter?.icon;
+                const waveCount = encounter ? getEncounterWaves(encounter).length : 0;
                 
                 return (
-                  <Button
+                  <div
                     key={id}
-                    variant={selectedEncounterId === id ? "secondary" : "ghost"}
-                    className="w-full justify-start text-sm h-auto py-2"
+                    className={cn(
+                      "flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors",
+                      selectedEncounterId === id ? "bg-secondary" : "hover:bg-muted"
+                    )}
                     onClick={() => setSelectedEncounterId(id)}
                   >
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="truncate">{displayName || `Encounter ${id}`}</span>
-                      <Badge variant="outline" className="text-xs shrink-0">#{id}</Badge>
-                      {encounter?.level && (
-                        <Badge variant="secondary" className="text-xs shrink-0">Lv. {encounter.level}</Badge>
-                      )}
+                    {encounterIcon && (
+                      <img 
+                        src={getEncounterIconUrl(encounterIcon)}
+                        alt=""
+                        className="w-8 h-8 object-contain rounded shrink-0"
+                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{displayName || `Encounter ${id}`}</p>
+                      <div className="flex gap-1 flex-wrap">
+                        <Badge variant="outline" className="text-xs">#{id}</Badge>
+                        {encounter?.level && (
+                          <Badge variant="secondary" className="text-xs">Lv. {encounter.level}</Badge>
+                        )}
+                        {waveCount > 1 && (
+                          <Badge className="text-xs">{waveCount} Waves</Badge>
+                        )}
+                      </div>
                     </div>
-                  </Button>
+                  </div>
                 );
               })}
               

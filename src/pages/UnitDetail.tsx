@@ -18,6 +18,7 @@ import { getStatusEffectDisplayName, getStatusEffectColor, getStatusEffectIconUr
 import { getClassDisplayName } from "@/lib/battleConfig";
 import { getAbilityImageUrl } from "@/lib/abilityImages";
 import { getDamageTypeName, getDamageTypeIconUrl } from "@/lib/damageImages";
+import { getUnitImageUrl } from "@/lib/unitImages";
 import { statIcons } from "@/lib/statIcons";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCompare } from "@/contexts/CompareContext";
@@ -144,6 +145,14 @@ export default function UnitDetail() {
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
+          {unit.identity.icon && (
+            <img
+              src={getUnitImageUrl(unit.identity.icon) || ""}
+              alt={t(unit.identity.name)}
+              className="w-16 h-16 object-contain rounded-lg border bg-muted"
+              onError={(e) => (e.currentTarget.style.display = 'none')}
+            />
+          )}
           <div className="flex-1">
             <h1 className="text-3xl font-bold">{t(unit.identity.name)}</h1>
             <p className="text-muted-foreground">
