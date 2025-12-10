@@ -9,7 +9,8 @@ import { EncounterViewer } from "@/components/encounters/EncounterViewer";
 import { getEncounterById } from "@/lib/encounters";
 import { formatRewards, getBossStrikeName } from "@/lib/bossStrikes";
 import { getUnitById } from "@/lib/units";
-import { getEventRewardIconUrl, getMenuBackgroundUrl, getEncounterIconUrl } from "@/lib/resourceImages";
+import { getEventRewardIconUrl, getEncounterIconUrl } from "@/lib/resourceImages";
+import { getBossStrikeBackgroundFromMissionIcon, getBossStrikeFallbackName } from "@/lib/bossStrikeImages";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { BossStrike, TierInfo } from "@/types/bossStrike";
 import bsPointsIcon from "@/assets/bs_points_icon.png";
@@ -28,24 +29,29 @@ export function BossStrikeViewer({ bossStrike, bossStrikeId }: BossStrikeViewerP
   const selectedEncounter = selectedEncounterId ? getEncounterById(selectedEncounterId) : null;
   
   const bossStrikeName = getBossStrikeName(bossStrike);
-  const displayName = bossStrikeName ? t(bossStrikeName) : null;
-  const showName = displayName && displayName !== bossStrikeName;
+  const encounterDisplayName = bossStrikeName ? t(bossStrikeName) : null;
+  const fallbackName = getBossStrikeFallbackName(bossStrike.mission_icon);
+  
+  // Use encounter name if translated, otherwise fallback name, otherwise generic
+  const displayName = (encounterDisplayName && encounterDisplayName !== bossStrikeName) 
+    ? encounterDisplayName 
+    : fallbackName || `Boss Strike #${bossStrikeId}`;
+  
+  const backgroundUrl = getBossStrikeBackgroundFromMissionIcon(bossStrike.mission_icon);
 
   return (
     <div className="space-y-6">
       {/* Header with background */}
       <Card className="overflow-hidden">
-        {bossStrike.menu_bg && (
+        {backgroundUrl && (
           <div 
             className="h-32 bg-cover bg-center"
-            style={{ backgroundImage: `url(${getMenuBackgroundUrl(bossStrike.menu_bg)})` }}
+            style={{ backgroundImage: `url(${backgroundUrl})` }}
           />
         )}
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
-            <CardTitle>
-              {showName ? displayName : `Boss Strike #${bossStrikeId}`}
-            </CardTitle>
+            <CardTitle>{displayName}</CardTitle>
             <Badge variant="outline">#{bossStrikeId}</Badge>
             {tierCount > 0 && <Badge>{tierCount} Tiers</Badge>}
           </div>
