@@ -6,6 +6,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Filter, X } from "lucide-react";
 
@@ -15,6 +22,8 @@ interface UnitFiltersProps {
   selectedTags: number[];
   setSelectedTags: (tags: number[]) => void;
   allTags: number[];
+  nanopodFilter: "all" | "nanopod" | "non-nanopod";
+  setNanopodFilter: (filter: "all" | "nanopod" | "non-nanopod") => void;
 }
 
 export function UnitFilters({
@@ -23,6 +32,8 @@ export function UnitFilters({
   selectedTags,
   setSelectedTags,
   allTags,
+  nanopodFilter,
+  setNanopodFilter,
 }: UnitFiltersProps) {
   const toggleTag = (tag: number) => {
     if (selectedTags.includes(tag)) {
@@ -35,9 +46,10 @@ export function UnitFilters({
   const clearFilters = () => {
     setSearchQuery("");
     setSelectedTags([]);
+    setNanopodFilter("all");
   };
 
-  const hasFilters = searchQuery || selectedTags.length > 0;
+  const hasFilters = searchQuery || selectedTags.length > 0 || nanopodFilter !== "all";
 
   return (
     <div className="space-y-4">
@@ -51,6 +63,17 @@ export function UnitFilters({
             className="pl-10"
           />
         </div>
+
+        <Select value={nanopodFilter} onValueChange={(v) => setNanopodFilter(v as typeof nanopodFilter)}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Unit type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Units</SelectItem>
+            <SelectItem value="nanopod">Nanopod</SelectItem>
+            <SelectItem value="non-nanopod">Non-Nanopod</SelectItem>
+          </SelectContent>
+        </Select>
 
         <Popover>
           <PopoverTrigger asChild>
