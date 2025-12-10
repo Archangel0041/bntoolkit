@@ -205,11 +205,12 @@ function EncounterListSection({
     });
   }, [tierInfo]);
 
-  // Get encounters grouped by tier for selected level
-  const encountersByTier = useMemo(() => {
+  // Get encounters grouped by tier for selected level, collapsing identical tiers
+  const collapsedTierGroups = useMemo(() => {
     if (!tierInfo || !selectedLevel) return [];
     
-    return tierInfo.map((tier, tierIndex) => {
+    // First, get encounters per tier
+    const tierEncounters = tierInfo.map((tier, tierIndex) => {
       const encounters = tier.encounters
         .filter(enc => {
           const minLevel = enc.min_level ?? 1;
@@ -222,8 +223,30 @@ function EncounterListSection({
       return {
         tierIndex: tierIndex + 1,
         encounters,
+        encounterKey: encounters.join(','), // Key for comparison
       };
     }).filter(tier => tier.encounters.length > 0);
+
+    // Group consecutive tiers with same encounters
+    const groups: { tierRange: string; encounters: number[] }[] = [];
+    
+    for (const tier of tierEncounters) {
+      const lastGroup = groups[groups.length - 1];
+      
+      if (lastGroup && lastGroup.encounters.join(',') === tier.encounterKey) {
+        // Same encounters as previous tier, extend the range
+        const [startTier] = lastGroup.tierRange.split('-').map(Number);
+        lastGroup.tierRange = `${startTier}-${tier.tierIndex}`;
+      } else {
+        // New group
+        groups.push({
+          tierRange: String(tier.tierIndex),
+          encounters: tier.encounters,
+        });
+      }
+    }
+    
+    return groups;
   }, [tierInfo, selectedLevel]);
 
   // Auto-select first level range on load
@@ -260,10 +283,10 @@ function EncounterListSection({
         {/* Encounter List grouped by Tier */}
         <ScrollArea className="h-[400px]">
           <div className="space-y-4">
-            {encountersByTier.map(({ tierIndex, encounters }) => (
-              <div key={tierIndex} className="space-y-2">
+            {collapsedTierGroups.map(({ tierRange, encounters }) => (
+              <div key={tierRange} className="space-y-2">
                 <h4 className="text-sm font-semibold text-muted-foreground border-b pb-1">
-                  Tier {tierIndex}
+                  Tier {tierRange.includes('-') ? tierRange : tierRange}
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {encounters.map(encId => {
@@ -308,7 +331,7 @@ function EncounterListSection({
                 </div>
               </div>
             ))}
-            {encountersByTier.length === 0 && selectedLevel && (
+            {collapsedTierGroups.length === 0 && selectedLevel && (
               <p className="text-muted-foreground text-sm text-center py-4">
                 No encounters at this level
               </p>
