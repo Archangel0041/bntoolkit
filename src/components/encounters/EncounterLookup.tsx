@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,10 +9,15 @@ import { getEncounterById, getAllEncounterIds } from "@/lib/encounters";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLanguage } from "@/contexts/LanguageContext";
 
+const ITEMS_PER_PAGE = 50;
+
 export function EncounterLookup() {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEncounterId, setSelectedEncounterId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const allEncounters = useMemo(() => {
     const ids = getAllEncounterIds();
@@ -23,8 +28,7 @@ export function EncounterLookup() {
   }, []);
   
   const filteredEncounters = useMemo(() => {
-    const encounters = searchQuery ? allEncounters : allEncounters.slice(0, 100);
-    if (!searchQuery) return encounters;
+    if (!searchQuery) return allEncounters;
     
     const query = searchQuery.toLowerCase();
     return allEncounters.filter(({ id, encounter }) => {
@@ -33,6 +37,35 @@ export function EncounterLookup() {
       return idMatch || nameMatch;
     });
   }, [searchQuery, allEncounters, t]);
+
+  // Reset visible count when search changes
+  useEffect(() => {
+    setVisibleCount(ITEMS_PER_PAGE);
+  }, [searchQuery]);
+
+  const visibleEncounters = useMemo(() => {
+    return filteredEncounters.slice(0, visibleCount);
+  }, [filteredEncounters, visibleCount]);
+
+  const hasMore = visibleCount < filteredEncounters.length;
+
+  // Intersection observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore) {
+          setVisibleCount(prev => Math.min(prev + ITEMS_PER_PAGE, filteredEncounters.length));
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, filteredEncounters.length]);
 
   const selectedEncounter = selectedEncounterId ? getEncounterById(selectedEncounterId) : null;
 
@@ -61,9 +94,9 @@ export function EncounterLookup() {
             </Button>
           </div>
           
-          <ScrollArea className="h-[400px] border rounded-md">
+          <ScrollArea className="h-[400px] border rounded-md" ref={scrollRef}>
             <div className="p-2 space-y-1">
-              {filteredEncounters.map(({ id, encounter }) => {
+              {visibleEncounters.map(({ id, encounter }) => {
                 const encounterName = encounter?.name ? t(encounter.name) : null;
                 const displayName = encounterName && encounterName !== encounter?.name ? encounterName : null;
                 
@@ -84,12 +117,23 @@ export function EncounterLookup() {
                   </Button>
                 );
               })}
-              {filteredEncounters.length === 0 && (
+              
+              {/* Infinite scroll trigger */}
+              {hasMore && (
+                <div ref={loadMoreRef} className="py-4 text-center">
+                  <span className="text-muted-foreground text-xs">
+                    Loading more... ({visibleCount} of {filteredEncounters.length})
+                  </span>
+                </div>
+              )}
+              
+              {visibleEncounters.length === 0 && (
                 <p className="text-muted-foreground text-center py-4">No encounters found</p>
               )}
-              {!searchQuery && filteredEncounters.length === 100 && (
+              
+              {!hasMore && filteredEncounters.length > ITEMS_PER_PAGE && (
                 <p className="text-muted-foreground text-center text-xs py-2">
-                  Showing first 100 • Search to find more
+                  Showing all {filteredEncounters.length} encounters
                 </p>
               )}
             </div>

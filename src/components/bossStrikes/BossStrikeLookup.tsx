@@ -6,7 +6,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Search, ChevronDown } from "lucide-react";
 import { BossStrikeViewer } from "./BossStrikeViewer";
 import { getBossStrikeById, getAllBossStrikeIds, getBossStrikeName } from "@/lib/bossStrikes";
-import { getMenuBackgroundUrl } from "@/lib/resourceImages";
+import { getBossStrikeBackgroundUrl } from "@/lib/bossStrikeImages";
+import { getMissionIconUrl } from "@/lib/resourceImages";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +44,18 @@ export function BossStrikeLookup() {
     setIsGridOpen(false);
   };
 
+  // Get background image URL - try local first, then mission icon as fallback
+  const getBackgroundImage = (id: string, missionIcon?: string): string | undefined => {
+    const localUrl = getBossStrikeBackgroundUrl(id);
+    if (localUrl) return localUrl;
+    
+    if (missionIcon) {
+      return getMissionIconUrl(missionIcon);
+    }
+    
+    return undefined;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex gap-2 max-w-md">
@@ -69,9 +82,7 @@ export function BossStrikeLookup() {
               const displayName = encounterName ? t(encounterName) : null;
               const showName = displayName && displayName !== encounterName;
               
-              // Use menu_bg field for background
-              const backgroundKey = data.menu_bg;
-              if (backgroundKey) console.log(`Boss Strike ${id} menu_bg:`, backgroundKey);
+              const backgroundUrl = getBackgroundImage(id, data.mission_icon);
               
               return (
                 <Card 
@@ -84,8 +95,8 @@ export function BossStrikeLookup() {
                 >
                   <div 
                     className="h-28 bg-cover bg-center bg-muted relative"
-                    style={backgroundKey ? { 
-                      backgroundImage: `url(${getMenuBackgroundUrl(backgroundKey)})` 
+                    style={backgroundUrl ? { 
+                      backgroundImage: `url(${backgroundUrl})` 
                     } : undefined}
                   >
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
