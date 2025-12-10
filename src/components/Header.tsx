@@ -1,6 +1,6 @@
 import { LanguageSelector } from "./LanguageSelector";
+import { ThemeToggle } from "./ThemeToggle";
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { Sword } from "lucide-react";
 
 export function Header() {
@@ -9,9 +9,10 @@ export function Header() {
       <div className="container mx-auto flex h-14 items-center justify-between px-4">
         <Link to="/" className="flex items-center gap-2 font-bold text-xl">
           <Sword className="h-6 w-6" />
-          <span>Battle Units</span>
+          <span>Battle Nations Toolkit</span>
         </Link>
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <LanguageSelector />
         </div>
       </div>
