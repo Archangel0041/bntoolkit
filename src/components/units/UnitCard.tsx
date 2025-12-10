@@ -44,9 +44,6 @@ export function UnitCard({ unit }: UnitCardProps) {
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <h3 className="font-semibold text-sm truncate">{t(unit.identity.name)}</h3>
-                <p className="text-xs text-muted-foreground truncate">
-                  {t(unit.identity.short_name)} • ID: {unit.id}
-                </p>
               </div>
               <Button
                 variant={inCompare ? "default" : "outline"}
