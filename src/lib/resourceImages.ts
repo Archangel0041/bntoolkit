@@ -24,34 +24,88 @@ export function getMenuBackgroundUrl(backgroundKey: string): string {
   return data.publicUrl;
 }
 
-export async function uploadResourceIcon(file: File, resourceKey: string): Promise<{ success: boolean; error?: string }> {
-  const fileName = `resource_${resourceKey}.png`;
-  const { error } = await supabase.storage.from(RESOURCE_ICONS_BUCKET).upload(fileName, file, { upsert: true });
-  
-  if (error) {
-    return { success: false, error: error.message };
+export async function uploadMultipleResourceIcons(
+  files: FileList,
+  onProgress?: (current: number, total: number, fileName: string) => void
+): Promise<{ success: number; failed: number; errors: string[] }> {
+  let success = 0;
+  let failed = 0;
+  const errors: string[] = [];
+  const total = files.length;
+
+  for (let i = 0; i < total; i++) {
+    const file = files[i];
+    onProgress?.(i + 1, total, file.name);
+
+    const { error } = await supabase.storage
+      .from(RESOURCE_ICONS_BUCKET)
+      .upload(file.name, file, { upsert: true });
+
+    if (error) {
+      failed++;
+      errors.push(`${file.name}: ${error.message}`);
+    } else {
+      success++;
+    }
   }
-  return { success: true };
+
+  return { success, failed, errors };
 }
 
-export async function uploadEventRewardIcon(file: File): Promise<{ success: boolean; error?: string }> {
-  const fileName = file.name;
-  const { error } = await supabase.storage.from(EVENT_REWARD_ICONS_BUCKET).upload(fileName, file, { upsert: true });
-  
-  if (error) {
-    return { success: false, error: error.message };
+export async function uploadMultipleEventRewardIcons(
+  files: FileList,
+  onProgress?: (current: number, total: number, fileName: string) => void
+): Promise<{ success: number; failed: number; errors: string[] }> {
+  let success = 0;
+  let failed = 0;
+  const errors: string[] = [];
+  const total = files.length;
+
+  for (let i = 0; i < total; i++) {
+    const file = files[i];
+    onProgress?.(i + 1, total, file.name);
+
+    const { error } = await supabase.storage
+      .from(EVENT_REWARD_ICONS_BUCKET)
+      .upload(file.name, file, { upsert: true });
+
+    if (error) {
+      failed++;
+      errors.push(`${file.name}: ${error.message}`);
+    } else {
+      success++;
+    }
   }
-  return { success: true };
+
+  return { success, failed, errors };
 }
 
-export async function uploadMenuBackground(file: File): Promise<{ success: boolean; error?: string }> {
-  const fileName = file.name;
-  const { error } = await supabase.storage.from(MENU_BACKGROUNDS_BUCKET).upload(fileName, file, { upsert: true });
-  
-  if (error) {
-    return { success: false, error: error.message };
+export async function uploadMultipleMenuBackgrounds(
+  files: FileList,
+  onProgress?: (current: number, total: number, fileName: string) => void
+): Promise<{ success: number; failed: number; errors: string[] }> {
+  let success = 0;
+  let failed = 0;
+  const errors: string[] = [];
+  const total = files.length;
+
+  for (let i = 0; i < total; i++) {
+    const file = files[i];
+    onProgress?.(i + 1, total, file.name);
+
+    const { error } = await supabase.storage
+      .from(MENU_BACKGROUNDS_BUCKET)
+      .upload(file.name, file, { upsert: true });
+
+    if (error) {
+      failed++;
+      errors.push(`${file.name}: ${error.message}`);
+    } else {
+      success++;
+    }
   }
-  return { success: true };
+
+  return { success, failed, errors };
 }
 
 export async function listResourceIcons(): Promise<string[]> {

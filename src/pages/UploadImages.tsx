@@ -8,24 +8,42 @@ import { uploadMultipleImages, listUploadedImages } from "@/lib/unitImages";
 import { uploadMultipleAbilityImages, listUploadedAbilityImages } from "@/lib/abilityImages";
 import { uploadMultipleDamageImages, listUploadedDamageImages } from "@/lib/damageImages";
 import { uploadMultipleStatusImages, listUploadedStatusImages } from "@/lib/statusEffects";
-import { Upload, CheckCircle, XCircle, FolderOpen, Users, Swords, Shield, Zap } from "lucide-react";
+import { 
+  uploadMultipleResourceIcons, 
+  uploadMultipleEventRewardIcons, 
+  uploadMultipleMenuBackgrounds,
+  listResourceIcons,
+  listEventRewardIcons,
+  listMenuBackgrounds 
+} from "@/lib/resourceImages";
+import { Upload, CheckCircle, XCircle, FolderOpen, Users, Swords, Shield, Zap, Coins, Gift, Image } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 
-type UploadType = "units" | "abilities" | "damage" | "status";
+type UploadType = "units" | "abilities" | "damage" | "status" | "resources" | "eventRewards" | "menuBackgrounds";
 
-const UPLOAD_CONFIG = {
+const UPLOAD_CONFIG: Record<UploadType, { 
+  fn: (files: FileList, onProgress?: (current: number, total: number, fileName: string) => void) => Promise<{ success: number; failed: number; errors: string[] }>;
+  listFn: () => Promise<string[]>;
+  label: string;
+}> = {
   units: { fn: uploadMultipleImages, listFn: listUploadedImages, label: "unit" },
   abilities: { fn: uploadMultipleAbilityImages, listFn: listUploadedAbilityImages, label: "ability" },
   damage: { fn: uploadMultipleDamageImages, listFn: listUploadedDamageImages, label: "damage" },
   status: { fn: uploadMultipleStatusImages, listFn: listUploadedStatusImages, label: "status" },
+  resources: { fn: uploadMultipleResourceIcons, listFn: listResourceIcons, label: "resource" },
+  eventRewards: { fn: uploadMultipleEventRewardIcons, listFn: listEventRewardIcons, label: "event reward" },
+  menuBackgrounds: { fn: uploadMultipleMenuBackgrounds, listFn: listMenuBackgrounds, label: "menu background" },
 };
 
 export default function UploadImages() {
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, fileName: "" });
   const [results, setResults] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
-  const [uploadedCount, setUploadedCount] = useState<Record<UploadType, number | null>>({ units: null, abilities: null, damage: null, status: null });
+  const [uploadedCount, setUploadedCount] = useState<Record<UploadType, number | null>>({ 
+    units: null, abilities: null, damage: null, status: null, 
+    resources: null, eventRewards: null, menuBackgrounds: null 
+  });
   const [activeTab, setActiveTab] = useState<UploadType>("units");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -71,7 +89,7 @@ export default function UploadImages() {
           <div>
             <h1 className="text-3xl font-bold">Upload Images</h1>
             <p className="text-muted-foreground">
-              Upload unit, ability, damage, and status effect images.
+              Upload unit, ability, damage, status, resource, and event images.
             </p>
           </div>
           <Button asChild variant="outline">
@@ -80,7 +98,7 @@ export default function UploadImages() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as UploadType); setResults(null); }}>
-          <TabsList className="grid w-full max-w-2xl grid-cols-4">
+          <TabsList className="flex flex-wrap h-auto gap-1">
             <TabsTrigger value="units" className="gap-2">
               <Users className="h-4 w-4" />
               Units
@@ -96,6 +114,18 @@ export default function UploadImages() {
             <TabsTrigger value="status" className="gap-2">
               <Zap className="h-4 w-4" />
               Status
+            </TabsTrigger>
+            <TabsTrigger value="resources" className="gap-2">
+              <Coins className="h-4 w-4" />
+              Resources
+            </TabsTrigger>
+            <TabsTrigger value="eventRewards" className="gap-2">
+              <Gift className="h-4 w-4" />
+              Event Rewards
+            </TabsTrigger>
+            <TabsTrigger value="menuBackgrounds" className="gap-2">
+              <Image className="h-4 w-4" />
+              Backgrounds
             </TabsTrigger>
           </TabsList>
 
@@ -132,7 +162,7 @@ export default function UploadImages() {
           <TabsContent value="damage" className="space-y-6">
             <UploadCard
               title="Damage Icon Upload"
-              description={<>File names should match damage type names (e.g., <code className="bg-muted px-1 rounded">damage_bullet.png</code>, <code className="bg-muted px-1 rounded">damage_bullet_resistant.png</code>).</>}
+              description={<>File names should match damage type names (e.g., <code className="bg-muted px-1 rounded">damage_bullet.png</code>).</>}
               fileInputRef={fileInputRef}
               isUploading={isUploading}
               onUpload={handleFileSelect}
@@ -147,13 +177,58 @@ export default function UploadImages() {
           <TabsContent value="status" className="space-y-6">
             <UploadCard
               title="Status Effect Icon Upload"
-              description={<>File names should match status effect ui_icon names (e.g., <code className="bg-muted px-1 rounded">bn_icon_poison.png</code>, <code className="bg-muted px-1 rounded">bn_icon_fire.png</code>).</>}
+              description={<>File names should match status effect ui_icon names (e.g., <code className="bg-muted px-1 rounded">bn_icon_poison.png</code>).</>}
               fileInputRef={fileInputRef}
               isUploading={isUploading}
               onUpload={handleFileSelect}
               onCheckCount={() => checkUploadedImages("status")}
               count={uploadedCount.status}
               countLabel="status icons"
+              progress={progress}
+              results={results}
+            />
+          </TabsContent>
+
+          <TabsContent value="resources" className="space-y-6">
+            <UploadCard
+              title="Resource Icon Upload"
+              description={<>File names should use format <code className="bg-muted px-1 rounded">resource_lumber.png</code>, <code className="bg-muted px-1 rounded">resource_concrete.png</code>, etc.</>}
+              fileInputRef={fileInputRef}
+              isUploading={isUploading}
+              onUpload={handleFileSelect}
+              onCheckCount={() => checkUploadedImages("resources")}
+              count={uploadedCount.resources}
+              countLabel="resource icons"
+              progress={progress}
+              results={results}
+            />
+          </TabsContent>
+
+          <TabsContent value="eventRewards" className="space-y-6">
+            <UploadCard
+              title="Event Reward Icon Upload"
+              description={<>File names should match reward_image values (e.g., <code className="bg-muted px-1 rounded">event_reward_concrete.png</code>, <code className="bg-muted px-1 rounded">event_reward_gears.png</code>).</>}
+              fileInputRef={fileInputRef}
+              isUploading={isUploading}
+              onUpload={handleFileSelect}
+              onCheckCount={() => checkUploadedImages("eventRewards")}
+              count={uploadedCount.eventRewards}
+              countLabel="event reward icons"
+              progress={progress}
+              results={results}
+            />
+          </TabsContent>
+
+          <TabsContent value="menuBackgrounds" className="space-y-6">
+            <UploadCard
+              title="Menu Background Upload"
+              description={<>File names should match menu_background values from boss strikes (e.g., <code className="bg-muted px-1 rounded">boss_strike_bg_1.png</code>).</>}
+              fileInputRef={fileInputRef}
+              isUploading={isUploading}
+              onUpload={handleFileSelect}
+              onCheckCount={() => checkUploadedImages("menuBackgrounds")}
+              count={uploadedCount.menuBackgrounds}
+              countLabel="menu backgrounds"
               progress={progress}
               results={results}
             />
@@ -170,29 +245,26 @@ export default function UploadImages() {
                 <h4 className="font-medium mb-2">Unit Images</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li><code>air_ancient_fragment_icon.png</code></li>
-                  <li><code>army_view_air_ancient_fragment.png</code></li>
                 </ul>
               </div>
               <div>
                 <h4 className="font-medium mb-2">Ability Icons</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li><code>ancient_lasershot_icon.png</code></li>
-                  <li><code>chem_cloud_icon.png</code></li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-medium mb-2">Damage Icons</h4>
+                <h4 className="font-medium mb-2">Resource Icons</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
-                  <li><code>damage_bullet.png</code></li>
-                  <li><code>damage_bullet_resistant.png</code></li>
+                  <li><code>resource_lumber.png</code></li>
+                  <li><code>resource_concrete.png</code></li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-medium mb-2">Status Icons</h4>
+                <h4 className="font-medium mb-2">Event Rewards</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
-                  <li><code>bn_icon_poison.png</code></li>
-                  <li><code>bn_icon_fire.png</code></li>
-                  <li><code>bn_icon_stun.png</code></li>
+                  <li><code>event_reward_concrete.png</code></li>
+                  <li><code>event_reward_gears.png</code></li>
                 </ul>
               </div>
             </div>
