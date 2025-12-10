@@ -19,6 +19,7 @@ import { getClassDisplayName } from "@/lib/battleConfig";
 import { getAbilityImageUrl } from "@/lib/abilityImages";
 import { getDamageTypeName, getDamageTypeIconUrl } from "@/lib/damageImages";
 import { getUnitImageUrl } from "@/lib/unitImages";
+import { getResourceIconUrl } from "@/lib/resourceImages";
 import { statIcons } from "@/lib/statIcons";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCompare } from "@/contexts/CompareContext";
@@ -361,7 +362,18 @@ export default function UnitDetail() {
             <StatSection title="Build Requirements" icon={<Coins className="h-4 w-4" />} defaultOpen>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {Object.entries(unit.requirements.cost).map(([resource, amount]) => (
-                  <StatRow key={resource} label={capitalize(resource)} value={amount.toLocaleString()} />
+                  <div key={resource} className="flex items-center justify-between py-1">
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      <img 
+                        src={getResourceIconUrl(resource)} 
+                        alt="" 
+                        className="h-5 w-5 object-contain"
+                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                      />
+                      {capitalize(resource)}
+                    </span>
+                    <span className="font-medium">{amount.toLocaleString()}</span>
+                  </div>
                 ))}
                 <StatRow 
                   label="Build Time" 
@@ -376,7 +388,18 @@ export default function UnitDetail() {
             <StatSection title="Healing" icon={<Wrench className="h-4 w-4" />} defaultOpen>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {Object.entries(unit.healing.heal_cost).map(([resource, amount]) => (
-                  <StatRow key={resource} label={capitalize(resource)} value={amount.toLocaleString()} />
+                  <div key={resource} className="flex items-center justify-between py-1">
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      <img 
+                        src={getResourceIconUrl(resource)} 
+                        alt="" 
+                        className="h-5 w-5 object-contain"
+                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                      />
+                      {capitalize(resource)}
+                    </span>
+                    <span className="font-medium">{amount.toLocaleString()}</span>
+                  </div>
                 ))}
                 <StatRow 
                   label="Heal Time" 
