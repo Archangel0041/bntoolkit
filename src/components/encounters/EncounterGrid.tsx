@@ -48,7 +48,7 @@ export function EncounterGrid({ units, showPlayerUnits, compact = false }: Encou
     return (
       <Link
         key={gridId}
-        to={`/units/${unit.unit_id}`}
+        to={`/unit/${unit.unit_id}`}
         className={cn(
           slotSize,
           "border rounded-md flex items-center justify-center overflow-hidden transition-all hover:scale-105 hover:z-10 relative group",
