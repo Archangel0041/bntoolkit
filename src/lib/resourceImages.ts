@@ -21,7 +21,8 @@ export function getEventRewardIconUrl(rewardImage: string): string {
 }
 
 export function getMenuBackgroundUrl(backgroundKey: string): string {
-  const fileName = `${backgroundKey}.png`;
+  // Handle cases where extension may or may not be included
+  const fileName = backgroundKey.endsWith('.png') ? backgroundKey : `${backgroundKey}.png`;
   const { data } = supabase.storage.from(MENU_BACKGROUNDS_BUCKET).getPublicUrl(fileName);
   return data.publicUrl;
 }
