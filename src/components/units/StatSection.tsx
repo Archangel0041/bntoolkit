@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getDamageResistanceIconUrl } from "@/lib/damageImages";
 
 interface StatSectionProps {
   title: string;
@@ -50,24 +51,47 @@ interface DamageModsGridProps {
 }
 
 export function DamageModsGrid({ mods, title }: DamageModsGridProps) {
-  const elements = ["cold", "crushing", "explosive", "fire", "piercing"];
+  const elements: Array<{ key: keyof typeof mods; label: string }> = [
+    { key: "cold", label: "Cold" },
+    { key: "crushing", label: "Crushing" },
+    { key: "explosive", label: "Explosive" },
+    { key: "fire", label: "Fire" },
+    { key: "piercing", label: "Piercing" },
+  ];
   
   return (
     <div>
       <h4 className="font-medium mb-2">{title}</h4>
       <div className="grid grid-cols-5 gap-2 text-center text-sm">
-        {elements.map((elem) => (
-          <div key={elem} className="space-y-1">
-            <div className="text-muted-foreground capitalize">{elem}</div>
-            <div className={cn(
-              "font-medium",
-              mods[elem] !== undefined && mods[elem] < 1 && "text-green-600 dark:text-green-400",
-              mods[elem] !== undefined && mods[elem] > 1 && "text-destructive"
-            )}>
-              {mods[elem] !== undefined ? `${(mods[elem] * 100).toFixed(0)}%` : "-"}
+        {elements.map(({ key, label }) => {
+          const value = mods[key];
+          const isResistant = value !== undefined && value < 1;
+          const isVulnerable = value !== undefined && value > 1;
+          const iconUrl = getDamageResistanceIconUrl(key, isResistant, isVulnerable);
+          
+          return (
+            <div key={key} className="space-y-1">
+              <div className="flex flex-col items-center gap-1">
+                {iconUrl && (
+                  <img 
+                    src={iconUrl} 
+                    alt={label} 
+                    className="h-8 w-8 object-contain"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                )}
+                <span className="text-muted-foreground text-xs">{label}</span>
+              </div>
+              <div className={cn(
+                "font-medium",
+                isResistant && "text-green-600 dark:text-green-400",
+                isVulnerable && "text-destructive"
+              )}>
+                {value !== undefined ? `${(value * 100).toFixed(0)}%` : "-"}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

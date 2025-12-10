@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCompare } from "@/contexts/CompareContext";
 import { UnitImage } from "./UnitImage";
-import { getClassDisplayName, getClassIcon } from "@/lib/battleConfig";
+import { getClassDisplayName } from "@/lib/battleConfig";
+import { statIcons } from "@/lib/statIcons";
 import type { ParsedUnit } from "@/types/units";
-import { Heart, Zap, Shield, Plus, Check, Swords, Eye, Target } from "lucide-react";
+import { Plus, Check } from "lucide-react";
 import { Link } from "react-router-dom";
 import premiumRays from "@/assets/premium_rays.png";
 
@@ -94,27 +95,27 @@ export function UnitCard({ unit }: UnitCardProps) {
             {stats && (
               <div className="grid grid-cols-4 gap-x-2 gap-y-1 mt-2 text-xs">
                 <span className="flex items-center gap-1" title="HP">
-                  <Heart className="h-3 w-3 text-destructive" />
+                  <img src={statIcons.hp} alt="" className="h-3 w-3 object-contain" />
                   {stats.hp}
                 </span>
                 <span className="flex items-center gap-1" title="Power">
-                  <Zap className="h-3 w-3 text-yellow-500" />
+                  <img src={statIcons.power} alt="" className="h-3 w-3 object-contain" />
                   {stats.power}
                 </span>
                 <span className="flex items-center gap-1" title="Defense">
-                  <Shield className="h-3 w-3 text-blue-500" />
+                  <img src={statIcons.defense} alt="" className="h-3 w-3 object-contain" />
                   {stats.defense}
                 </span>
                 <span className="flex items-center gap-1" title="Dodge">
-                  <Eye className="h-3 w-3 text-purple-500" />
+                  <img src={statIcons.dodge} alt="" className="h-3 w-3 object-contain" />
                   {stats.dodge}
                 </span>
                 <span className="flex items-center gap-1" title="Bravery">
-                  <Swords className="h-3 w-3 text-orange-500" />
+                  <img src={statIcons.bravery} alt="" className="h-3 w-3 object-contain" />
                   {stats.bravery}
                 </span>
                 <span className="flex items-center gap-1" title="Critical">
-                  <Target className="h-3 w-3 text-red-500" />
+                  <img src={statIcons.critical} alt="" className="h-3 w-3 object-contain" />
                   {stats.critical}
                 </span>
               </div>

@@ -12,6 +12,15 @@ const DAMAGE_TYPE_ICONS: Record<number, string> = {
   6: "damage_torpedo",     // Torpedo
 };
 
+// Resistance type to icon name mapping
+const RESISTANCE_ICONS: Record<string, { normal: string; resistant: string; vulnerable: string }> = {
+  cold: { normal: "damage_cold", resistant: "damage_cold_resistant", vulnerable: "damage_cold_vulnerable" },
+  crushing: { normal: "damage_crushing", resistant: "damage_crushing_resistant", vulnerable: "damage_crushing_vulnerable" },
+  explosive: { normal: "damage_shell", resistant: "damage_shell_resistant", vulnerable: "damage_shell_vulnerable" },
+  fire: { normal: "damage_fire", resistant: "damage_fire_resistant", vulnerable: "damage_fire_vulnerable" },
+  piercing: { normal: "damage_bullet", resistant: "damage_bullet_resistant", vulnerable: "damage_bullet_vulnerable" },
+};
+
 export function getDamageTypeName(damageType: number): string {
   const names: Record<number, string> = {
     1: "Bullet",
@@ -27,6 +36,25 @@ export function getDamageTypeName(damageType: number): string {
 export function getDamageTypeIconUrl(damageType: number): string | null {
   const iconName = DAMAGE_TYPE_ICONS[damageType];
   if (!iconName) return null;
+  
+  const { data } = supabase.storage
+    .from(BUCKET_NAME)
+    .getPublicUrl(`${iconName}.png`);
+  
+  return data.publicUrl;
+}
+
+export function getDamageResistanceIconUrl(
+  resistanceType: string, 
+  isResistant: boolean, 
+  isVulnerable: boolean
+): string | null {
+  const icons = RESISTANCE_ICONS[resistanceType];
+  if (!icons) return null;
+  
+  let iconName = icons.normal;
+  if (isResistant) iconName = icons.resistant;
+  else if (isVulnerable) iconName = icons.vulnerable;
   
   const { data } = supabase.storage
     .from(BUCKET_NAME)
