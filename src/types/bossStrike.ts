@@ -40,7 +40,7 @@ export interface BossStrike {
   guild_weights?: GuildWeight[];
   mission_icon?: string;
   tier_info?: TierInfo[];
-  menu_background?: string;
+  menu_bg?: string;
   name?: string;
 }
 

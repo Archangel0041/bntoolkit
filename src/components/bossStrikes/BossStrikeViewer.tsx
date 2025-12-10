@@ -33,10 +33,10 @@ export function BossStrikeViewer({ bossStrike, bossStrikeId }: BossStrikeViewerP
     <div className="space-y-6">
       {/* Header with background */}
       <Card className="overflow-hidden">
-        {bossStrike.menu_background && (
+        {bossStrike.menu_bg && (
           <div 
             className="h-32 bg-cover bg-center"
-            style={{ backgroundImage: `url(${getMenuBackgroundUrl(bossStrike.menu_background)})` }}
+            style={{ backgroundImage: `url(${getMenuBackgroundUrl(bossStrike.menu_bg)})` }}
           />
         )}
         <CardHeader>

@@ -69,8 +69,8 @@ export function BossStrikeLookup() {
               const displayName = encounterName ? t(encounterName) : null;
               const showName = displayName && displayName !== encounterName;
               
-              // Use mission_icon as the background key (it's like "npc_silverwolves_scientist_boss_mission")
-              const backgroundKey = data.menu_background || data.mission_icon;
+              // Use menu_bg field for background
+              const backgroundKey = data.menu_bg;
               
               return (
                 <Card 
