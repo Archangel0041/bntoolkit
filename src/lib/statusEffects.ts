@@ -46,10 +46,30 @@ export function getFamilyFromEffectId(effectId: number): StatusEffectFamily | un
   return getStatusEffectFamily(effect.family);
 }
 
+// Fallback names for status effects that might not have localization
+const FALLBACK_NAMES: Record<string, string> = {
+  se_stun: "Stun",
+  se_poison: "Poison",
+  se_frozen: "Frozen",
+  se_plague: "Plague",
+  se_fire: "Fire",
+  se_flammable: "Flammable",
+  se_breach: "Breach",
+  se_shell: "Shell",
+  se_cold: "Cold",
+  se_shatter: "Shatter",
+  se_quake: "Quake",
+};
+
 // For immunities (which use family IDs directly)
 export function getStatusEffectDisplayName(familyId: number): string {
   const family = getStatusEffectFamily(familyId);
-  return family?.display_name || `Effect #${familyId}`;
+  if (!family) return `Effect #${familyId}`;
+  return family.display_name;
+}
+
+export function getStatusEffectFallbackName(displayName: string): string {
+  return FALLBACK_NAMES[displayName] || displayName;
 }
 
 export function getStatusEffectColor(familyId: number): string {
