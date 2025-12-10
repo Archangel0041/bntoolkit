@@ -16,12 +16,13 @@ import { getUnitById } from "@/lib/units";
 import { getAbilityById } from "@/lib/abilities";
 import { getStatusEffectDisplayName, getStatusEffectColor } from "@/lib/statusEffects";
 import { getClassDisplayName } from "@/lib/battleConfig";
+import { getAbilityImageUrl } from "@/lib/abilityImages";
+import { statIcons } from "@/lib/statIcons";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCompare } from "@/contexts/CompareContext";
 import { cn } from "@/lib/utils";
 import { 
-  ArrowLeft, Heart, Zap, Shield, Target, Eye, Swords, 
-  Clock, Coins, Wrench, Plus, Check, Activity
+  ArrowLeft, Swords, Clock, Coins, Wrench, Plus, Check, Activity, Shield
 } from "lucide-react";
 
 function formatDuration(seconds: number): string {
@@ -42,11 +43,11 @@ interface StatWithChangeProps {
   label: string;
   value: number | string;
   prevValue?: number | string;
-  icon?: React.ReactNode;
+  iconSrc?: string;
   suffix?: string;
 }
 
-function StatWithChange({ label, value, prevValue, icon, suffix = "" }: StatWithChangeProps) {
+function StatWithChange({ label, value, prevValue, iconSrc, suffix = "" }: StatWithChangeProps) {
   const numValue = typeof value === "number" ? value : parseFloat(value);
   const numPrevValue = prevValue !== undefined ? (typeof prevValue === "number" ? prevValue : parseFloat(prevValue as string)) : undefined;
   
@@ -54,14 +55,16 @@ function StatWithChange({ label, value, prevValue, icon, suffix = "" }: StatWith
   const isIncrease = hasChange && numValue > numPrevValue!;
   
   return (
-    <div className="flex justify-between py-1">
-      <span className="text-muted-foreground">{label}</span>
+    <div className="flex justify-between items-center py-1">
+      <span className="text-muted-foreground flex items-center gap-2">
+        {iconSrc && <img src={iconSrc} alt="" className="h-5 w-5 object-contain" />}
+        {label}
+      </span>
       <span className={cn(
-        "flex items-center gap-1",
+        "flex items-center gap-1 font-medium",
         hasChange && isIncrease && "text-green-600 dark:text-green-400",
         hasChange && !isIncrease && "text-red-600 dark:text-red-400"
       )}>
-        {icon}
         {value}{suffix}
         {hasChange && (
           <span className="text-xs ml-1">
@@ -182,16 +185,16 @@ export default function UnitDetail() {
           {stats && (
             <StatSection title="Main Stats" icon={<Activity className="h-4 w-4" />} defaultOpen>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <StatWithChange label="HP" value={stats.hp} prevValue={prevStats?.hp} icon={<Heart className="h-4 w-4 text-destructive" />} />
-                <StatWithChange label="Power" value={stats.power} prevValue={prevStats?.power} icon={<Zap className="h-4 w-4 text-yellow-500" />} />
-                <StatWithChange label="PV" value={stats.pv} prevValue={prevStats?.pv} icon={<Shield className="h-4 w-4 text-blue-500" />} />
-                <StatWithChange label="Accuracy" value={stats.accuracy} prevValue={prevStats?.accuracy} icon={<Target className="h-4 w-4" />} />
-                <StatWithChange label="Defense" value={stats.defense} prevValue={prevStats?.defense} />
-                <StatWithChange label="Dodge" value={stats.dodge} prevValue={prevStats?.dodge} icon={<Eye className="h-4 w-4" />} />
-                <StatWithChange label="Bravery" value={stats.bravery} prevValue={prevStats?.bravery} />
-                <StatWithChange label="Critical" value={stats.critical} prevValue={prevStats?.critical} suffix="%" />
-                <StatRow label="Ability Slots" value={stats.ability_slots} />
-                {stats.armor_hp && <StatWithChange label="Armor HP" value={stats.armor_hp} prevValue={prevStats?.armor_hp} />}
+                <StatWithChange label="HP" value={stats.hp} prevValue={prevStats?.hp} iconSrc={statIcons.hp} />
+                <StatWithChange label="Power" value={stats.power} prevValue={prevStats?.power} iconSrc={statIcons.power} />
+                <StatWithChange label="PV" value={stats.pv} prevValue={prevStats?.pv} iconSrc={statIcons.pv} />
+                <StatWithChange label="Accuracy" value={stats.accuracy} prevValue={prevStats?.accuracy} iconSrc={statIcons.accuracy} />
+                <StatWithChange label="Defense" value={stats.defense} prevValue={prevStats?.defense} iconSrc={statIcons.defense} />
+                <StatWithChange label="Dodge" value={stats.dodge} prevValue={prevStats?.dodge} iconSrc={statIcons.dodge} />
+                <StatWithChange label="Bravery" value={stats.bravery} prevValue={prevStats?.bravery} iconSrc={statIcons.bravery} />
+                <StatWithChange label="Critical" value={stats.critical} prevValue={prevStats?.critical} iconSrc={statIcons.critical} suffix="%" />
+                <StatWithChange label="Ability Slots" value={stats.ability_slots} prevValue={prevStats?.ability_slots} iconSrc={statIcons.ability_slots} />
+                {stats.armor_hp && <StatWithChange label="Armor HP" value={stats.armor_hp} prevValue={prevStats?.armor_hp} iconSrc={statIcons.armor_hp} />}
               </div>
               {unit.statsConfig?.size && (
                 <div className="mt-4 pt-4 border-t">
@@ -204,7 +207,7 @@ export default function UnitDetail() {
 
           {/* Damage & Armor */}
           {stats && (stats.damage_mods || stats.armor_damage_mods) && (
-            <StatSection title="Damage & Armor Modifiers" icon={<Swords className="h-4 w-4" />} defaultOpen>
+            <StatSection title="Damage & Armor Modifiers" icon={<img src={statIcons.damage_mods} alt="" className="h-4 w-4" />} defaultOpen>
               <div className="space-y-4">
                 {stats.damage_mods && (
                   <DamageModsGrid mods={stats.damage_mods} title="Damage Resistance" />
@@ -246,9 +249,20 @@ export default function UnitDetail() {
                   weapon.abilities.map((abilId) => {
                     const ability = getAbilityById(abilId);
                     if (!ability) return null;
+                    const abilityIconUrl = getAbilityImageUrl(ability.icon);
                     return (
                       <div key={`${weaponKey}-${abilId}`} className="p-4 bg-muted/50 rounded-lg">
-                        <h4 className="font-medium mb-2">{t(ability.name)}</h4>
+                        <div className="flex items-center gap-3 mb-3">
+                          {abilityIconUrl && (
+                            <img 
+                              src={abilityIconUrl} 
+                              alt="" 
+                              className="h-10 w-10 rounded object-cover"
+                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                            />
+                          )}
+                          <h4 className="font-medium">{t(ability.name)}</h4>
+                        </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
                           <StatRow label="Attack" value={ability.stats.attack} />
                           <StatRow label="Crit %" value={`${ability.stats.critical_hit_percent}%`} />
