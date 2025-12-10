@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EncounterViewer } from "@/components/encounters/EncounterViewer";
-import { getEncounterById } from "@/lib/encounters";
+import { getEncounterById, getEncounterWaves } from "@/lib/encounters";
 import { formatRewards, getBossStrikeName } from "@/lib/bossStrikes";
 import { getUnitById } from "@/lib/units";
 import { getEventRewardIconUrl, getEncounterIconUrl } from "@/lib/resourceImages";
@@ -295,6 +295,7 @@ function EncounterListSection({
                     const encounterName = encounter?.name ? t(encounter.name) : null;
                     const displayName = encounterName && encounterName !== encounter?.name ? encounterName : null;
                     const encounterIcon = encounter?.icon;
+                    const waveCount = encounter ? getEncounterWaves(encounter).length : 0;
 
                     return (
                       <Card
@@ -320,6 +321,9 @@ function EncounterListSection({
                                 <Badge variant="outline" className="text-xs">#{encId}</Badge>
                                 {encounter?.level && (
                                   <Badge variant="secondary" className="text-xs">Lv. {encounter.level}</Badge>
+                                )}
+                                {waveCount > 1 && (
+                                  <Badge className="text-xs">{waveCount} Waves</Badge>
                                 )}
                               </div>
                             </div>
