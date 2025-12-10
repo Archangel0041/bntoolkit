@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { getUnitById } from "@/lib/units";
 import { getAbilityById } from "@/lib/abilities";
-import { getStatusEffectDisplayName, getStatusEffectColor } from "@/lib/statusEffects";
+import { getStatusEffectDisplayName, getStatusEffectColor, getStatusEffectIconUrl } from "@/lib/statusEffects";
 import { getClassDisplayName } from "@/lib/battleConfig";
 import { getAbilityImageUrl } from "@/lib/abilityImages";
 import { getDamageTypeName, getDamageTypeIconUrl } from "@/lib/damageImages";
@@ -227,19 +227,27 @@ export default function UnitDetail() {
           {/* Status Immunities */}
           {unit.statsConfig?.status_effect_immunities && unit.statsConfig.status_effect_immunities.length > 0 && (
             <StatSection title="Status Effect Immunities" icon={<Shield className="h-4 w-4" />} defaultOpen>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-3">
                 {unit.statsConfig.status_effect_immunities.map((immunityId) => {
                   const displayName = getStatusEffectDisplayName(immunityId);
                   const color = getStatusEffectColor(immunityId);
+                  const iconUrl = getStatusEffectIconUrl(immunityId);
                   return (
-                    <Badge 
+                    <div 
                       key={immunityId} 
-                      variant="outline"
-                      className="border-2"
-                      style={{ borderColor: color, color }}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg border-2"
+                      style={{ borderColor: color, backgroundColor: `${color}15` }}
                     >
-                      {t(displayName)}
-                    </Badge>
+                      {iconUrl && (
+                        <img 
+                          src={iconUrl} 
+                          alt="" 
+                          className="h-5 w-5 object-contain"
+                          onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                        />
+                      )}
+                      <span style={{ color }}>{t(displayName)}</span>
+                    </div>
                   );
                 })}
               </div>
@@ -296,6 +304,37 @@ export default function UnitDetail() {
                             <StatRow label="Armor Pierce" value={`${ability.stats.armor_piercing_percent}%`} />
                           )}
                         </div>
+                        {ability.stats.status_effects && Object.keys(ability.stats.status_effects).length > 0 && (
+                          <div className="mt-3 pt-3 border-t">
+                            <p className="text-xs text-muted-foreground mb-2">Inflicts Status Effects:</p>
+                            <div className="flex flex-wrap gap-2">
+                              {Object.entries(ability.stats.status_effects).map(([effectId, chance]) => {
+                                const id = parseInt(effectId);
+                                const displayName = getStatusEffectDisplayName(id);
+                                const color = getStatusEffectColor(id);
+                                const iconUrl = getStatusEffectIconUrl(id);
+                                return (
+                                  <div 
+                                    key={effectId} 
+                                    className="flex items-center gap-1.5 px-2 py-1 rounded text-xs"
+                                    style={{ backgroundColor: `${color}20`, color }}
+                                  >
+                                    {iconUrl && (
+                                      <img 
+                                        src={iconUrl} 
+                                        alt="" 
+                                        className="h-4 w-4 object-contain"
+                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                      />
+                                    )}
+                                    <span>{t(displayName)}</span>
+                                    <span className="opacity-70">({chance}%)</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })
