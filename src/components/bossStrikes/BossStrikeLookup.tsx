@@ -6,7 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Search, ChevronDown } from "lucide-react";
 import { BossStrikeViewer } from "./BossStrikeViewer";
 import { getBossStrikeById, getAllBossStrikeIds, getBossStrikeName } from "@/lib/bossStrikes";
-import { getBossStrikeBackgroundUrl } from "@/lib/bossStrikeImages";
+import { getBossStrikeBackgroundFromMissionIcon, getBossStrikeFallbackName } from "@/lib/bossStrikeImages";
 import { getMissionIconUrl } from "@/lib/resourceImages";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
@@ -32,7 +32,10 @@ export function BossStrikeLookup() {
     return allBossStrikes.filter(bs => {
       const idMatch = bs.id.includes(query);
       const nameMatch = bs.encounterName && t(bs.encounterName).toLowerCase().includes(query);
-      return idMatch || nameMatch;
+      // Also search by fallback name
+      const fallbackName = getBossStrikeFallbackName(bs.data.mission_icon);
+      const fallbackMatch = fallbackName && fallbackName.toLowerCase().includes(query);
+      return idMatch || nameMatch || fallbackMatch;
     });
   }, [searchQuery, allBossStrikes, t]);
 
@@ -44,16 +47,30 @@ export function BossStrikeLookup() {
     setIsGridOpen(false);
   };
 
-  // Get background image URL - try local first, then mission icon as fallback
-  const getBackgroundImage = (id: string, missionIcon?: string): string | undefined => {
-    const localUrl = getBossStrikeBackgroundUrl(id);
-    if (localUrl) return localUrl;
+  // Get background image URL from mission_icon
+  const getBackgroundImage = (missionIcon?: string): string | undefined => {
+    const bgFromMissionIcon = getBossStrikeBackgroundFromMissionIcon(missionIcon);
+    if (bgFromMissionIcon) return bgFromMissionIcon;
     
+    // Fallback to mission icon from storage
     if (missionIcon) {
       return getMissionIconUrl(missionIcon);
     }
     
     return undefined;
+  };
+
+  // Get display name - use encounter name, fallback name, or generic
+  const getDisplayName = (encounterName: string | undefined, missionIcon?: string, id?: string): string => {
+    if (encounterName) {
+      const translated = t(encounterName);
+      if (translated !== encounterName) return translated;
+    }
+    
+    const fallbackName = getBossStrikeFallbackName(missionIcon);
+    if (fallbackName) return fallbackName;
+    
+    return `Boss Strike #${id}`;
   };
 
   return (
@@ -79,10 +96,8 @@ export function BossStrikeLookup() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {filteredBossStrikes.map(({ id, data, encounterName }) => {
               const isSelected = selectedBossStrikeId === id;
-              const displayName = encounterName ? t(encounterName) : null;
-              const showName = displayName && displayName !== encounterName;
-              
-              const backgroundUrl = getBackgroundImage(id, data.mission_icon);
+              const displayName = getDisplayName(encounterName, data.mission_icon, id);
+              const backgroundUrl = getBackgroundImage(data.mission_icon);
               
               return (
                 <Card 
@@ -117,7 +132,7 @@ export function BossStrikeLookup() {
                   </div>
                   <CardContent className="p-3">
                     <p className="text-sm font-medium truncate">
-                      {showName ? displayName : `Boss Strike #${id}`}
+                      {displayName}
                     </p>
                   </CardContent>
                 </Card>

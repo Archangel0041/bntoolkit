@@ -1,43 +1,59 @@
-// Map boss strike IDs to their background images
-const bossStrikeBackgrounds: Record<string, string> = {
-  "1": "/boss-strike-images/boss_strike_mad_scientist_1136x640.png",
-  "2": "/boss-strike-images/boss_rebel_tanks_1136x640.png",
-  "3": "/boss-strike-images/raider_bosses_boss_strike1136x640.png",
-  "4": "/boss-strike-images/navy_boss_strike1136x640.png",
-  "5": "/boss-strike-images/boss_animal_raider_1136x640.png",
-  "6": "/boss-strike-images/boss_rebel_girl_pilot_1136x640.png",
-  "7": "/boss-strike-images/boss_strike7.png",
-  "8": "/boss-strike-images/infected_boss_strike_illustration_1136x640.png",
-  // Variants with IDs
-  "10277": "/boss-strike-images/boss_rebel_tanks_1136x640_10277.png",
-  "10291": "/boss-strike-images/raider_bosses_boss_strike1136x640_10291.png",
-  "10357": "/boss-strike-images/navy_boss_strike1136x640_10357.png",
-  "10445": "/boss-strike-images/boss_strike_mad_scientist_1136x640_10445.png",
-  "10490": "/boss-strike-images/boss_animal_raider_1136x640_10490.png",
-  "10529": "/boss-strike-images/boss_rebel_girl_pilot_1136x640_10529.png",
-  "10538": "/boss-strike-images/infected_boss_strike_illustration_1136x640_10538.png",
-  "10584": "/boss-strike-images/boss_strike7_10584.png",
+// Map mission_icon patterns to background images
+const missionIconToBackground: Record<string, string> = {
+  "scientist": "/boss-strike-images/boss_strike_mad_scientist_1136x640.png",
+  "vogel": "/boss-strike-images/boss_strike_mad_scientist_1136x640.png",
+  "animal_raider": "/boss-strike-images/boss_animal_raider_1136x640.png",
+  "yuzul": "/boss-strike-images/boss_animal_raider_1136x640.png",
+  "rebel_tanks": "/boss-strike-images/boss_rebel_tanks_1136x640.png",
+  "ludlow": "/boss-strike-images/boss_rebel_tanks_1136x640.png",
+  "navy": "/boss-strike-images/navy_boss_strike1136x640.png",
+  "sovereign": "/boss-strike-images/navy_boss_strike1136x640.png",
+  "infected": "/boss-strike-images/infected_boss_strike_illustration_1136x640.png",
+  "shrow": "/boss-strike-images/boss_strike7.png",
+  "rebel_girl_pilot": "/boss-strike-images/boss_rebel_girl_pilot_1136x640.png",
+  "evaline": "/boss-strike-images/boss_rebel_girl_pilot_1136x640.png",
+  "acehart": "/boss-strike-images/boss_rebel_girl_pilot_1136x640.png",
+  "raider_bosses": "/boss-strike-images/raider_bosses_boss_strike1136x640.png",
 };
 
+// Fallback names for boss strikes based on mission_icon patterns
+const missionIconToName: Record<string, string> = {
+  "rebel_girl_pilot": "Rebel Pilot Evaline Acehart",
+  "evaline": "Rebel Pilot Evaline Acehart",
+  "acehart": "Rebel Pilot Evaline Acehart",
+};
+
+export function getBossStrikeBackgroundFromMissionIcon(missionIcon?: string): string | null {
+  if (!missionIcon) return null;
+  
+  const lowerIcon = missionIcon.toLowerCase();
+  
+  // Check each pattern
+  for (const [pattern, imageUrl] of Object.entries(missionIconToBackground)) {
+    if (lowerIcon.includes(pattern)) {
+      return imageUrl;
+    }
+  }
+  
+  return null;
+}
+
+export function getBossStrikeFallbackName(missionIcon?: string): string | null {
+  if (!missionIcon) return null;
+  
+  const lowerIcon = missionIcon.toLowerCase();
+  
+  for (const [pattern, name] of Object.entries(missionIconToName)) {
+    if (lowerIcon.includes(pattern)) {
+      return name;
+    }
+  }
+  
+  return null;
+}
+
+// Legacy function for backwards compatibility
 export function getBossStrikeBackgroundUrl(bossStrikeId: string): string | null {
-  // First try exact match
-  if (bossStrikeBackgrounds[bossStrikeId]) {
-    return bossStrikeBackgrounds[bossStrikeId];
-  }
-  
-  // Try to find a matching image based on ID patterns
-  // Boss strikes 1-8 have base images, higher IDs might be variants
-  const numId = parseInt(bossStrikeId);
-  
-  if (numId >= 10000) {
-    // This is a variant ID, check if we have it
-    return bossStrikeBackgrounds[bossStrikeId] || null;
-  }
-  
-  // For IDs 1-8, return the base image
-  if (numId >= 1 && numId <= 8) {
-    return bossStrikeBackgrounds[bossStrikeId] || null;
-  }
-  
+  // No longer used - prefer getBossStrikeBackgroundFromMissionIcon
   return null;
 }
