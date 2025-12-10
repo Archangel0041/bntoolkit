@@ -10,7 +10,7 @@ import { getEncounterById } from "@/lib/encounters";
 import { formatRewards, getBossStrikeName } from "@/lib/bossStrikes";
 import { getUnitById } from "@/lib/units";
 import { getEventRewardIconUrl, getEncounterIconUrl } from "@/lib/resourceImages";
-import { getBossStrikeBackgroundFromMissionIcon, getBossStrikeFallbackName } from "@/lib/bossStrikeImages";
+import { getBossStrikeBackgroundById, getBossStrikeNameById } from "@/lib/bossStrikeImages";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { BossStrike, TierInfo } from "@/types/bossStrike";
 import bsPointsIcon from "@/assets/bs_points_icon.png";
@@ -28,16 +28,16 @@ export function BossStrikeViewer({ bossStrike, bossStrikeId }: BossStrikeViewerP
   const tierCount = bossStrike.tier_info?.length ?? 0;
   const selectedEncounter = selectedEncounterId ? getEncounterById(selectedEncounterId) : null;
   
+  const mappedName = getBossStrikeNameById(bossStrikeId);
   const bossStrikeName = getBossStrikeName(bossStrike);
   const encounterDisplayName = bossStrikeName ? t(bossStrikeName) : null;
-  const fallbackName = getBossStrikeFallbackName(bossStrike.mission_icon);
   
-  // Use encounter name if translated, otherwise fallback name, otherwise generic
-  const displayName = (encounterDisplayName && encounterDisplayName !== bossStrikeName) 
-    ? encounterDisplayName 
-    : fallbackName || `Boss Strike #${bossStrikeId}`;
+  // Use mapped name first, then encounter name if translated, otherwise generic
+  const displayName = mappedName 
+    || (encounterDisplayName && encounterDisplayName !== bossStrikeName ? encounterDisplayName : null)
+    || `Boss Strike #${bossStrikeId}`;
   
-  const backgroundUrl = getBossStrikeBackgroundFromMissionIcon(bossStrike.mission_icon);
+  const backgroundUrl = getBossStrikeBackgroundById(bossStrikeId);
 
   return (
     <div className="space-y-6">
