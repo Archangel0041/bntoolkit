@@ -40,6 +40,10 @@ function formatDuration(seconds: number): string {
   return parts.join(" ") || "0s";
 }
 
+function capitalize(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
 interface StatWithChangeProps {
   label: string;
   value: number | string;
@@ -305,7 +309,7 @@ export default function UnitDetail() {
             <StatSection title="Build Requirements" icon={<Coins className="h-4 w-4" />} defaultOpen>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {Object.entries(unit.requirements.cost).map(([resource, amount]) => (
-                  <StatRow key={resource} label={resource} value={amount.toLocaleString()} />
+                  <StatRow key={resource} label={capitalize(resource)} value={amount.toLocaleString()} />
                 ))}
                 <StatRow 
                   label="Build Time" 
@@ -320,7 +324,7 @@ export default function UnitDetail() {
             <StatSection title="Healing" icon={<Wrench className="h-4 w-4" />} defaultOpen>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {Object.entries(unit.healing.heal_cost).map(([resource, amount]) => (
-                  <StatRow key={resource} label={resource} value={amount.toLocaleString()} />
+                  <StatRow key={resource} label={capitalize(resource)} value={amount.toLocaleString()} />
                 ))}
                 <StatRow 
                   label="Heal Time" 
