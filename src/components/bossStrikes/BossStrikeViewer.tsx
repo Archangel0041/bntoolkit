@@ -7,8 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { EncounterViewer } from "@/components/encounters/EncounterViewer";
 import { getEncounterById } from "@/lib/encounters";
-import { getTierEncountersByLevelRange, formatRewards } from "@/lib/bossStrikes";
+import { getTierEncountersByLevelRange, formatRewards, getBossStrikeName } from "@/lib/bossStrikes";
 import { getEventRewardIconUrl, getMenuBackgroundUrl } from "@/lib/resourceImages";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { BossStrike, TierInfo } from "@/types/bossStrike";
 
 interface BossStrikeViewerProps {
@@ -17,11 +18,16 @@ interface BossStrikeViewerProps {
 }
 
 export function BossStrikeViewer({ bossStrike, bossStrikeId }: BossStrikeViewerProps) {
+  const { t } = useLanguage();
   const [selectedEncounterId, setSelectedEncounterId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState("tiers");
 
   const tierCount = bossStrike.tier_info?.length ?? 0;
   const selectedEncounter = selectedEncounterId ? getEncounterById(selectedEncounterId) : null;
+  
+  const bossStrikeName = getBossStrikeName(bossStrike);
+  const displayName = bossStrikeName ? t(bossStrikeName) : null;
+  const showName = displayName && displayName !== bossStrikeName;
 
   return (
     <div className="space-y-6">
@@ -35,7 +41,10 @@ export function BossStrikeViewer({ bossStrike, bossStrikeId }: BossStrikeViewerP
         )}
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
-            <CardTitle>Boss Strike #{bossStrikeId}</CardTitle>
+            <CardTitle>
+              {showName ? displayName : `Boss Strike #${bossStrikeId}`}
+            </CardTitle>
+            <Badge variant="outline">#{bossStrikeId}</Badge>
             {tierCount > 0 && <Badge>{tierCount} Tiers</Badge>}
           </div>
           {bossStrike.default_progress_cost && (
