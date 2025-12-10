@@ -375,10 +375,18 @@ export default function UnitDetail() {
                     <span className="font-medium">{amount.toLocaleString()}</span>
                   </div>
                 ))}
-                <StatRow 
-                  label="Build Time" 
-                  value={<span className="flex items-center gap-1"><Clock className="h-4 w-4" />{formatDuration(unit.requirements.build_time)}</span>} 
-                />
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-muted-foreground flex items-center gap-2">
+                    <img 
+                      src={getResourceIconUrl("time")} 
+                      alt="" 
+                      className="h-5 w-5 object-contain"
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
+                    Build Time
+                  </span>
+                  <span className="font-medium">{formatDuration(unit.requirements.build_time)}</span>
+                </div>
               </div>
             </StatSection>
           )}
@@ -401,10 +409,18 @@ export default function UnitDetail() {
                     <span className="font-medium">{amount.toLocaleString()}</span>
                   </div>
                 ))}
-                <StatRow 
-                  label="Heal Time" 
-                  value={<span className="flex items-center gap-1"><Clock className="h-4 w-4" />{formatDuration(unit.healing.heal_time)}</span>} 
-                />
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-muted-foreground flex items-center gap-2">
+                    <img 
+                      src={getResourceIconUrl("time")} 
+                      alt="" 
+                      className="h-5 w-5 object-contain"
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
+                    Heal Time
+                  </span>
+                  <span className="font-medium">{formatDuration(unit.healing.heal_time)}</span>
+                </div>
               </div>
             </StatSection>
           )}
