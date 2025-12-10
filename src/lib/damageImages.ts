@@ -15,7 +15,7 @@ const DAMAGE_TYPE_ICONS: Record<number, string> = {
 // Resistance type to icon name mapping
 const RESISTANCE_ICONS: Record<string, { normal: string; resistant: string; vulnerable: string }> = {
   cold: { normal: "damage_cold", resistant: "damage_cold_resistant", vulnerable: "damage_cold_vulnerable" },
-  crushing: { normal: "damage_crushing", resistant: "damage_crushing_resistant", vulnerable: "damage_crushing_vulnerable" },
+  crushing: { normal: "damage_melee", resistant: "damage_melee_resistant", vulnerable: "damage_melee_vulnerable" },
   explosive: { normal: "damage_shell", resistant: "damage_shell_resistant", vulnerable: "damage_shell_vulnerable" },
   fire: { normal: "damage_fire", resistant: "damage_fire_resistant", vulnerable: "damage_fire_vulnerable" },
   piercing: { normal: "damage_bullet", resistant: "damage_bullet_resistant", vulnerable: "damage_bullet_vulnerable" },
