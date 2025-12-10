@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { getUnitById } from "@/lib/units";
 import { getAbilityById } from "@/lib/abilities";
-import { getStatusEffectDisplayName, getStatusEffectColor, getStatusEffectIconUrl, getEffectDisplayName, getEffectColor, getEffectIconUrl, getEffectDuration, getStatusEffectFallbackName } from "@/lib/statusEffects";
+import { getStatusEffectDisplayName, getStatusEffectColor, getStatusEffectIconUrl, getEffectDisplayNameTranslated, getEffectColor, getEffectIconUrl, getEffectDuration } from "@/lib/statusEffects";
 import { getClassDisplayName } from "@/lib/battleConfig";
 import { getAbilityImageUrl } from "@/lib/abilityImages";
 import { getDamageTypeName, getDamageTypeIconUrl } from "@/lib/damageImages";
@@ -229,12 +229,7 @@ export default function UnitDetail() {
             <StatSection title="Status Effect Immunities" icon={<Shield className="h-4 w-4" />} defaultOpen>
               <div className="flex flex-wrap gap-3">
                 {unit.statsConfig.status_effect_immunities.map((immunityId) => {
-                  const displayNameKey = getStatusEffectDisplayName(immunityId);
-                  const translatedName = t(displayNameKey);
-                  // Use fallback if translation returns the raw key
-                  const finalName = translatedName === displayNameKey 
-                    ? getStatusEffectFallbackName(displayNameKey) 
-                    : translatedName;
+                  const displayName = getStatusEffectDisplayName(immunityId);
                   const color = getStatusEffectColor(immunityId);
                   const iconUrl = getStatusEffectIconUrl(immunityId);
                   return (
@@ -251,7 +246,7 @@ export default function UnitDetail() {
                           onError={(e) => { e.currentTarget.style.display = 'none'; }}
                         />
                       )}
-                      <span className="font-medium text-foreground">{finalName}</span>
+                      <span className="font-medium text-foreground">{displayName}</span>
                     </div>
                   );
                 })}
@@ -315,11 +310,7 @@ export default function UnitDetail() {
                             <div className="flex flex-wrap gap-2">
                               {Object.entries(ability.stats.status_effects).map(([effectId, chance]) => {
                                 const id = parseInt(effectId);
-                                const displayNameKey = getEffectDisplayName(id);
-                                const translatedName = t(displayNameKey);
-                                const finalName = translatedName === displayNameKey 
-                                  ? getStatusEffectFallbackName(displayNameKey) 
-                                  : translatedName;
+                                const displayName = getEffectDisplayNameTranslated(id);
                                 const color = getEffectColor(id);
                                 const iconUrl = getEffectIconUrl(id);
                                 const duration = getEffectDuration(id);
@@ -337,7 +328,7 @@ export default function UnitDetail() {
                                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                       />
                                     )}
-                                    <span className="text-foreground font-medium">{finalName}</span>
+                                    <span className="text-foreground font-medium">{displayName}</span>
                                     <span className="text-muted-foreground">({chance}%{duration > 0 ? `, ${duration}t` : ""})</span>
                                   </div>
                                 );
