@@ -6,17 +6,24 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { uploadMultipleImages, listUploadedImages } from "@/lib/unitImages";
 import { uploadMultipleAbilityImages, listUploadedAbilityImages } from "@/lib/abilityImages";
-import { Upload, CheckCircle, XCircle, FolderOpen, Users, Swords } from "lucide-react";
+import { uploadMultipleDamageImages, listUploadedDamageImages } from "@/lib/damageImages";
+import { Upload, CheckCircle, XCircle, FolderOpen, Users, Swords, Shield } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 
-type UploadType = "units" | "abilities";
+type UploadType = "units" | "abilities" | "damage";
+
+const UPLOAD_CONFIG = {
+  units: { fn: uploadMultipleImages, listFn: listUploadedImages, label: "unit" },
+  abilities: { fn: uploadMultipleAbilityImages, listFn: listUploadedAbilityImages, label: "ability" },
+  damage: { fn: uploadMultipleDamageImages, listFn: listUploadedDamageImages, label: "damage" },
+};
 
 export default function UploadImages() {
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, fileName: "" });
   const [results, setResults] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
-  const [uploadedCount, setUploadedCount] = useState<{ units: number | null; abilities: number | null }>({ units: null, abilities: null });
+  const [uploadedCount, setUploadedCount] = useState<Record<UploadType, number | null>>({ units: null, abilities: null, damage: null });
   const [activeTab, setActiveTab] = useState<UploadType>("units");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -29,8 +36,8 @@ export default function UploadImages() {
     setResults(null);
     setProgress({ current: 0, total: files.length, fileName: "" });
 
-    const uploadFn = activeTab === "units" ? uploadMultipleImages : uploadMultipleAbilityImages;
-    const uploadResults = await uploadFn(files, (current, total, fileName) => {
+    const config = UPLOAD_CONFIG[activeTab];
+    const uploadResults = await config.fn(files, (current, total, fileName) => {
       setProgress({ current, total, fileName });
     });
 
@@ -40,7 +47,7 @@ export default function UploadImages() {
     if (uploadResults.success > 0) {
       toast({
         title: "Upload Complete",
-        description: `Successfully uploaded ${uploadResults.success} ${activeTab === "units" ? "unit" : "ability"} images.`,
+        description: `Successfully uploaded ${uploadResults.success} ${config.label} images.`,
       });
     }
 
@@ -50,8 +57,7 @@ export default function UploadImages() {
   };
 
   const checkUploadedImages = async (type: UploadType) => {
-    const listFn = type === "units" ? listUploadedImages : listUploadedAbilityImages;
-    const images = await listFn();
+    const images = await UPLOAD_CONFIG[type].listFn();
     setUploadedCount(prev => ({ ...prev, [type]: images.length }));
   };
 
@@ -63,7 +69,7 @@ export default function UploadImages() {
           <div>
             <h1 className="text-3xl font-bold">Upload Images</h1>
             <p className="text-muted-foreground">
-              Upload unit and ability images to display them in the database.
+              Upload unit, ability, and damage type images.
             </p>
           </div>
           <Button asChild variant="outline">
@@ -72,107 +78,64 @@ export default function UploadImages() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as UploadType); setResults(null); }}>
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-lg grid-cols-3">
             <TabsTrigger value="units" className="gap-2">
               <Users className="h-4 w-4" />
-              Unit Images
+              Units
             </TabsTrigger>
             <TabsTrigger value="abilities" className="gap-2">
               <Swords className="h-4 w-4" />
-              Ability Icons
+              Abilities
+            </TabsTrigger>
+            <TabsTrigger value="damage" className="gap-2">
+              <Shield className="h-4 w-4" />
+              Damage
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="units" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Unit Image Upload</CardTitle>
-                <CardDescription>
-                  File names should match unit icon names (e.g., <code className="bg-muted px-1 rounded">air_ancient_fragment_icon.png</code>).
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  id="file-upload"
-                />
-                
-                <div className="flex gap-4">
-                  <Button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="gap-2"
-                  >
-                    <Upload className="h-4 w-4" />
-                    {isUploading ? "Uploading..." : "Select Images"}
-                  </Button>
-                  
-                  <Button variant="outline" onClick={() => checkUploadedImages("units")} className="gap-2">
-                    <FolderOpen className="h-4 w-4" />
-                    Check Count
-                  </Button>
-                </div>
-
-                {uploadedCount.units !== null && (
-                  <p className="text-sm text-muted-foreground">
-                    Currently {uploadedCount.units} unit images uploaded.
-                  </p>
-                )}
-
-                <UploadProgress isUploading={isUploading} progress={progress} results={results} />
-              </CardContent>
-            </Card>
+            <UploadCard
+              title="Unit Image Upload"
+              description={<>File names should match unit icon names (e.g., <code className="bg-muted px-1 rounded">air_ancient_fragment_icon.png</code>).</>}
+              fileInputRef={fileInputRef}
+              isUploading={isUploading}
+              onUpload={handleFileSelect}
+              onCheckCount={() => checkUploadedImages("units")}
+              count={uploadedCount.units}
+              countLabel="unit images"
+              progress={progress}
+              results={results}
+            />
           </TabsContent>
 
           <TabsContent value="abilities" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Ability Icon Upload</CardTitle>
-                <CardDescription>
-                  File names should match ability icon names (e.g., <code className="bg-muted px-1 rounded">ancient_lasershot_icon.png</code>, <code className="bg-muted px-1 rounded">chem_cloud_icon.png</code>).
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleFileSelect}
-                  className="hidden"
-                  id="file-upload-abilities"
-                />
-                
-                <div className="flex gap-4">
-                  <Button
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                    className="gap-2"
-                  >
-                    <Upload className="h-4 w-4" />
-                    {isUploading ? "Uploading..." : "Select Icons"}
-                  </Button>
-                  
-                  <Button variant="outline" onClick={() => checkUploadedImages("abilities")} className="gap-2">
-                    <FolderOpen className="h-4 w-4" />
-                    Check Count
-                  </Button>
-                </div>
+            <UploadCard
+              title="Ability Icon Upload"
+              description={<>File names should match ability icon names (e.g., <code className="bg-muted px-1 rounded">ancient_lasershot_icon.png</code>).</>}
+              fileInputRef={fileInputRef}
+              isUploading={isUploading}
+              onUpload={handleFileSelect}
+              onCheckCount={() => checkUploadedImages("abilities")}
+              count={uploadedCount.abilities}
+              countLabel="ability icons"
+              progress={progress}
+              results={results}
+            />
+          </TabsContent>
 
-                {uploadedCount.abilities !== null && (
-                  <p className="text-sm text-muted-foreground">
-                    Currently {uploadedCount.abilities} ability icons uploaded.
-                  </p>
-                )}
-
-                <UploadProgress isUploading={isUploading} progress={progress} results={results} />
-              </CardContent>
-            </Card>
+          <TabsContent value="damage" className="space-y-6">
+            <UploadCard
+              title="Damage Icon Upload"
+              description={<>File names should match damage type names (e.g., <code className="bg-muted px-1 rounded">damage_bullet.png</code>, <code className="bg-muted px-1 rounded">damage_bullet_resistant.png</code>).</>}
+              fileInputRef={fileInputRef}
+              isUploading={isUploading}
+              onUpload={handleFileSelect}
+              onCheckCount={() => checkUploadedImages("damage")}
+              count={uploadedCount.damage}
+              countLabel="damage icons"
+              progress={progress}
+              results={results}
+            />
           </TabsContent>
         </Tabs>
 
@@ -181,7 +144,7 @@ export default function UploadImages() {
             <CardTitle>Naming Conventions</CardTitle>
           </CardHeader>
           <CardContent className="prose dark:prose-invert max-w-none">
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid md:grid-cols-3 gap-6">
               <div>
                 <h4 className="font-medium mb-2">Unit Images</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
@@ -194,7 +157,14 @@ export default function UploadImages() {
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li><code>ancient_lasershot_icon.png</code></li>
                   <li><code>chem_cloud_icon.png</code></li>
-                  <li><code>chem_hose_icon.png</code></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-medium mb-2">Damage Icons</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li><code>damage_bullet.png</code></li>
+                  <li><code>damage_bullet_resistant.png</code></li>
+                  <li><code>damage_bullet_vulnerable.png</code></li>
                 </ul>
               </div>
             </div>
@@ -202,6 +172,58 @@ export default function UploadImages() {
         </Card>
       </main>
     </div>
+  );
+}
+
+interface UploadCardProps {
+  title: string;
+  description: React.ReactNode;
+  fileInputRef: React.RefObject<HTMLInputElement>;
+  isUploading: boolean;
+  onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onCheckCount: () => void;
+  count: number | null;
+  countLabel: string;
+  progress: { current: number; total: number; fileName: string };
+  results: { success: number; failed: number; errors: string[] } | null;
+}
+
+function UploadCard({ title, description, fileInputRef, isUploading, onUpload, onCheckCount, count, countLabel, progress, results }: UploadCardProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={onUpload}
+          className="hidden"
+        />
+        
+        <div className="flex gap-4">
+          <Button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className="gap-2">
+            <Upload className="h-4 w-4" />
+            {isUploading ? "Uploading..." : "Select Images"}
+          </Button>
+          
+          <Button variant="outline" onClick={onCheckCount} className="gap-2">
+            <FolderOpen className="h-4 w-4" />
+            Check Count
+          </Button>
+        </div>
+
+        {count !== null && (
+          <p className="text-sm text-muted-foreground">Currently {count} {countLabel} uploaded.</p>
+        )}
+
+        <UploadProgress isUploading={isUploading} progress={progress} results={results} />
+      </CardContent>
+    </Card>
   );
 }
 
