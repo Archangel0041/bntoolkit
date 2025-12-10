@@ -15,8 +15,10 @@ import {
 import { getUnitById } from "@/lib/units";
 import { getAbilityById } from "@/lib/abilities";
 import { getStatusEffectDisplayName, getStatusEffectColor } from "@/lib/statusEffects";
+import { getClassDisplayName } from "@/lib/battleConfig";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCompare } from "@/contexts/CompareContext";
+import { cn } from "@/lib/utils";
 import { 
   ArrowLeft, Heart, Zap, Shield, Target, Eye, Swords, 
   Clock, Coins, Wrench, Plus, Check, Activity
@@ -34,6 +36,41 @@ function formatDuration(seconds: number): string {
   if (secs > 0 && hours === 0) parts.push(`${secs}s`);
   
   return parts.join(" ") || "0s";
+}
+
+interface StatWithChangeProps {
+  label: string;
+  value: number | string;
+  prevValue?: number | string;
+  icon?: React.ReactNode;
+  suffix?: string;
+}
+
+function StatWithChange({ label, value, prevValue, icon, suffix = "" }: StatWithChangeProps) {
+  const numValue = typeof value === "number" ? value : parseFloat(value);
+  const numPrevValue = prevValue !== undefined ? (typeof prevValue === "number" ? prevValue : parseFloat(prevValue as string)) : undefined;
+  
+  const hasChange = numPrevValue !== undefined && !isNaN(numValue) && !isNaN(numPrevValue) && numValue !== numPrevValue;
+  const isIncrease = hasChange && numValue > numPrevValue!;
+  
+  return (
+    <div className="flex justify-between py-1">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={cn(
+        "flex items-center gap-1",
+        hasChange && isIncrease && "text-green-600 dark:text-green-400",
+        hasChange && !isIncrease && "text-red-600 dark:text-red-400"
+      )}>
+        {icon}
+        {value}{suffix}
+        {hasChange && (
+          <span className="text-xs ml-1">
+            ({isIncrease ? "+" : ""}{(numValue - numPrevValue!).toFixed(numValue % 1 === 0 ? 0 : 1)})
+          </span>
+        )}
+      </span>
+    </div>
+  );
 }
 
 export default function UnitDetail() {
@@ -66,8 +103,12 @@ export default function UnitDetail() {
   const [selectedRank, setSelectedRank] = useState(maxRank);
   
   const stats = allStats[selectedRank - 1];
+  const prevStats = selectedRank > 1 ? allStats[selectedRank - 2] : undefined;
   const inCompare = isInCompare(unit.id);
   const canAddToCompare = compareUnits.length < 2;
+
+  const classDisplayName = t(getClassDisplayName(unit.identity.class_name));
+  const sideLabel = unit.identity.side === 1 ? "Friendly" : unit.identity.side === 2 ? "Enemy" : `Side ${unit.identity.side}`;
 
   const handleCompareClick = () => {
     if (inCompare) {
@@ -89,7 +130,9 @@ export default function UnitDetail() {
           </Button>
           <div className="flex-1">
             <h1 className="text-3xl font-bold">{t(unit.identity.name)}</h1>
-            <p className="text-muted-foreground">ID: {unit.id}</p>
+            <p className="text-muted-foreground">
+              ID: {unit.id} • {classDisplayName} • {sideLabel}
+            </p>
           </div>
           {maxRank > 1 && (
             <Select value={selectedRank.toString()} onValueChange={(v) => setSelectedRank(parseInt(v))}>
@@ -131,16 +174,16 @@ export default function UnitDetail() {
           {stats && (
             <StatSection title="Main Stats" icon={<Activity className="h-4 w-4" />} defaultOpen>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <StatRow label="HP" value={<span className="flex items-center gap-1"><Heart className="h-4 w-4 text-destructive" />{stats.hp}</span>} />
-                <StatRow label="Power" value={<span className="flex items-center gap-1"><Zap className="h-4 w-4 text-yellow-500" />{stats.power}</span>} />
-                <StatRow label="PV" value={<span className="flex items-center gap-1"><Shield className="h-4 w-4 text-blue-500" />{stats.pv}</span>} />
-                <StatRow label="Accuracy" value={<span className="flex items-center gap-1"><Target className="h-4 w-4" />{stats.accuracy}</span>} />
-                <StatRow label="Defense" value={stats.defense} />
-                <StatRow label="Dodge" value={<span className="flex items-center gap-1"><Eye className="h-4 w-4" />{stats.dodge}</span>} />
-                <StatRow label="Bravery" value={stats.bravery} />
-                <StatRow label="Critical" value={`${stats.critical}%`} />
+                <StatWithChange label="HP" value={stats.hp} prevValue={prevStats?.hp} icon={<Heart className="h-4 w-4 text-destructive" />} />
+                <StatWithChange label="Power" value={stats.power} prevValue={prevStats?.power} icon={<Zap className="h-4 w-4 text-yellow-500" />} />
+                <StatWithChange label="PV" value={stats.pv} prevValue={prevStats?.pv} icon={<Shield className="h-4 w-4 text-blue-500" />} />
+                <StatWithChange label="Accuracy" value={stats.accuracy} prevValue={prevStats?.accuracy} icon={<Target className="h-4 w-4" />} />
+                <StatWithChange label="Defense" value={stats.defense} prevValue={prevStats?.defense} />
+                <StatWithChange label="Dodge" value={stats.dodge} prevValue={prevStats?.dodge} icon={<Eye className="h-4 w-4" />} />
+                <StatWithChange label="Bravery" value={stats.bravery} prevValue={prevStats?.bravery} />
+                <StatWithChange label="Critical" value={stats.critical} prevValue={prevStats?.critical} suffix="%" />
                 <StatRow label="Ability Slots" value={stats.ability_slots} />
-                {stats.armor_hp && <StatRow label="Armor HP" value={stats.armor_hp} />}
+                {stats.armor_hp && <StatWithChange label="Armor HP" value={stats.armor_hp} prevValue={prevStats?.armor_hp} />}
               </div>
               {unit.statsConfig?.size && (
                 <div className="mt-4 pt-4 border-t">
