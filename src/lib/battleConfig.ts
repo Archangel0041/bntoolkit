@@ -26,7 +26,12 @@ export function getClassType(classId: number): ClassType | undefined {
 
 export function getClassDisplayName(classId: number): string {
   const classType = getClassType(classId);
-  return classType?.display_name || `class_${classId}`;
+  if (!classType) return `Class ${classId}`;
+  // Capitalize and format display name
+  return classType.display_name
+    .split("_")
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 export function getClassIcon(classId: number): string {
