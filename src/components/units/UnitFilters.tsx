@@ -2,13 +2,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -21,10 +14,7 @@ interface UnitFiltersProps {
   setSearchQuery: (query: string) => void;
   selectedTags: number[];
   setSelectedTags: (tags: number[]) => void;
-  selectedSide: number | null;
-  setSelectedSide: (side: number | null) => void;
   allTags: number[];
-  allSides: number[];
 }
 
 export function UnitFilters({
@@ -32,10 +22,7 @@ export function UnitFilters({
   setSearchQuery,
   selectedTags,
   setSelectedTags,
-  selectedSide,
-  setSelectedSide,
   allTags,
-  allSides,
 }: UnitFiltersProps) {
   const toggleTag = (tag: number) => {
     if (selectedTags.includes(tag)) {
@@ -48,10 +35,9 @@ export function UnitFilters({
   const clearFilters = () => {
     setSearchQuery("");
     setSelectedTags([]);
-    setSelectedSide(null);
   };
 
-  const hasFilters = searchQuery || selectedTags.length > 0 || selectedSide !== null;
+  const hasFilters = searchQuery || selectedTags.length > 0;
 
   return (
     <div className="space-y-4">
@@ -65,23 +51,6 @@ export function UnitFilters({
             className="pl-10"
           />
         </div>
-
-        <Select
-          value={selectedSide?.toString() ?? "all"}
-          onValueChange={(val) => setSelectedSide(val === "all" ? null : parseInt(val))}
-        >
-          <SelectTrigger className="w-full sm:w-[140px]">
-            <SelectValue placeholder="Side" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Sides</SelectItem>
-            {allSides.map((side) => (
-              <SelectItem key={side} value={side.toString()}>
-                Side {side}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
 
         <Popover>
           <PopoverTrigger asChild>
