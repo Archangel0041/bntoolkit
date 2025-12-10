@@ -1,6 +1,7 @@
 export interface EncounterUnit {
   grid_id?: number;
   unit_id: number;
+  wave_number?: number;
 }
 
 export interface EncounterWave {

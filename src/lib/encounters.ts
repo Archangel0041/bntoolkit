@@ -12,30 +12,29 @@ export function getAllEncounterIds(): string[] {
 }
 
 export function getEncounterWaves(encounter: Encounter): EncounterUnit[][] {
-  const waves: EncounterUnit[][] = [];
+  if (!encounter.units || encounter.units.length === 0) {
+    return [];
+  }
+
+  // Group units by wave_number (undefined = wave 0)
+  const waveMap = new Map<number, EncounterUnit[]>();
   
-  // Wave 1 is always the main units array (if exists)
-  if (encounter.units && encounter.units.length > 0) {
-    // Filter to only include units that have grid_id defined
-    const unitsWithGrid = encounter.units.filter(u => u.grid_id !== undefined);
-    if (unitsWithGrid.length > 0) {
-      waves.push(unitsWithGrid);
+  encounter.units.forEach(unit => {
+    if (unit.grid_id === undefined) return;
+    
+    const waveNum = unit.wave_number ?? 0;
+    if (!waveMap.has(waveNum)) {
+      waveMap.set(waveNum, []);
     }
-  }
-  
-  // Additional waves from the waves array
-  if (encounter.waves && encounter.waves.length > 0) {
-    encounter.waves.forEach((wave) => {
-      if (wave.units && wave.units.length > 0) {
-        const unitsWithGrid = wave.units.filter(u => u.grid_id !== undefined);
-        if (unitsWithGrid.length > 0) {
-          waves.push(unitsWithGrid);
-        }
-      }
-    });
-  }
-  
-  return waves;
+    waveMap.get(waveNum)!.push(unit);
+  });
+
+  // Sort by wave number and return as array
+  const sortedWaves = Array.from(waveMap.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([_, units]) => units);
+
+  return sortedWaves;
 }
 
 export function getUnitAtGridPosition(units: EncounterUnit[], gridId: number): EncounterUnit | undefined {
