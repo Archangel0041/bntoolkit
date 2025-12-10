@@ -71,6 +71,7 @@ export function BossStrikeLookup() {
               
               // Use menu_bg field for background
               const backgroundKey = data.menu_bg;
+              if (backgroundKey) console.log(`Boss Strike ${id} menu_bg:`, backgroundKey);
               
               return (
                 <Card 
