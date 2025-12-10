@@ -76,21 +76,6 @@ export function UnitCard({ unit }: UnitCardProps) {
             )}
           </div>
         </div>
-        <CardContent className="pt-0 pb-3 px-3">
-          <div className="flex flex-wrap gap-1">
-            <Badge variant="secondary" className="text-xs">Side {unit.identity.side}</Badge>
-            {unit.identity.tags.slice(0, 2).map((tag) => (
-              <Badge key={tag} variant="outline" className="text-xs">
-                #{tag}
-              </Badge>
-            ))}
-            {unit.identity.tags.length > 2 && (
-              <Badge variant="outline" className="text-xs">
-                +{unit.identity.tags.length - 2}
-              </Badge>
-            )}
-          </div>
-        </CardContent>
       </Card>
     </Link>
   );
