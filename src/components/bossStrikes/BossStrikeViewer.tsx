@@ -151,70 +151,93 @@ function EncounterListSection({
   onSelectEncounter: (id: number) => void;
   selectedEncounterId: number | null;
 }) {
-  const encountersByLevel = useMemo(() => {
-    if (!tierInfo || tierInfo.length === 0) return new Map();
+  // Group encounters by tier ranges: Tiers 1-5 and Tiers 6-10
+  const { lowTierEncounters, highTierEncounters } = useMemo(() => {
+    if (!tierInfo || tierInfo.length === 0) {
+      return { lowTierEncounters: new Map(), highTierEncounters: new Map() };
+    }
     
-    // Combine all tier encounters and group by level
-    const allEncounters = tierInfo.flatMap(tier => tier.encounters);
-    const grouped = new Map<string, Set<number>>();
+    const groupByLevel = (tiers: TierInfo[]) => {
+      const grouped = new Map<string, Set<number>>();
+      tiers.flatMap(tier => tier.encounters).forEach(enc => {
+        const minLevel = enc.min_level ?? 1;
+        const key = `${minLevel}-${enc.max_level}`;
+        if (!grouped.has(key)) {
+          grouped.set(key, new Set());
+        }
+        grouped.get(key)!.add(enc.encounter_id);
+      });
+      return grouped;
+    };
     
-    allEncounters.forEach(enc => {
-      const minLevel = enc.min_level ?? 1;
-      const key = `${minLevel}-${enc.max_level}`;
-      
-      if (!grouped.has(key)) {
-        grouped.set(key, new Set());
-      }
-      grouped.get(key)!.add(enc.encounter_id);
-    });
+    // Tiers 1-5 (index 0-4) and Tiers 6-10 (index 5-9)
+    const lowTiers = tierInfo.slice(0, 5);
+    const highTiers = tierInfo.slice(5, 10);
     
-    return grouped;
+    return {
+      lowTierEncounters: groupByLevel(lowTiers),
+      highTierEncounters: groupByLevel(highTiers)
+    };
   }, [tierInfo]);
 
-  if (encountersByLevel.size === 0) {
+  if (lowTierEncounters.size === 0 && highTierEncounters.size === 0) {
     return <p className="text-muted-foreground">No encounters available</p>;
   }
 
-  const sortedLevelRanges = Array.from(encountersByLevel.keys()).sort((a, b) => {
-    const aMin = parseInt(a.split('-')[0]);
-    const bMin = parseInt(b.split('-')[0]);
-    return aMin - bMin;
-  });
+  const renderLevelGroup = (grouped: Map<string, Set<number>>, groupName: string) => {
+    const sortedLevelRanges = Array.from(grouped.keys()).sort((a, b) => {
+      const aMin = parseInt(a.split('-')[0]);
+      const bMin = parseInt(b.split('-')[0]);
+      return aMin - bMin;
+    });
+
+    if (sortedLevelRanges.length === 0) return null;
+
+    return (
+      <div className="space-y-2">
+        <h4 className="font-medium text-sm text-muted-foreground">{groupName}</h4>
+        <Accordion type="multiple" defaultValue={sortedLevelRanges.slice(0, 2)}>
+          {sortedLevelRanges.map(levelRange => {
+            const encounterIds = Array.from(grouped.get(levelRange)!) as number[];
+            const sortedIds = encounterIds.sort((a, b) => a - b);
+            return (
+              <AccordionItem key={levelRange} value={levelRange}>
+                <AccordionTrigger className="text-sm">
+                  Level {levelRange} ({sortedIds.length} encounters)
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="flex flex-wrap gap-1">
+                    {sortedIds.map(encId => (
+                      <Badge
+                        key={encId}
+                        variant={selectedEncounterId === encId ? "default" : "outline"}
+                        className="cursor-pointer hover:bg-primary/20"
+                        onClick={() => onSelectEncounter(encId)}
+                      >
+                        {encId}
+                      </Badge>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
+      </div>
+    );
+  };
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Encounters by Level</CardTitle>
+        <CardTitle className="text-base">Encounters by Tier</CardTitle>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[500px]">
-          <Accordion type="multiple" defaultValue={sortedLevelRanges.slice(0, 2)}>
-            {sortedLevelRanges.map(levelRange => {
-              const encounterIds = Array.from(encountersByLevel.get(levelRange)!) as number[];
-              const sortedIds = encounterIds.sort((a, b) => a - b);
-              return (
-                <AccordionItem key={levelRange} value={levelRange}>
-                  <AccordionTrigger className="text-sm">
-                    Level {levelRange} ({sortedIds.length} encounters)
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="flex flex-wrap gap-1">
-                      {sortedIds.map(encId => (
-                        <Badge
-                          key={encId}
-                          variant={selectedEncounterId === encId ? "default" : "outline"}
-                          className="cursor-pointer hover:bg-primary/20"
-                          onClick={() => onSelectEncounter(encId)}
-                        >
-                          {encId}
-                        </Badge>
-                      ))}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              );
-            })}
-          </Accordion>
+          <div className="space-y-6">
+            {renderLevelGroup(lowTierEncounters, "Tiers 1-5")}
+            {renderLevelGroup(highTierEncounters, "Tiers 6-10")}
+          </div>
         </ScrollArea>
       </CardContent>
     </Card>

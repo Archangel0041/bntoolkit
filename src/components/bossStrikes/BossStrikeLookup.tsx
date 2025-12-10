@@ -2,8 +2,8 @@ import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Search, ChevronDown } from "lucide-react";
 import { BossStrikeViewer } from "./BossStrikeViewer";
 import { getBossStrikeById, getAllBossStrikeIds, getBossStrikeName } from "@/lib/bossStrikes";
 import { getMenuBackgroundUrl } from "@/lib/resourceImages";
@@ -14,6 +14,7 @@ export function BossStrikeLookup() {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBossStrikeId, setSelectedBossStrikeId] = useState<string | null>(null);
+  const [isGridOpen, setIsGridOpen] = useState(true);
 
   const allBossStrikes = useMemo(() => {
     const ids = getAllBossStrikeIds();
@@ -36,6 +37,12 @@ export function BossStrikeLookup() {
 
   const selectedBossStrike = selectedBossStrikeId ? getBossStrikeById(selectedBossStrikeId) : null;
 
+  // When a boss strike is selected, collapse the grid
+  const handleSelectBossStrike = (id: string) => {
+    setSelectedBossStrikeId(id);
+    setIsGridOpen(false);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex gap-2 max-w-md">
@@ -50,59 +57,68 @@ export function BossStrikeLookup() {
         </div>
       </div>
 
-      <ScrollArea className="h-[200px]">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {filteredBossStrikes.map(({ id, data, encounterName }) => {
-            const isSelected = selectedBossStrikeId === id;
-            const displayName = encounterName ? t(encounterName) : null;
-            const showName = displayName && displayName !== encounterName;
-            
-            return (
-              <Card 
-                key={id}
-                className={cn(
-                  "cursor-pointer overflow-hidden transition-all hover:ring-2 hover:ring-primary/50",
-                  isSelected && "ring-2 ring-primary"
-                )}
-                onClick={() => setSelectedBossStrikeId(id)}
-              >
-                <div 
-                  className="h-20 bg-cover bg-center bg-muted relative"
-                  style={data.menu_background ? { 
-                    backgroundImage: `url(${getMenuBackgroundUrl(data.menu_background)})` 
-                  } : undefined}
-                >
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                  <Badge 
-                    variant="secondary" 
-                    className="absolute top-2 left-2 text-xs"
-                  >
-                    #{id}
-                  </Badge>
-                  {data.tier_info && (
-                    <Badge 
-                      variant="outline" 
-                      className="absolute top-2 right-2 text-xs bg-background/80"
-                    >
-                      {data.tier_info.length} Tiers
-                    </Badge>
+      <Collapsible open={isGridOpen} onOpenChange={setIsGridOpen}>
+        <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium hover:text-primary transition-colors">
+          <ChevronDown className={cn("h-4 w-4 transition-transform", isGridOpen && "rotate-180")} />
+          {isGridOpen ? "Hide" : "Show"} Boss Strikes ({filteredBossStrikes.length})
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filteredBossStrikes.map(({ id, data, encounterName }) => {
+              const isSelected = selectedBossStrikeId === id;
+              const displayName = encounterName ? t(encounterName) : null;
+              const showName = displayName && displayName !== encounterName;
+              
+              // Use mission_icon as the background key (it's like "npc_silverwolves_scientist_boss_mission")
+              const backgroundKey = data.menu_background || data.mission_icon;
+              
+              return (
+                <Card 
+                  key={id}
+                  className={cn(
+                    "cursor-pointer overflow-hidden transition-all hover:ring-2 hover:ring-primary/50",
+                    isSelected && "ring-2 ring-primary"
                   )}
-                </div>
-                <CardContent className="p-2">
-                  <p className="text-xs font-medium truncate">
-                    {showName ? displayName : `Boss Strike #${id}`}
-                  </p>
-                </CardContent>
-              </Card>
-            );
-          })}
-          {filteredBossStrikes.length === 0 && (
-            <p className="text-muted-foreground text-center py-4 col-span-full">
-              No boss strikes found
-            </p>
-          )}
-        </div>
-      </ScrollArea>
+                  onClick={() => handleSelectBossStrike(id)}
+                >
+                  <div 
+                    className="h-28 bg-cover bg-center bg-muted relative"
+                    style={backgroundKey ? { 
+                      backgroundImage: `url(${getMenuBackgroundUrl(backgroundKey)})` 
+                    } : undefined}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                    <Badge 
+                      variant="secondary" 
+                      className="absolute top-2 left-2 text-xs"
+                    >
+                      #{id}
+                    </Badge>
+                    {data.tier_info && (
+                      <Badge 
+                        variant="outline" 
+                        className="absolute top-2 right-2 text-xs bg-background/80"
+                      >
+                        {data.tier_info.length} Tiers
+                      </Badge>
+                    )}
+                  </div>
+                  <CardContent className="p-3">
+                    <p className="text-sm font-medium truncate">
+                      {showName ? displayName : `Boss Strike #${id}`}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })}
+            {filteredBossStrikes.length === 0 && (
+              <p className="text-muted-foreground text-center py-4 col-span-full">
+                No boss strikes found
+              </p>
+            )}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       {selectedBossStrike && (
         <BossStrikeViewer bossStrike={selectedBossStrike} bossStrikeId={selectedBossStrikeId!} />
