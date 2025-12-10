@@ -1,6 +1,7 @@
 import { LanguageSelector } from "./LanguageSelector";
 import { Link } from "react-router-dom";
-import { Sword } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sword, Upload } from "lucide-react";
 
 export function Header() {
   return (
@@ -10,7 +11,15 @@ export function Header() {
           <Sword className="h-6 w-6" />
           <span>Battle Units</span>
         </Link>
-        <LanguageSelector />
+        <div className="flex items-center gap-2">
+          <Button asChild variant="ghost" size="sm" className="gap-2">
+            <Link to="/upload">
+              <Upload className="h-4 w-4" />
+              <span className="hidden sm:inline">Upload Images</span>
+            </Link>
+          </Button>
+          <LanguageSelector />
+        </div>
       </div>
     </header>
   );
