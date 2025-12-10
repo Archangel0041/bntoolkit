@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search } from "lucide-react";
 import { BossStrikeViewer } from "./BossStrikeViewer";
-import { getBossStrikeById, getAllBossStrikeIds } from "@/lib/bossStrikes";
+import { getBossStrikeById, getAllBossStrikeIds, getBossStrikeName } from "@/lib/bossStrikes";
 import { getMenuBackgroundUrl } from "@/lib/resourceImages";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
@@ -17,10 +17,11 @@ export function BossStrikeLookup() {
 
   const allBossStrikes = useMemo(() => {
     const ids = getAllBossStrikeIds();
-    return ids.map(id => ({
-      id,
-      data: getBossStrikeById(id)!
-    }));
+    return ids.map(id => {
+      const data = getBossStrikeById(id)!;
+      const encounterName = getBossStrikeName(data);
+      return { id, data, encounterName };
+    });
   }, []);
   
   const filteredBossStrikes = useMemo(() => {
@@ -28,7 +29,7 @@ export function BossStrikeLookup() {
     const query = searchQuery.toLowerCase();
     return allBossStrikes.filter(bs => {
       const idMatch = bs.id.includes(query);
-      const nameMatch = bs.data.name && t(bs.data.name).toLowerCase().includes(query);
+      const nameMatch = bs.encounterName && t(bs.encounterName).toLowerCase().includes(query);
       return idMatch || nameMatch;
     });
   }, [searchQuery, allBossStrikes, t]);
@@ -51,10 +52,10 @@ export function BossStrikeLookup() {
 
       <ScrollArea className="h-[200px]">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-          {filteredBossStrikes.map(({ id, data }) => {
+          {filteredBossStrikes.map(({ id, data, encounterName }) => {
             const isSelected = selectedBossStrikeId === id;
-            const displayName = data.name ? t(data.name) : null;
-            const showName = displayName && displayName !== data.name;
+            const displayName = encounterName ? t(encounterName) : null;
+            const showName = displayName && displayName !== encounterName;
             
             return (
               <Card 

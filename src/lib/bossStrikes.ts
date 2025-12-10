@@ -1,5 +1,6 @@
 import bossStrikeData from "@/data/boss_strike_config.json";
 import type { BossStrike, BossStrikeData, TierInfo } from "@/types/bossStrike";
+import { getEncounterById } from "@/lib/encounters";
 
 const rawData = bossStrikeData as unknown as BossStrikeData;
 
@@ -9,6 +10,19 @@ export function getBossStrikeById(id: number | string): BossStrike | undefined {
 
 export function getAllBossStrikeIds(): string[] {
   return Object.keys(rawData).sort((a, b) => parseInt(a) - parseInt(b));
+}
+
+export function getBossStrikeName(bossStrike: BossStrike): string | undefined {
+  // Get name from the first encounter of the first tier
+  if (bossStrike.tier_info && bossStrike.tier_info.length > 0) {
+    const firstTier = bossStrike.tier_info[0];
+    if (firstTier.encounters && firstTier.encounters.length > 0) {
+      const firstEncounterId = firstTier.encounters[0].encounter_id;
+      const encounter = getEncounterById(firstEncounterId);
+      return encounter?.name;
+    }
+  }
+  return undefined;
 }
 
 export function getTierEncountersByLevelRange(tier: TierInfo): Map<string, number[]> {
