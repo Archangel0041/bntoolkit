@@ -13,6 +13,7 @@ export interface AbilityStats {
   min_range: number;
   shots_per_attack: number;
   targets: number[];
+  status_effects?: Record<string, number>;
 }
 
 export interface Ability {

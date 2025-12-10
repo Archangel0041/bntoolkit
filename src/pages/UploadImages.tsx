@@ -7,23 +7,25 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { uploadMultipleImages, listUploadedImages } from "@/lib/unitImages";
 import { uploadMultipleAbilityImages, listUploadedAbilityImages } from "@/lib/abilityImages";
 import { uploadMultipleDamageImages, listUploadedDamageImages } from "@/lib/damageImages";
-import { Upload, CheckCircle, XCircle, FolderOpen, Users, Swords, Shield } from "lucide-react";
+import { uploadMultipleStatusImages, listUploadedStatusImages } from "@/lib/statusEffects";
+import { Upload, CheckCircle, XCircle, FolderOpen, Users, Swords, Shield, Zap } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 
-type UploadType = "units" | "abilities" | "damage";
+type UploadType = "units" | "abilities" | "damage" | "status";
 
 const UPLOAD_CONFIG = {
   units: { fn: uploadMultipleImages, listFn: listUploadedImages, label: "unit" },
   abilities: { fn: uploadMultipleAbilityImages, listFn: listUploadedAbilityImages, label: "ability" },
   damage: { fn: uploadMultipleDamageImages, listFn: listUploadedDamageImages, label: "damage" },
+  status: { fn: uploadMultipleStatusImages, listFn: listUploadedStatusImages, label: "status" },
 };
 
 export default function UploadImages() {
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, fileName: "" });
   const [results, setResults] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
-  const [uploadedCount, setUploadedCount] = useState<Record<UploadType, number | null>>({ units: null, abilities: null, damage: null });
+  const [uploadedCount, setUploadedCount] = useState<Record<UploadType, number | null>>({ units: null, abilities: null, damage: null, status: null });
   const [activeTab, setActiveTab] = useState<UploadType>("units");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -69,7 +71,7 @@ export default function UploadImages() {
           <div>
             <h1 className="text-3xl font-bold">Upload Images</h1>
             <p className="text-muted-foreground">
-              Upload unit, ability, and damage type images.
+              Upload unit, ability, damage, and status effect images.
             </p>
           </div>
           <Button asChild variant="outline">
@@ -78,7 +80,7 @@ export default function UploadImages() {
         </div>
 
         <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as UploadType); setResults(null); }}>
-          <TabsList className="grid w-full max-w-lg grid-cols-3">
+          <TabsList className="grid w-full max-w-2xl grid-cols-4">
             <TabsTrigger value="units" className="gap-2">
               <Users className="h-4 w-4" />
               Units
@@ -90,6 +92,10 @@ export default function UploadImages() {
             <TabsTrigger value="damage" className="gap-2">
               <Shield className="h-4 w-4" />
               Damage
+            </TabsTrigger>
+            <TabsTrigger value="status" className="gap-2">
+              <Zap className="h-4 w-4" />
+              Status
             </TabsTrigger>
           </TabsList>
 
@@ -137,6 +143,21 @@ export default function UploadImages() {
               results={results}
             />
           </TabsContent>
+
+          <TabsContent value="status" className="space-y-6">
+            <UploadCard
+              title="Status Effect Icon Upload"
+              description={<>File names should match status effect ui_icon names (e.g., <code className="bg-muted px-1 rounded">bn_icon_poison.png</code>, <code className="bg-muted px-1 rounded">bn_icon_fire.png</code>).</>}
+              fileInputRef={fileInputRef}
+              isUploading={isUploading}
+              onUpload={handleFileSelect}
+              onCheckCount={() => checkUploadedImages("status")}
+              count={uploadedCount.status}
+              countLabel="status icons"
+              progress={progress}
+              results={results}
+            />
+          </TabsContent>
         </Tabs>
 
         <Card>
@@ -144,7 +165,7 @@ export default function UploadImages() {
             <CardTitle>Naming Conventions</CardTitle>
           </CardHeader>
           <CardContent className="prose dark:prose-invert max-w-none">
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-4 gap-6">
               <div>
                 <h4 className="font-medium mb-2">Unit Images</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
@@ -164,7 +185,14 @@ export default function UploadImages() {
                 <ul className="text-sm text-muted-foreground space-y-1">
                   <li><code>damage_bullet.png</code></li>
                   <li><code>damage_bullet_resistant.png</code></li>
-                  <li><code>damage_bullet_vulnerable.png</code></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-medium mb-2">Status Icons</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li><code>bn_icon_poison.png</code></li>
+                  <li><code>bn_icon_fire.png</code></li>
+                  <li><code>bn_icon_stun.png</code></li>
                 </ul>
               </div>
             </div>
