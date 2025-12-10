@@ -12,15 +12,19 @@ import {
   uploadMultipleResourceIcons, 
   uploadMultipleEventRewardIcons, 
   uploadMultipleMenuBackgrounds,
+  uploadMultipleEncounterIcons,
+  uploadMultipleMissionIcons,
   listResourceIcons,
   listEventRewardIcons,
-  listMenuBackgrounds 
+  listMenuBackgrounds,
+  listEncounterIcons,
+  listMissionIcons
 } from "@/lib/resourceImages";
-import { Upload, CheckCircle, XCircle, FolderOpen, Users, Swords, Shield, Zap, Coins, Gift, Image } from "lucide-react";
+import { Upload, CheckCircle, XCircle, FolderOpen, Users, Swords, Shield, Zap, Coins, Gift, Image, Map, Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 
-type UploadType = "units" | "abilities" | "damage" | "status" | "resources" | "eventRewards" | "menuBackgrounds";
+type UploadType = "units" | "abilities" | "damage" | "status" | "resources" | "eventRewards" | "menuBackgrounds" | "encounters" | "missions";
 
 const UPLOAD_CONFIG: Record<UploadType, { 
   fn: (files: FileList, onProgress?: (current: number, total: number, fileName: string) => void) => Promise<{ success: number; failed: number; errors: string[] }>;
@@ -34,6 +38,8 @@ const UPLOAD_CONFIG: Record<UploadType, {
   resources: { fn: uploadMultipleResourceIcons, listFn: listResourceIcons, label: "resource" },
   eventRewards: { fn: uploadMultipleEventRewardIcons, listFn: listEventRewardIcons, label: "event reward" },
   menuBackgrounds: { fn: uploadMultipleMenuBackgrounds, listFn: listMenuBackgrounds, label: "menu background" },
+  encounters: { fn: uploadMultipleEncounterIcons, listFn: listEncounterIcons, label: "encounter" },
+  missions: { fn: uploadMultipleMissionIcons, listFn: listMissionIcons, label: "mission" },
 };
 
 export default function UploadImages() {
@@ -42,7 +48,8 @@ export default function UploadImages() {
   const [results, setResults] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
   const [uploadedCount, setUploadedCount] = useState<Record<UploadType, number | null>>({ 
     units: null, abilities: null, damage: null, status: null, 
-    resources: null, eventRewards: null, menuBackgrounds: null 
+    resources: null, eventRewards: null, menuBackgrounds: null,
+    encounters: null, missions: null
   });
   const [activeTab, setActiveTab] = useState<UploadType>("units");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -126,6 +133,14 @@ export default function UploadImages() {
             <TabsTrigger value="menuBackgrounds" className="gap-2">
               <Image className="h-4 w-4" />
               Backgrounds
+            </TabsTrigger>
+            <TabsTrigger value="encounters" className="gap-2">
+              <Map className="h-4 w-4" />
+              Encounters
+            </TabsTrigger>
+            <TabsTrigger value="missions" className="gap-2">
+              <Target className="h-4 w-4" />
+              Missions
             </TabsTrigger>
           </TabsList>
 
@@ -222,13 +237,43 @@ export default function UploadImages() {
           <TabsContent value="menuBackgrounds" className="space-y-6">
             <UploadCard
               title="Menu Background Upload"
-              description={<>File names should match menu_background values from boss strikes (e.g., <code className="bg-muted px-1 rounded">boss_strike_bg_1.png</code>).</>}
+              description={<>File names should match menu_bg values from boss strikes (e.g., <code className="bg-muted px-1 rounded">boss_strike_mad_scientist_1136x640.png</code>).</>}
               fileInputRef={fileInputRef}
               isUploading={isUploading}
               onUpload={handleFileSelect}
               onCheckCount={() => checkUploadedImages("menuBackgrounds")}
               count={uploadedCount.menuBackgrounds}
               countLabel="menu backgrounds"
+              progress={progress}
+              results={results}
+            />
+          </TabsContent>
+
+          <TabsContent value="encounters" className="space-y-6">
+            <UploadCard
+              title="Encounter Icon Upload"
+              description={<>File names should match encounter icon values (e.g., <code className="bg-muted px-1 rounded">encounter_icon_name.png</code>).</>}
+              fileInputRef={fileInputRef}
+              isUploading={isUploading}
+              onUpload={handleFileSelect}
+              onCheckCount={() => checkUploadedImages("encounters")}
+              count={uploadedCount.encounters}
+              countLabel="encounter icons"
+              progress={progress}
+              results={results}
+            />
+          </TabsContent>
+
+          <TabsContent value="missions" className="space-y-6">
+            <UploadCard
+              title="Mission Icon Upload"
+              description={<>File names should match mission_icon values from boss strikes (e.g., <code className="bg-muted px-1 rounded">npc_silverwolves_scientist_boss_mission.png</code>).</>}
+              fileInputRef={fileInputRef}
+              isUploading={isUploading}
+              onUpload={handleFileSelect}
+              onCheckCount={() => checkUploadedImages("missions")}
+              count={uploadedCount.missions}
+              countLabel="mission icons"
               progress={progress}
               results={results}
             />
@@ -254,17 +299,15 @@ export default function UploadImages() {
                 </ul>
               </div>
               <div>
-                <h4 className="font-medium mb-2">Resource Icons</h4>
+                <h4 className="font-medium mb-2">Menu Backgrounds</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
-                  <li><code>resource_lumber.png</code></li>
-                  <li><code>resource_concrete.png</code></li>
+                  <li><code>boss_strike_mad_scientist_1136x640.png</code></li>
                 </ul>
               </div>
               <div>
-                <h4 className="font-medium mb-2">Event Rewards</h4>
+                <h4 className="font-medium mb-2">Mission Icons</h4>
                 <ul className="text-sm text-muted-foreground space-y-1">
-                  <li><code>event_reward_concrete.png</code></li>
-                  <li><code>event_reward_gears.png</code></li>
+                  <li><code>npc_silverwolves_scientist_boss_mission.png</code></li>
                 </ul>
               </div>
             </div>
