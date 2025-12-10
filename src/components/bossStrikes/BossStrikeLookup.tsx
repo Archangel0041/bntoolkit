@@ -1,69 +1,107 @@
 import { useState, useMemo } from "react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search } from "lucide-react";
 import { BossStrikeViewer } from "./BossStrikeViewer";
 import { getBossStrikeById, getAllBossStrikeIds } from "@/lib/bossStrikes";
+import { getMenuBackgroundUrl } from "@/lib/resourceImages";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { cn } from "@/lib/utils";
 
 export function BossStrikeLookup() {
+  const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBossStrikeId, setSelectedBossStrikeId] = useState<string | null>(null);
 
-  const allIds = useMemo(() => getAllBossStrikeIds(), []);
+  const allBossStrikes = useMemo(() => {
+    const ids = getAllBossStrikeIds();
+    return ids.map(id => ({
+      id,
+      data: getBossStrikeById(id)!
+    }));
+  }, []);
   
-  const filteredIds = useMemo(() => {
-    if (!searchQuery) return allIds;
-    return allIds.filter(id => id.includes(searchQuery));
-  }, [searchQuery, allIds]);
+  const filteredBossStrikes = useMemo(() => {
+    if (!searchQuery) return allBossStrikes;
+    const query = searchQuery.toLowerCase();
+    return allBossStrikes.filter(bs => {
+      const idMatch = bs.id.includes(query);
+      const nameMatch = bs.data.name && t(bs.data.name).toLowerCase().includes(query);
+      return idMatch || nameMatch;
+    });
+  }, [searchQuery, allBossStrikes, t]);
 
   const selectedBossStrike = selectedBossStrikeId ? getBossStrikeById(selectedBossStrikeId) : null;
 
-  const handleSearch = () => {
-    if (searchQuery && getBossStrikeById(searchQuery)) {
-      setSelectedBossStrikeId(searchQuery);
-    }
-  };
-
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Select Boss Strike</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Search by ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-            />
-            <Button onClick={handleSearch}>
-              <Search className="h-4 w-4" />
-            </Button>
-          </div>
-          
-          <ScrollArea className="h-[150px] border rounded-md">
-            <div className="p-2 flex flex-wrap gap-2">
-              {filteredIds.map(id => (
-                <Button
-                  key={id}
-                  variant={selectedBossStrikeId === id ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedBossStrikeId(id)}
+      <div className="flex gap-2 max-w-md">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by ID or name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      </div>
+
+      <ScrollArea className="h-[200px]">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+          {filteredBossStrikes.map(({ id, data }) => {
+            const isSelected = selectedBossStrikeId === id;
+            const displayName = data.name ? t(data.name) : null;
+            const showName = displayName && displayName !== data.name;
+            
+            return (
+              <Card 
+                key={id}
+                className={cn(
+                  "cursor-pointer overflow-hidden transition-all hover:ring-2 hover:ring-primary/50",
+                  isSelected && "ring-2 ring-primary"
+                )}
+                onClick={() => setSelectedBossStrikeId(id)}
+              >
+                <div 
+                  className="h-20 bg-cover bg-center bg-muted relative"
+                  style={data.menu_background ? { 
+                    backgroundImage: `url(${getMenuBackgroundUrl(data.menu_background)})` 
+                  } : undefined}
                 >
-                  #{id}
-                </Button>
-              ))}
-              {filteredIds.length === 0 && (
-                <p className="text-muted-foreground text-center py-4 w-full">No boss strikes found</p>
-              )}
-            </div>
-          </ScrollArea>
-        </CardContent>
-      </Card>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                  <Badge 
+                    variant="secondary" 
+                    className="absolute top-2 left-2 text-xs"
+                  >
+                    #{id}
+                  </Badge>
+                  {data.tier_info && (
+                    <Badge 
+                      variant="outline" 
+                      className="absolute top-2 right-2 text-xs bg-background/80"
+                    >
+                      {data.tier_info.length} Tiers
+                    </Badge>
+                  )}
+                </div>
+                <CardContent className="p-2">
+                  <p className="text-xs font-medium truncate">
+                    {showName ? displayName : `Boss Strike #${id}`}
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })}
+          {filteredBossStrikes.length === 0 && (
+            <p className="text-muted-foreground text-center py-4 col-span-full">
+              No boss strikes found
+            </p>
+          )}
+        </div>
+      </ScrollArea>
 
       {selectedBossStrike && (
         <BossStrikeViewer bossStrike={selectedBossStrike} bossStrikeId={selectedBossStrikeId!} />
