@@ -205,22 +205,25 @@ function EncounterListSection({
     });
   }, [tierInfo]);
 
-  // Get encounters for selected level
-  const filteredEncounters = useMemo(() => {
+  // Get encounters grouped by tier for selected level
+  const encountersByTier = useMemo(() => {
     if (!tierInfo || !selectedLevel) return [];
     
-    const encounterIds = new Set<number>();
-    tierInfo.forEach(tier => {
-      tier.encounters.forEach(enc => {
-        const minLevel = enc.min_level ?? 1;
-        const key = `${minLevel}-${enc.max_level}`;
-        if (key === selectedLevel) {
-          encounterIds.add(enc.encounter_id);
-        }
-      });
-    });
-    
-    return Array.from(encounterIds).sort((a, b) => a - b);
+    return tierInfo.map((tier, tierIndex) => {
+      const encounters = tier.encounters
+        .filter(enc => {
+          const minLevel = enc.min_level ?? 1;
+          const key = `${minLevel}-${enc.max_level}`;
+          return key === selectedLevel;
+        })
+        .map(enc => enc.encounter_id)
+        .sort((a, b) => a - b);
+      
+      return {
+        tierIndex: tierIndex + 1,
+        encounters,
+      };
+    }).filter(tier => tier.encounters.length > 0);
   }, [tierInfo, selectedLevel]);
 
   // Auto-select first level range on load
@@ -254,50 +257,59 @@ function EncounterListSection({
           ))}
         </div>
 
-        {/* Encounter List */}
+        {/* Encounter List grouped by Tier */}
         <ScrollArea className="h-[400px]">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {filteredEncounters.map(encId => {
-              const encounter = getEncounterById(encId);
-              const isSelected = selectedEncounterId === encId;
-              const encounterName = encounter?.name ? t(encounter.name) : null;
-              const displayName = encounterName && encounterName !== encounter?.name ? encounterName : null;
-              const encounterIcon = encounter?.icon;
+          <div className="space-y-4">
+            {encountersByTier.map(({ tierIndex, encounters }) => (
+              <div key={tierIndex} className="space-y-2">
+                <h4 className="text-sm font-semibold text-muted-foreground border-b pb-1">
+                  Tier {tierIndex}
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {encounters.map(encId => {
+                    const encounter = getEncounterById(encId);
+                    const isSelected = selectedEncounterId === encId;
+                    const encounterName = encounter?.name ? t(encounter.name) : null;
+                    const displayName = encounterName && encounterName !== encounter?.name ? encounterName : null;
+                    const encounterIcon = encounter?.icon;
 
-              return (
-                <Card
-                  key={encId}
-                  className={`cursor-pointer transition-all hover:ring-2 hover:ring-primary/50 ${isSelected ? 'ring-2 ring-primary' : ''}`}
-                  onClick={() => onSelectEncounter(encId)}
-                >
-                  <CardContent className="p-3">
-                    <div className="flex items-center gap-3">
-                      {encounterIcon && (
-                        <img 
-                          src={getEncounterIconUrl(encounterIcon)}
-                          alt=""
-                          className="w-10 h-10 object-contain rounded"
-                          onError={(e) => (e.currentTarget.style.display = 'none')}
-                        />
-                      )}
-                      <div className="flex-1 min-w-0 space-y-1">
-                        <p className="font-medium text-sm truncate">
-                          {displayName || `Encounter ${encId}`}
-                        </p>
-                        <div className="flex gap-1 flex-wrap">
-                          <Badge variant="outline" className="text-xs">#{encId}</Badge>
-                          {encounter?.level && (
-                            <Badge variant="secondary" className="text-xs">Lv. {encounter.level}</Badge>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-            {filteredEncounters.length === 0 && selectedLevel && (
-              <p className="text-muted-foreground text-sm col-span-full text-center py-4">
+                    return (
+                      <Card
+                        key={encId}
+                        className={`cursor-pointer transition-all hover:ring-2 hover:ring-primary/50 ${isSelected ? 'ring-2 ring-primary' : ''}`}
+                        onClick={() => onSelectEncounter(encId)}
+                      >
+                        <CardContent className="p-3">
+                          <div className="flex items-center gap-3">
+                            {encounterIcon && (
+                              <img 
+                                src={getEncounterIconUrl(encounterIcon)}
+                                alt=""
+                                className="w-10 h-10 object-contain rounded"
+                                onError={(e) => (e.currentTarget.style.display = 'none')}
+                              />
+                            )}
+                            <div className="flex-1 min-w-0 space-y-1">
+                              <p className="font-medium text-sm truncate">
+                                {displayName || `Encounter ${encId}`}
+                              </p>
+                              <div className="flex gap-1 flex-wrap">
+                                <Badge variant="outline" className="text-xs">#{encId}</Badge>
+                                {encounter?.level && (
+                                  <Badge variant="secondary" className="text-xs">Lv. {encounter.level}</Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+            {encountersByTier.length === 0 && selectedLevel && (
+              <p className="text-muted-foreground text-sm text-center py-4">
                 No encounters at this level
               </p>
             )}
