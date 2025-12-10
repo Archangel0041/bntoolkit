@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCompare } from "@/contexts/CompareContext";
+import { UnitImage } from "./UnitImage";
 import type { ParsedUnit } from "@/types/units";
 import { Heart, Zap, Shield, Plus, Check } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -31,53 +32,61 @@ export function UnitCard({ unit }: UnitCardProps) {
 
   return (
     <Link to={`/unit/${unit.id}`}>
-      <Card className="h-full transition-all hover:shadow-lg hover:scale-[1.02] cursor-pointer group">
-        <CardHeader className="pb-2">
-          <div className="flex items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <CardTitle className="text-lg truncate">{t(unit.identity.name)}</CardTitle>
-              <p className="text-sm text-muted-foreground truncate">
-                {t(unit.identity.short_name)} • ID: {unit.id}
-              </p>
+      <Card className="h-full transition-all hover:shadow-lg hover:scale-[1.02] cursor-pointer group overflow-hidden">
+        <div className="flex">
+          <UnitImage
+            iconName={unit.identity.icon}
+            alt={t(unit.identity.name)}
+            className="w-20 h-20 shrink-0"
+            fallbackClassName="w-20 h-20 shrink-0 rounded-none"
+          />
+          <div className="flex-1 min-w-0 p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <h3 className="font-semibold text-sm truncate">{t(unit.identity.name)}</h3>
+                <p className="text-xs text-muted-foreground truncate">
+                  {t(unit.identity.short_name)} • ID: {unit.id}
+                </p>
+              </div>
+              <Button
+                variant={inCompare ? "default" : "outline"}
+                size="icon"
+                className="h-7 w-7 shrink-0"
+                onClick={handleCompareClick}
+                disabled={!inCompare && !canAddToCompare}
+              >
+                {inCompare ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+              </Button>
             </div>
-            <Button
-              variant={inCompare ? "default" : "outline"}
-              size="icon"
-              className="h-8 w-8 shrink-0"
-              onClick={handleCompareClick}
-              disabled={!inCompare && !canAddToCompare}
-            >
-              {inCompare ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-            </Button>
+            {stats && (
+              <div className="flex gap-3 mt-2 text-xs">
+                <span className="flex items-center gap-1">
+                  <Heart className="h-3 w-3 text-destructive" />
+                  {stats.hp}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Zap className="h-3 w-3 text-yellow-500" />
+                  {stats.power}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Shield className="h-3 w-3 text-blue-500" />
+                  {stats.pv}
+                </span>
+              </div>
+            )}
           </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {stats && (
-            <div className="grid grid-cols-3 gap-2 text-sm">
-              <div className="flex items-center gap-1">
-                <Heart className="h-4 w-4 text-destructive" />
-                <span className="font-medium">{stats.hp}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Zap className="h-4 w-4 text-yellow-500" />
-                <span className="font-medium">{stats.power}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Shield className="h-4 w-4 text-blue-500" />
-                <span className="font-medium">{stats.pv}</span>
-              </div>
-            </div>
-          )}
+        </div>
+        <CardContent className="pt-0 pb-3 px-3">
           <div className="flex flex-wrap gap-1">
-            <Badge variant="secondary">Side {unit.identity.side}</Badge>
-            {unit.identity.tags.slice(0, 3).map((tag) => (
+            <Badge variant="secondary" className="text-xs">Side {unit.identity.side}</Badge>
+            {unit.identity.tags.slice(0, 2).map((tag) => (
               <Badge key={tag} variant="outline" className="text-xs">
                 #{tag}
               </Badge>
             ))}
-            {unit.identity.tags.length > 3 && (
+            {unit.identity.tags.length > 2 && (
               <Badge variant="outline" className="text-xs">
-                +{unit.identity.tags.length - 3}
+                +{unit.identity.tags.length - 2}
               </Badge>
             )}
           </div>
