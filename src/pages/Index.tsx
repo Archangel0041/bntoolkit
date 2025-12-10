@@ -1,12 +1,53 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState, useMemo } from "react";
+import { Header } from "@/components/Header";
+import { UnitFilters } from "@/components/units/UnitFilters";
+import { UnitGrid } from "@/components/units/UnitGrid";
+import { CompareBar } from "@/components/units/CompareBar";
+import { allUnits, getAllTags, getAllSides, filterUnits } from "@/lib/units";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const Index = () => {
+  const { t } = useLanguage();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTags, setSelectedTags] = useState<number[]>([]);
+  const [selectedSide, setSelectedSide] = useState<number | null>(null);
+
+  const allTags = useMemo(() => getAllTags(), []);
+  const allSides = useMemo(() => getAllSides(), []);
+
+  const filteredUnits = useMemo(() => {
+    return filterUnits(allUnits, searchQuery, selectedTags, selectedSide, t);
+  }, [searchQuery, selectedTags, selectedSide, t]);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-background pb-20">
+      <Header />
+      <main className="container mx-auto px-4 py-6 space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">Battle Unit Database</h1>
+          <p className="text-muted-foreground">
+            Browse and explore {allUnits.length} battle units. Click any card to view details.
+          </p>
+        </div>
+
+        <UnitFilters
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          selectedTags={selectedTags}
+          setSelectedTags={setSelectedTags}
+          selectedSide={selectedSide}
+          setSelectedSide={setSelectedSide}
+          allTags={allTags}
+          allSides={allSides}
+        />
+
+        <div className="text-sm text-muted-foreground">
+          Showing {filteredUnits.length} of {allUnits.length} units
+        </div>
+
+        <UnitGrid units={filteredUnits} />
+      </main>
+      <CompareBar />
     </div>
   );
 };
