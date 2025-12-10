@@ -5,6 +5,7 @@ import { StatSection, StatRow, DamageModsGrid } from "@/components/units/StatSec
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getUnitById } from "@/lib/units";
+import { getAbilityById } from "@/lib/abilities";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCompare } from "@/contexts/CompareContext";
 import { 
@@ -77,7 +78,6 @@ export default function UnitDetail() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary">Side {unit.identity.side}</Badge>
           {unit.identity.tags.map((tag) => (
             <Badge key={tag} variant="outline">
               #{tag}
@@ -126,32 +126,32 @@ export default function UnitDetail() {
             </StatSection>
           )}
 
-          {/* Weapons */}
+          {/* Abilities */}
           {unit.weapons && Object.keys(unit.weapons.weapons).length > 0 && (
-            <StatSection title="Weapons" icon={<Swords className="h-4 w-4" />}>
+            <StatSection title="Abilities" icon={<Swords className="h-4 w-4" />}>
               <div className="space-y-4">
-                {Object.entries(unit.weapons.weapons).map(([key, weapon]) => (
-                  <div key={key} className="p-4 bg-muted/50 rounded-lg">
-                    <h4 className="font-medium mb-2">{t(weapon.name)}</h4>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-                      <StatRow label="Damage" value={`${weapon.stats.base_damage_min}-${weapon.stats.base_damage_max}`} />
-                      <StatRow label="Crit %" value={`${weapon.stats.base_crit_percent}%`} />
-                      <StatRow label="Ammo" value={weapon.stats.ammo === -1 ? "∞" : weapon.stats.ammo} />
-                      <StatRow label="Attack Bonus" value={weapon.stats.base_atk} />
-                      <StatRow label="Range Bonus" value={weapon.stats.range_bonus} />
-                    </div>
-                    {weapon.abilities.length > 0 && (
-                      <div className="mt-2 pt-2 border-t">
-                        <span className="text-sm text-muted-foreground">Abilities: </span>
-                        {weapon.abilities.map((abil, i) => (
-                          <Badge key={i} variant="outline" className="mr-1">
-                            #{abil}
-                          </Badge>
-                        ))}
+                {Object.entries(unit.weapons.weapons).flatMap(([weaponKey, weapon]) =>
+                  weapon.abilities.map((abilId) => {
+                    const ability = getAbilityById(abilId);
+                    if (!ability) return null;
+                    return (
+                      <div key={`${weaponKey}-${abilId}`} className="p-4 bg-muted/50 rounded-lg">
+                        <h4 className="font-medium mb-2">{t(ability.name)}</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                          <StatRow label="Attack" value={ability.stats.attack} />
+                          <StatRow label="Crit %" value={`${ability.stats.critical_hit_percent}%`} />
+                          <StatRow label="Cooldown" value={ability.stats.ability_cooldown} />
+                          <StatRow label="Ammo Required" value={ability.stats.ammo_required} />
+                          <StatRow label="Range" value={`${ability.stats.min_range}-${ability.stats.max_range}`} />
+                          <StatRow label="Shots" value={ability.stats.shots_per_attack} />
+                          {ability.stats.armor_piercing_percent > 0 && (
+                            <StatRow label="Armor Pierce" value={`${ability.stats.armor_piercing_percent}%`} />
+                          )}
+                        </div>
                       </div>
-                    )}
-                  </div>
-                ))}
+                    );
+                  })
+                )}
               </div>
             </StatSection>
           )}

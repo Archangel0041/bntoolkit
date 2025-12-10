@@ -3,21 +3,19 @@ import { Header } from "@/components/Header";
 import { UnitFilters } from "@/components/units/UnitFilters";
 import { UnitGrid } from "@/components/units/UnitGrid";
 import { CompareBar } from "@/components/units/CompareBar";
-import { allUnits, getAllTags, getAllSides, filterUnits } from "@/lib/units";
+import { allUnits, getAllTags, filterUnits } from "@/lib/units";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 const Index = () => {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
-  const [selectedSide, setSelectedSide] = useState<number | null>(null);
 
   const allTags = useMemo(() => getAllTags(), []);
-  const allSides = useMemo(() => getAllSides(), []);
 
   const filteredUnits = useMemo(() => {
-    return filterUnits(allUnits, searchQuery, selectedTags, selectedSide, t);
-  }, [searchQuery, selectedTags, selectedSide, t]);
+    return filterUnits(allUnits, searchQuery, selectedTags, null, t);
+  }, [searchQuery, selectedTags, t]);
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -35,10 +33,7 @@ const Index = () => {
           setSearchQuery={setSearchQuery}
           selectedTags={selectedTags}
           setSelectedTags={setSelectedTags}
-          selectedSide={selectedSide}
-          setSelectedSide={setSelectedSide}
           allTags={allTags}
-          allSides={allSides}
         />
 
         <div className="text-sm text-muted-foreground">
