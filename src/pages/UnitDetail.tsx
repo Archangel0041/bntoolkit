@@ -183,7 +183,10 @@ export default function UnitDetail() {
           ))}
         </div>
 
-        <p className="text-muted-foreground">{t(unit.identity.description)}</p>
+        {/* Only show description if it's actually translated (not a raw key) */}
+        {t(unit.identity.description) !== unit.identity.description && (
+          <p className="text-muted-foreground">{t(unit.identity.description)}</p>
+        )}
 
         <div className="space-y-4">
           {/* Main Stats */}
