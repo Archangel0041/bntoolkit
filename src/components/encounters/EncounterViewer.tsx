@@ -5,20 +5,27 @@ import { Badge } from "@/components/ui/badge";
 import { EncounterGrid } from "./EncounterGrid";
 import { getEncounterWaves } from "@/lib/encounters";
 import type { Encounter } from "@/types/encounters";
+import type { BossStrike } from "@/types/bossStrike";
 import { useLanguage } from "@/contexts/LanguageContext";
+import bsPointsIcon from "@/assets/bs_points_icon.png";
 
 interface EncounterViewerProps {
   encounter: Encounter;
   encounterId: string | number;
+  bossStrike?: BossStrike;
 }
 
-export function EncounterViewer({ encounter, encounterId }: EncounterViewerProps) {
+export function EncounterViewer({ encounter, encounterId, bossStrike }: EncounterViewerProps) {
   const { t } = useLanguage();
   const waves = getEncounterWaves(encounter);
   const [activeWave, setActiveWave] = useState("0");
 
   const encounterName = encounter.name ? t(encounter.name) : `Encounter ${encounterId}`;
   const displayName = encounterName !== encounter.name ? encounterName : `Encounter ${encounterId}`;
+
+  // Calculate wave points based on boss strike progress cost
+  const basePoints = bossStrike?.default_progress_cost?.awarded_points ?? 0;
+  const pointsPerWave = basePoints > 0 ? Math.floor(basePoints / waves.length) : 0;
 
   return (
     <Card>
@@ -34,10 +41,19 @@ export function EncounterViewer({ encounter, encounterId }: EncounterViewerProps
         {waves.length === 0 ? (
           <p className="text-muted-foreground text-center py-4">No units in this encounter</p>
         ) : waves.length === 1 ? (
-          <EncounterGrid 
-            units={waves[0]} 
-            showPlayerUnits={encounter.player_units}
-          />
+          <div className="space-y-3">
+            <EncounterGrid 
+              units={waves[0]} 
+              showPlayerUnits={encounter.player_units}
+            />
+            {basePoints > 0 && (
+              <WavePointsDisplay 
+                waveIndex={0}
+                totalWaves={1}
+                pointsPerWave={basePoints}
+              />
+            )}
+          </div>
         ) : (
           <Tabs value={activeWave} onValueChange={setActiveWave}>
             <TabsList className="mb-4">
@@ -49,15 +65,58 @@ export function EncounterViewer({ encounter, encounterId }: EncounterViewerProps
             </TabsList>
             {waves.map((waveUnits, index) => (
               <TabsContent key={index} value={String(index)}>
-                <EncounterGrid 
-                  units={waveUnits} 
-                  showPlayerUnits={index === 0 ? encounter.player_units : undefined}
-                />
+                <div className="space-y-3">
+                  <EncounterGrid 
+                    units={waveUnits} 
+                    showPlayerUnits={index === 0 ? encounter.player_units : undefined}
+                  />
+                  {basePoints > 0 && (
+                    <WavePointsDisplay 
+                      waveIndex={index}
+                      totalWaves={waves.length}
+                      pointsPerWave={pointsPerWave}
+                    />
+                  )}
+                </div>
               </TabsContent>
             ))}
           </Tabs>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function WavePointsDisplay({ 
+  waveIndex, 
+  totalWaves, 
+  pointsPerWave 
+}: { 
+  waveIndex: number; 
+  totalWaves: number; 
+  pointsPerWave: number; 
+}) {
+  const wavePoints = pointsPerWave;
+  const cumulativePoints = (waveIndex + 1) * pointsPerWave;
+
+  return (
+    <div className="flex items-center justify-center gap-4 p-3 bg-muted/50 rounded-lg">
+      <div className="flex items-center gap-2">
+        <img src={bsPointsIcon} alt="BS Points" className="w-6 h-6" />
+        <div className="text-sm">
+          <span className="text-muted-foreground">Wave {waveIndex + 1}: </span>
+          <span className="font-semibold">{wavePoints.toLocaleString()}</span>
+        </div>
+      </div>
+      {totalWaves > 1 && (
+        <div className="flex items-center gap-2 border-l pl-4">
+          <img src={bsPointsIcon} alt="BS Points" className="w-6 h-6" />
+          <div className="text-sm">
+            <span className="text-muted-foreground">Total (W1→{waveIndex + 1}): </span>
+            <span className="font-semibold text-primary">{cumulativePoints.toLocaleString()}</span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
