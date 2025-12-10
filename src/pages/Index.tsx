@@ -10,12 +10,22 @@ const Index = () => {
   const { t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
+  const [nanopodFilter, setNanopodFilter] = useState<"all" | "nanopod" | "non-nanopod">("all");
 
   const allTags = useMemo(() => getAllTags(), []);
 
   const filteredUnits = useMemo(() => {
-    return filterUnits(allUnits, searchQuery, selectedTags, null, t);
-  }, [searchQuery, selectedTags, t]);
+    let units = filterUnits(allUnits, searchQuery, selectedTags, null, t);
+    
+    // Apply nanopod filter
+    if (nanopodFilter === "nanopod") {
+      units = units.filter(u => u.requirements?.cost?.nanopods && u.requirements.cost.nanopods > 0);
+    } else if (nanopodFilter === "non-nanopod") {
+      units = units.filter(u => !u.requirements?.cost?.nanopods || u.requirements.cost.nanopods === 0);
+    }
+    
+    return units;
+  }, [searchQuery, selectedTags, nanopodFilter, t]);
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -34,6 +44,8 @@ const Index = () => {
           selectedTags={selectedTags}
           setSelectedTags={setSelectedTags}
           allTags={allTags}
+          nanopodFilter={nanopodFilter}
+          setNanopodFilter={setNanopodFilter}
         />
 
         <div className="text-sm text-muted-foreground">

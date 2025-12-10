@@ -7,7 +7,7 @@ import { UnitImage } from "./UnitImage";
 import type { ParsedUnit } from "@/types/units";
 import { Heart, Zap, Shield, Plus, Check, Swords, Eye, Target } from "lucide-react";
 import { Link } from "react-router-dom";
-import nanopodIcon from "@/assets/nanopod_vial.png";
+import premiumRays from "@/assets/premium_rays.png";
 
 interface UnitCardProps {
   unit: ParsedUnit;
@@ -37,23 +37,33 @@ export function UnitCard({ unit }: UnitCardProps) {
   return (
     <Link to={`/unit/${unit.id}`}>
       <Card className="h-full transition-all hover:shadow-lg hover:scale-[1.02] cursor-pointer group overflow-hidden relative">
-        {isNanopodUnit && (
-          <div className="absolute top-1 left-1 z-10">
-            <img 
-              src={nanopodIcon} 
-              alt="Nanopod unit" 
-              className="w-6 h-6 rotate-45 drop-shadow-md"
-              title="Nanopod unit"
+        <div className="flex">
+          <div className="relative w-20 h-20 shrink-0">
+            {isNanopodUnit && (
+              <div className="absolute inset-0 z-0 overflow-hidden">
+                <img 
+                  src={premiumRays} 
+                  alt="" 
+                  className="w-full h-full object-cover animate-pulse opacity-80"
+                  style={{
+                    filter: "hue-rotate(60deg) saturate(1.5) brightness(1.2)",
+                  }}
+                />
+                <div 
+                  className="absolute inset-0"
+                  style={{
+                    boxShadow: "inset 0 0 20px 5px rgba(74, 222, 128, 0.4)",
+                  }}
+                />
+              </div>
+            )}
+            <UnitImage
+              iconName={unit.identity.icon}
+              alt={t(unit.identity.name)}
+              className="w-20 h-20 relative z-10"
+              fallbackClassName="w-20 h-20 rounded-none relative z-10"
             />
           </div>
-        )}
-        <div className="flex">
-          <UnitImage
-            iconName={unit.identity.icon}
-            alt={t(unit.identity.name)}
-            className="w-20 h-20 shrink-0"
-            fallbackClassName="w-20 h-20 shrink-0 rounded-none"
-          />
           <div className="flex-1 min-w-0 p-3">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
