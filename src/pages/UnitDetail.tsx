@@ -1,9 +1,17 @@
+import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { CompareBar } from "@/components/units/CompareBar";
 import { StatSection, StatRow, DamageModsGrid } from "@/components/units/StatSection";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { getUnitById } from "@/lib/units";
 import { getAbilityById } from "@/lib/abilities";
 import { getStatusEffectDisplayName, getStatusEffectColor } from "@/lib/statusEffects";
@@ -13,6 +21,20 @@ import {
   ArrowLeft, Heart, Zap, Shield, Target, Eye, Swords, 
   Clock, Coins, Wrench, Plus, Check, Activity
 } from "lucide-react";
+
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  
+  const parts: string[] = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (minutes > 0) parts.push(`${minutes}m`);
+  if (secs > 0 && hours === 0) parts.push(`${secs}s`);
+  
+  return parts.join(" ") || "0s";
+}
 
 export default function UnitDetail() {
   const { id } = useParams<{ id: string }>();
@@ -39,7 +61,11 @@ export default function UnitDetail() {
     );
   }
 
-  const stats = unit.statsConfig?.stats[0];
+  const allStats = unit.statsConfig?.stats || [];
+  const maxRank = allStats.length;
+  const [selectedRank, setSelectedRank] = useState(maxRank);
+  
+  const stats = allStats[selectedRank - 1];
   const inCompare = isInCompare(unit.id);
   const canAddToCompare = compareUnits.length < 2;
 
@@ -63,10 +89,22 @@ export default function UnitDetail() {
           </Button>
           <div className="flex-1">
             <h1 className="text-3xl font-bold">{t(unit.identity.name)}</h1>
-            <p className="text-muted-foreground">
-              {t(unit.identity.short_name)} • ID: {unit.id}
-            </p>
+            <p className="text-muted-foreground">ID: {unit.id}</p>
           </div>
+          {maxRank > 1 && (
+            <Select value={selectedRank.toString()} onValueChange={(v) => setSelectedRank(parseInt(v))}>
+              <SelectTrigger className="w-[120px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: maxRank }, (_, i) => i + 1).map((rank) => (
+                  <SelectItem key={rank} value={rank.toString()}>
+                    Rank {rank}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Button
             variant={inCompare ? "default" : "outline"}
             onClick={handleCompareClick}
@@ -188,7 +226,7 @@ export default function UnitDetail() {
                 ))}
                 <StatRow 
                   label="Build Time" 
-                  value={<span className="flex items-center gap-1"><Clock className="h-4 w-4" />{unit.requirements.build_time}s</span>} 
+                  value={<span className="flex items-center gap-1"><Clock className="h-4 w-4" />{formatDuration(unit.requirements.build_time)}</span>} 
                 />
               </div>
             </StatSection>
@@ -203,7 +241,7 @@ export default function UnitDetail() {
                 ))}
                 <StatRow 
                   label="Heal Time" 
-                  value={<span className="flex items-center gap-1"><Clock className="h-4 w-4" />{unit.healing.heal_time}s</span>} 
+                  value={<span className="flex items-center gap-1"><Clock className="h-4 w-4" />{formatDuration(unit.healing.heal_time)}</span>} 
                 />
               </div>
             </StatSection>
