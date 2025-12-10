@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getUnitById } from "@/lib/units";
 import { getAbilityById } from "@/lib/abilities";
+import { getStatusEffectDisplayName, getStatusEffectColor } from "@/lib/statusEffects";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCompare } from "@/contexts/CompareContext";
 import { 
@@ -114,7 +115,7 @@ export default function UnitDetail() {
 
           {/* Damage & Armor */}
           {stats && (stats.damage_mods || stats.armor_damage_mods) && (
-            <StatSection title="Damage & Armor Modifiers" icon={<Swords className="h-4 w-4" />}>
+            <StatSection title="Damage & Armor Modifiers" icon={<Swords className="h-4 w-4" />} defaultOpen>
               <div className="space-y-4">
                 {stats.damage_mods && (
                   <DamageModsGrid mods={stats.damage_mods} title="Damage Resistance" />
@@ -126,9 +127,31 @@ export default function UnitDetail() {
             </StatSection>
           )}
 
+          {/* Status Immunities */}
+          {unit.statsConfig?.status_effect_immunities && unit.statsConfig.status_effect_immunities.length > 0 && (
+            <StatSection title="Status Effect Immunities" icon={<Shield className="h-4 w-4" />} defaultOpen>
+              <div className="flex flex-wrap gap-2">
+                {unit.statsConfig.status_effect_immunities.map((immunityId) => {
+                  const displayName = getStatusEffectDisplayName(immunityId);
+                  const color = getStatusEffectColor(immunityId);
+                  return (
+                    <Badge 
+                      key={immunityId} 
+                      variant="outline"
+                      className="border-2"
+                      style={{ borderColor: color, color }}
+                    >
+                      {t(displayName)}
+                    </Badge>
+                  );
+                })}
+              </div>
+            </StatSection>
+          )}
+
           {/* Abilities */}
           {unit.weapons && Object.keys(unit.weapons.weapons).length > 0 && (
-            <StatSection title="Abilities" icon={<Swords className="h-4 w-4" />}>
+            <StatSection title="Abilities" icon={<Swords className="h-4 w-4" />} defaultOpen>
               <div className="space-y-4">
                 {Object.entries(unit.weapons.weapons).flatMap(([weaponKey, weapon]) =>
                   weapon.abilities.map((abilId) => {
@@ -158,7 +181,7 @@ export default function UnitDetail() {
 
           {/* Requirements */}
           {unit.requirements && (
-            <StatSection title="Build Requirements" icon={<Coins className="h-4 w-4" />}>
+            <StatSection title="Build Requirements" icon={<Coins className="h-4 w-4" />} defaultOpen>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {Object.entries(unit.requirements.cost).map(([resource, amount]) => (
                   <StatRow key={resource} label={resource} value={amount.toLocaleString()} />
@@ -173,7 +196,7 @@ export default function UnitDetail() {
 
           {/* Healing */}
           {unit.healing && (
-            <StatSection title="Healing" icon={<Wrench className="h-4 w-4" />}>
+            <StatSection title="Healing" icon={<Wrench className="h-4 w-4" />} defaultOpen>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {Object.entries(unit.healing.heal_cost).map(([resource, amount]) => (
                   <StatRow key={resource} label={resource} value={amount.toLocaleString()} />
@@ -182,19 +205,6 @@ export default function UnitDetail() {
                   label="Heal Time" 
                   value={<span className="flex items-center gap-1"><Clock className="h-4 w-4" />{unit.healing.heal_time}s</span>} 
                 />
-              </div>
-            </StatSection>
-          )}
-
-          {/* Status Immunities */}
-          {unit.statsConfig?.status_effect_immunities && unit.statsConfig.status_effect_immunities.length > 0 && (
-            <StatSection title="Status Immunities" icon={<Shield className="h-4 w-4" />}>
-              <div className="flex flex-wrap gap-2">
-                {unit.statsConfig.status_effect_immunities.map((immunity) => (
-                  <Badge key={immunity} variant="secondary">
-                    Effect #{immunity}
-                  </Badge>
-                ))}
               </div>
             </StatSection>
           )}
