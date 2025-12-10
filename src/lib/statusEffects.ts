@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import statusEffectFamiliesData from "@/data/status_effect_families.json";
+import statusEffectsData from "@/data/status_effects.json";
 
 const BUCKET_NAME = "status-icons";
 
@@ -12,24 +13,52 @@ interface StatusEffectFamily {
   ui_icon: string;
 }
 
+interface StatusEffect {
+  family: number;
+  duration: number;
+  status_effect_type: number;
+  dot_ability_damage_mult?: number;
+  dot_bonus_damage?: number;
+  dot_damage_type?: number;
+  dot_diminishing?: boolean;
+  dot_ap_percent?: number;
+  stun_block_action?: boolean;
+  stun_block_movement?: boolean;
+}
+
 const families = statusEffectFamiliesData as Record<string, StatusEffectFamily>;
+const effects = statusEffectsData as Record<string, StatusEffect>;
 
-export function getStatusEffectFamily(id: number): StatusEffectFamily | undefined {
-  return families[id.toString()];
+// Get family directly by family ID (for immunities which use family IDs)
+export function getStatusEffectFamily(familyId: number): StatusEffectFamily | undefined {
+  return families[familyId.toString()];
 }
 
-export function getStatusEffectDisplayName(id: number): string {
-  const family = getStatusEffectFamily(id);
-  return family?.display_name || `Effect #${id}`;
+// Get status effect by effect ID, then resolve to family
+export function getStatusEffect(effectId: number): StatusEffect | undefined {
+  return effects[effectId.toString()];
 }
 
-export function getStatusEffectColor(id: number): string {
-  const family = getStatusEffectFamily(id);
+// Get family from a status effect ID (for abilities which use effect IDs)
+export function getFamilyFromEffectId(effectId: number): StatusEffectFamily | undefined {
+  const effect = getStatusEffect(effectId);
+  if (!effect) return undefined;
+  return getStatusEffectFamily(effect.family);
+}
+
+// For immunities (which use family IDs directly)
+export function getStatusEffectDisplayName(familyId: number): string {
+  const family = getStatusEffectFamily(familyId);
+  return family?.display_name || `Effect #${familyId}`;
+}
+
+export function getStatusEffectColor(familyId: number): string {
+  const family = getStatusEffectFamily(familyId);
   return family?.color_hex ? `#${family.color_hex}` : "#888888";
 }
 
-export function getStatusEffectIconUrl(id: number): string | null {
-  const family = getStatusEffectFamily(id);
+export function getStatusEffectIconUrl(familyId: number): string | null {
+  const family = getStatusEffectFamily(familyId);
   if (!family?.ui_icon) return null;
   
   const { data } = supabase.storage
@@ -37,6 +66,33 @@ export function getStatusEffectIconUrl(id: number): string | null {
     .getPublicUrl(`${family.ui_icon}.png`);
   
   return data.publicUrl;
+}
+
+// For abilities (which use effect IDs that need to be resolved to families)
+export function getEffectDisplayName(effectId: number): string {
+  const family = getFamilyFromEffectId(effectId);
+  return family?.display_name || `Effect #${effectId}`;
+}
+
+export function getEffectColor(effectId: number): string {
+  const family = getFamilyFromEffectId(effectId);
+  return family?.color_hex ? `#${family.color_hex}` : "#888888";
+}
+
+export function getEffectIconUrl(effectId: number): string | null {
+  const family = getFamilyFromEffectId(effectId);
+  if (!family?.ui_icon) return null;
+  
+  const { data } = supabase.storage
+    .from(BUCKET_NAME)
+    .getPublicUrl(`${family.ui_icon}.png`);
+  
+  return data.publicUrl;
+}
+
+export function getEffectDuration(effectId: number): number {
+  const effect = getStatusEffect(effectId);
+  return effect?.duration || 0;
 }
 
 export function getAllStatusEffectFamilies(): { id: number; family: StatusEffectFamily }[] {

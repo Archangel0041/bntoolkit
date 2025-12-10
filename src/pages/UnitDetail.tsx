@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/select";
 import { getUnitById } from "@/lib/units";
 import { getAbilityById } from "@/lib/abilities";
-import { getStatusEffectDisplayName, getStatusEffectColor, getStatusEffectIconUrl } from "@/lib/statusEffects";
+import { getStatusEffectDisplayName, getStatusEffectColor, getStatusEffectIconUrl, getEffectDisplayName, getEffectColor, getEffectIconUrl, getEffectDuration } from "@/lib/statusEffects";
 import { getClassDisplayName } from "@/lib/battleConfig";
 import { getAbilityImageUrl } from "@/lib/abilityImages";
 import { getDamageTypeName, getDamageTypeIconUrl } from "@/lib/damageImages";
@@ -310,9 +310,10 @@ export default function UnitDetail() {
                             <div className="flex flex-wrap gap-2">
                               {Object.entries(ability.stats.status_effects).map(([effectId, chance]) => {
                                 const id = parseInt(effectId);
-                                const displayName = getStatusEffectDisplayName(id);
-                                const color = getStatusEffectColor(id);
-                                const iconUrl = getStatusEffectIconUrl(id);
+                                const displayName = getEffectDisplayName(id);
+                                const color = getEffectColor(id);
+                                const iconUrl = getEffectIconUrl(id);
+                                const duration = getEffectDuration(id);
                                 return (
                                   <div 
                                     key={effectId} 
@@ -328,7 +329,7 @@ export default function UnitDetail() {
                                       />
                                     )}
                                     <span>{t(displayName)}</span>
-                                    <span className="opacity-70">({chance}%)</span>
+                                    <span className="opacity-70">({chance}%{duration > 0 ? `, ${duration}t` : ""})</span>
                                   </div>
                                 );
                               })}
