@@ -29,17 +29,19 @@ const languageFiles: Record<SupportedLanguage, LocalizedFile> = {
 };
 
 // Build lookup maps for performance
-const keyToIdMap = new Map<string, number>();
+// Use string keys because IDs exceed Number.MAX_SAFE_INTEGER and lose precision as numbers
+const keyToIdMap = new Map<string, string>();
 shared.m_Entries.forEach((entry) => {
-  keyToIdMap.set(entry.m_Key, entry.m_Id);
+  // Convert ID to string to preserve precision for large numbers
+  keyToIdMap.set(entry.m_Key, String(entry.m_Id));
 });
 
-const idToTextMaps: Record<SupportedLanguage, Map<number, string>> = {} as Record<SupportedLanguage, Map<number, string>>;
+const idToTextMaps: Record<SupportedLanguage, Map<string, string>> = {} as Record<SupportedLanguage, Map<string, string>>;
 
 Object.entries(languageFiles).forEach(([lang, file]) => {
-  const map = new Map<number, string>();
+  const map = new Map<string, string>();
   file.m_TableData.forEach((entry) => {
-    map.set(entry.m_Id, entry.m_Localized);
+    map.set(String(entry.m_Id), entry.m_Localized);
   });
   idToTextMaps[lang as SupportedLanguage] = map;
 });
