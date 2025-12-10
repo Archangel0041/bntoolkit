@@ -235,8 +235,8 @@ export default function UnitDetail() {
                   return (
                     <div 
                       key={immunityId} 
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg border-2"
-                      style={{ borderColor: color, backgroundColor: `${color}15` }}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded-lg border bg-card shadow-sm"
+                      style={{ borderColor: color, borderLeftWidth: 4 }}
                     >
                       {iconUrl && (
                         <img 
@@ -246,7 +246,7 @@ export default function UnitDetail() {
                           onError={(e) => { e.currentTarget.style.display = 'none'; }}
                         />
                       )}
-                      <span style={{ color }}>{t(displayName)}</span>
+                      <span className="font-medium text-foreground">{t(displayName)}</span>
                     </div>
                   );
                 })}
@@ -317,8 +317,8 @@ export default function UnitDetail() {
                                 return (
                                   <div 
                                     key={effectId} 
-                                    className="flex items-center gap-1.5 px-2 py-1 rounded text-xs"
-                                    style={{ backgroundColor: `${color}20`, color }}
+                                    className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs bg-muted border"
+                                    style={{ borderColor: color, borderLeftWidth: 3 }}
                                   >
                                     {iconUrl && (
                                       <img 
@@ -328,8 +328,8 @@ export default function UnitDetail() {
                                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                       />
                                     )}
-                                    <span>{t(displayName)}</span>
-                                    <span className="opacity-70">({chance}%{duration > 0 ? `, ${duration}t` : ""})</span>
+                                    <span className="text-foreground font-medium">{t(displayName)}</span>
+                                    <span className="text-muted-foreground">({chance}%{duration > 0 ? `, ${duration}t` : ""})</span>
                                   </div>
                                 );
                               })}
