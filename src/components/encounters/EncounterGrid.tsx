@@ -22,7 +22,7 @@ export function EncounterGrid({ units, showPlayerUnits, compact = false }: Encou
     return showPlayerUnits?.find(u => u.grid_id === gridId);
   };
 
-  const renderSlot = (gridId: number, isRow3 = false) => {
+  const renderSlot = (gridId: number) => {
     const encounterUnit = getUnitAtPosition(gridId);
     const playerUnit = getPlayerUnitAtPosition(gridId);
     const unit = encounterUnit || playerUnit;
@@ -36,11 +36,9 @@ export function EncounterGrid({ units, showPlayerUnits, compact = false }: Encou
           key={gridId}
           className={cn(
             slotSize,
-            "border border-dashed border-muted-foreground/30 rounded-md flex items-center justify-center text-xs text-muted-foreground/50"
+            "border border-dashed border-muted-foreground/20 rounded-md"
           )}
-        >
-          {gridId}
-        </div>
+        />
       );
     }
 
@@ -78,19 +76,19 @@ export function EncounterGrid({ units, showPlayerUnits, compact = false }: Encou
 
   return (
     <div className="flex flex-col items-center gap-2">
-      {/* Row 1: positions 4,3,2,1,0 (left to right visually) */}
+      {/* Row 3 (back row): positions 13,12,11 - now at top */}
       <div className="flex gap-1">
-        {GRID_LAYOUT.ROW_1.map(gridId => renderSlot(gridId))}
+        {GRID_LAYOUT.ROW_3.map(gridId => renderSlot(gridId))}
       </div>
       
-      {/* Row 2: positions 9,8,7,6,5 */}
+      {/* Row 2 (middle): positions 9,8,7,6,5 */}
       <div className="flex gap-1">
         {GRID_LAYOUT.ROW_2.map(gridId => renderSlot(gridId))}
       </div>
       
-      {/* Row 3: positions 13,12,11 (centered) */}
+      {/* Row 1 (front row): positions 4,3,2,1,0 - now at bottom */}
       <div className="flex gap-1">
-        {GRID_LAYOUT.ROW_3.map(gridId => renderSlot(gridId, true))}
+        {GRID_LAYOUT.ROW_1.map(gridId => renderSlot(gridId))}
       </div>
     </div>
   );
