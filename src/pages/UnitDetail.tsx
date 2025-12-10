@@ -108,7 +108,15 @@ export default function UnitDetail() {
   const canAddToCompare = compareUnits.length < 2;
 
   const classDisplayName = t(getClassDisplayName(unit.identity.class_name));
-  const sideLabel = unit.identity.side === 1 ? "Friendly" : unit.identity.side === 2 ? "Enemy" : `Side ${unit.identity.side}`;
+  const sideLabels: Record<number, string> = {
+    1: "Friendly",
+    2: "Enemy", 
+    3: "Unknown",
+    4: "Cast (NPC)",
+    5: "Boss",
+    6: "Test",
+  };
+  const sideLabel = sideLabels[unit.identity.side] || `Side ${unit.identity.side}`;
 
   const handleCompareClick = () => {
     if (inCompare) {

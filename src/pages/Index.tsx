@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { Header } from "@/components/Header";
 import { UnitFilters } from "@/components/units/UnitFilters";
 import { UnitGrid } from "@/components/units/UnitGrid";
@@ -6,7 +6,15 @@ import { CompareBar } from "@/components/units/CompareBar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { allUnits, getAllTags, filterUnits } from "@/lib/units";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { toast } from "sonner";
+
+const SIDE_LABELS: Record<number, string> = {
+  1: "Friendly",
+  2: "Enemy",
+  3: "Unknown",
+  4: "Cast (NPCs)",
+  5: "Bosses",
+  6: "Test",
+};
 
 const Index = () => {
   const { t } = useLanguage();
@@ -16,22 +24,9 @@ const Index = () => {
 
   const allTags = useMemo(() => getAllTags(), []);
 
-  // Check for unusual sides on mount
-  useEffect(() => {
-    const unusualUnits = allUnits.filter(u => u.identity.side !== 1 && u.identity.side !== 2);
-    if (unusualUnits.length > 0) {
-      const sides = [...new Set(unusualUnits.map(u => u.identity.side))];
-      toast.warning(`Found ${unusualUnits.length} units with unusual sides: ${sides.join(", ")}`, {
-        duration: 10000,
-      });
-      console.log("Units with unusual sides:", unusualUnits.map(u => ({ id: u.id, name: u.identity.name, side: u.identity.side })));
-    }
-  }, []);
-
   const filteredUnits = useMemo(() => {
     let units = filterUnits(allUnits, searchQuery, selectedTags, null, t);
     
-    // Apply nanopod filter
     if (nanopodFilter === "nanopod") {
       units = units.filter(u => u.requirements?.cost?.nanopods && u.requirements.cost.nanopods > 0);
     } else if (nanopodFilter === "non-nanopod") {
@@ -41,9 +36,14 @@ const Index = () => {
     return units;
   }, [searchQuery, selectedTags, nanopodFilter, t]);
 
-  const friendlyUnits = useMemo(() => filteredUnits.filter(u => u.identity.side === 1), [filteredUnits]);
-  const enemyUnits = useMemo(() => filteredUnits.filter(u => u.identity.side === 2), [filteredUnits]);
-  const otherUnits = useMemo(() => filteredUnits.filter(u => u.identity.side !== 1 && u.identity.side !== 2), [filteredUnits]);
+  const unitsBySide = useMemo(() => ({
+    friendly: filteredUnits.filter(u => u.identity.side === 1),
+    enemy: filteredUnits.filter(u => u.identity.side === 2),
+    unknown: filteredUnits.filter(u => u.identity.side === 3),
+    cast: filteredUnits.filter(u => u.identity.side === 4),
+    bosses: filteredUnits.filter(u => u.identity.side === 5),
+    test: filteredUnits.filter(u => u.identity.side === 6),
+  }), [filteredUnits]);
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -71,28 +71,53 @@ const Index = () => {
         </div>
 
         <Tabs defaultValue="friendly" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+          <TabsList className="flex flex-wrap h-auto gap-1">
             <TabsTrigger value="friendly">
-              Friendly Units ({friendlyUnits.length})
+              Friendly ({unitsBySide.friendly.length})
             </TabsTrigger>
             <TabsTrigger value="enemy">
-              Enemy Units ({enemyUnits.length})
+              Enemy ({unitsBySide.enemy.length})
             </TabsTrigger>
+            {unitsBySide.bosses.length > 0 && (
+              <TabsTrigger value="bosses">
+                Bosses ({unitsBySide.bosses.length})
+              </TabsTrigger>
+            )}
+            {unitsBySide.cast.length > 0 && (
+              <TabsTrigger value="cast">
+                Cast/NPCs ({unitsBySide.cast.length})
+              </TabsTrigger>
+            )}
+            {unitsBySide.unknown.length > 0 && (
+              <TabsTrigger value="unknown">
+                Unknown ({unitsBySide.unknown.length})
+              </TabsTrigger>
+            )}
+            {unitsBySide.test.length > 0 && (
+              <TabsTrigger value="test">
+                Test ({unitsBySide.test.length})
+              </TabsTrigger>
+            )}
           </TabsList>
           <TabsContent value="friendly" className="mt-6">
-            <UnitGrid units={friendlyUnits} />
+            <UnitGrid units={unitsBySide.friendly} />
           </TabsContent>
           <TabsContent value="enemy" className="mt-6">
-            <UnitGrid units={enemyUnits} />
+            <UnitGrid units={unitsBySide.enemy} />
+          </TabsContent>
+          <TabsContent value="bosses" className="mt-6">
+            <UnitGrid units={unitsBySide.bosses} />
+          </TabsContent>
+          <TabsContent value="cast" className="mt-6">
+            <UnitGrid units={unitsBySide.cast} />
+          </TabsContent>
+          <TabsContent value="unknown" className="mt-6">
+            <UnitGrid units={unitsBySide.unknown} />
+          </TabsContent>
+          <TabsContent value="test" className="mt-6">
+            <UnitGrid units={unitsBySide.test} />
           </TabsContent>
         </Tabs>
-
-        {otherUnits.length > 0 && (
-          <div className="mt-8">
-            <h2 className="text-xl font-semibold mb-4">Other Units (Side: Unknown)</h2>
-            <UnitGrid units={otherUnits} />
-          </div>
-        )}
       </main>
       <CompareBar />
     </div>
