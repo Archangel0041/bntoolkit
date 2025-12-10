@@ -27,8 +27,29 @@ export function getMenuBackgroundUrl(backgroundKey: string): string {
   return data.publicUrl;
 }
 
+// Common icon mappings from encounter icon field to actual file names
+const encounterIconMappings: Record<string, string> = {
+  "raider": "encounter_raider_event_boss_icon",
+  "rebel_avatar": "encounter_rebel_event_boss_icon",
+  "infected": "challenge_encounter_infected_icon",
+  "silverwolves": "challenge_encounter_silver_wolves_icon",
+  "rebel": "challenge_encounter_rebel_icon",
+  "grouper": "encounter_grouper_icon",
+  "raptor": "land_encounter_raptor",
+  "boar": "land_encounter_boar",
+  "mammoth": "land_encounter_mammoth",
+  "spider_wasp": "encounter_spider_wasp_icon",
+  "kraken": "encounter_kraken_icon",
+  "gantas": "gantas",
+};
+
 export function getEncounterIconUrl(iconKey: string): string {
-  const fileName = `${iconKey}.png`;
+  // Check if we have a mapping for this icon
+  const mappedIcon = encounterIconMappings[iconKey.toLowerCase()];
+  const fileName = mappedIcon 
+    ? `${mappedIcon}.png`
+    : iconKey.endsWith('.png') ? iconKey : `${iconKey}.png`;
+  
   const { data } = supabase.storage.from(ENCOUNTER_ICONS_BUCKET).getPublicUrl(fileName);
   return data.publicUrl;
 }
