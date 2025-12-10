@@ -3,16 +3,21 @@ import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { uploadMultipleImages, listUploadedImages } from "@/lib/unitImages";
-import { Upload, CheckCircle, XCircle, FolderOpen } from "lucide-react";
+import { uploadMultipleAbilityImages, listUploadedAbilityImages } from "@/lib/abilityImages";
+import { Upload, CheckCircle, XCircle, FolderOpen, Users, Swords } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
+
+type UploadType = "units" | "abilities";
 
 export default function UploadImages() {
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, fileName: "" });
   const [results, setResults] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
-  const [uploadedCount, setUploadedCount] = useState<number | null>(null);
+  const [uploadedCount, setUploadedCount] = useState<{ units: number | null; abilities: number | null }>({ units: null, abilities: null });
+  const [activeTab, setActiveTab] = useState<UploadType>("units");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -24,7 +29,8 @@ export default function UploadImages() {
     setResults(null);
     setProgress({ current: 0, total: files.length, fileName: "" });
 
-    const uploadResults = await uploadMultipleImages(files, (current, total, fileName) => {
+    const uploadFn = activeTab === "units" ? uploadMultipleImages : uploadMultipleAbilityImages;
+    const uploadResults = await uploadFn(files, (current, total, fileName) => {
       setProgress({ current, total, fileName });
     });
 
@@ -34,19 +40,19 @@ export default function UploadImages() {
     if (uploadResults.success > 0) {
       toast({
         title: "Upload Complete",
-        description: `Successfully uploaded ${uploadResults.success} images.`,
+        description: `Successfully uploaded ${uploadResults.success} ${activeTab === "units" ? "unit" : "ability"} images.`,
       });
     }
 
-    // Reset file input
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
-  const checkUploadedImages = async () => {
-    const images = await listUploadedImages();
-    setUploadedCount(images.length);
+  const checkUploadedImages = async (type: UploadType) => {
+    const listFn = type === "units" ? listUploadedImages : listUploadedAbilityImages;
+    const images = await listFn();
+    setUploadedCount(prev => ({ ...prev, [type]: images.length }));
   };
 
   return (
@@ -55,9 +61,9 @@ export default function UploadImages() {
       <main className="container mx-auto px-4 py-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Upload Unit Images</h1>
+            <h1 className="text-3xl font-bold">Upload Images</h1>
             <p className="text-muted-foreground">
-              Upload your unit images to display them in the database.
+              Upload unit and ability images to display them in the database.
             </p>
           </div>
           <Button asChild variant="outline">
@@ -65,104 +71,190 @@ export default function UploadImages() {
           </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Bulk Image Upload</CardTitle>
-            <CardDescription>
-              Select multiple image files to upload. File names should match the icon names from the unit data
-              (e.g., <code className="bg-muted px-1 rounded">air_ancient_fragment_icon.png</code>).
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleFileSelect}
-              className="hidden"
-              id="file-upload"
-            />
-            
-            <div className="flex gap-4">
-              <Button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="gap-2"
-              >
-                <Upload className="h-4 w-4" />
-                {isUploading ? "Uploading..." : "Select Images"}
-              </Button>
-              
-              <Button variant="outline" onClick={checkUploadedImages} className="gap-2">
-                <FolderOpen className="h-4 w-4" />
-                Check Uploaded Count
-              </Button>
-            </div>
+        <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as UploadType); setResults(null); }}>
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="units" className="gap-2">
+              <Users className="h-4 w-4" />
+              Unit Images
+            </TabsTrigger>
+            <TabsTrigger value="abilities" className="gap-2">
+              <Swords className="h-4 w-4" />
+              Ability Icons
+            </TabsTrigger>
+          </TabsList>
 
-            {uploadedCount !== null && (
-              <p className="text-sm text-muted-foreground">
-                Currently {uploadedCount} images uploaded in storage.
-              </p>
-            )}
-
-            {isUploading && (
-              <div className="space-y-2">
-                <Progress value={(progress.current / progress.total) * 100} />
-                <p className="text-sm text-muted-foreground">
-                  Uploading {progress.current} of {progress.total}: {progress.fileName}
-                </p>
-              </div>
-            )}
-
-            {results && (
-              <div className="space-y-3 pt-4 border-t">
-                <div className="flex gap-6">
-                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                    <CheckCircle className="h-5 w-5" />
-                    <span className="font-medium">{results.success} succeeded</span>
-                  </div>
-                  {results.failed > 0 && (
-                    <div className="flex items-center gap-2 text-destructive">
-                      <XCircle className="h-5 w-5" />
-                      <span className="font-medium">{results.failed} failed</span>
-                    </div>
-                  )}
+          <TabsContent value="units" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Unit Image Upload</CardTitle>
+                <CardDescription>
+                  File names should match unit icon names (e.g., <code className="bg-muted px-1 rounded">air_ancient_fragment_icon.png</code>).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  id="file-upload"
+                />
+                
+                <div className="flex gap-4">
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="gap-2"
+                  >
+                    <Upload className="h-4 w-4" />
+                    {isUploading ? "Uploading..." : "Select Images"}
+                  </Button>
+                  
+                  <Button variant="outline" onClick={() => checkUploadedImages("units")} className="gap-2">
+                    <FolderOpen className="h-4 w-4" />
+                    Check Count
+                  </Button>
                 </div>
 
-                {results.errors.length > 0 && (
-                  <div className="bg-destructive/10 rounded-lg p-3">
-                    <p className="font-medium text-destructive mb-2">Errors:</p>
-                    <ul className="text-sm text-destructive space-y-1">
-                      {results.errors.slice(0, 10).map((error, i) => (
-                        <li key={i}>{error}</li>
-                      ))}
-                      {results.errors.length > 10 && (
-                        <li>...and {results.errors.length - 10} more</li>
-                      )}
-                    </ul>
-                  </div>
+                {uploadedCount.units !== null && (
+                  <p className="text-sm text-muted-foreground">
+                    Currently {uploadedCount.units} unit images uploaded.
+                  </p>
                 )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+
+                <UploadProgress isUploading={isUploading} progress={progress} results={results} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="abilities" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Ability Icon Upload</CardTitle>
+                <CardDescription>
+                  File names should match ability icon names (e.g., <code className="bg-muted px-1 rounded">ancient_lasershot_icon.png</code>, <code className="bg-muted px-1 rounded">chem_cloud_icon.png</code>).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleFileSelect}
+                  className="hidden"
+                  id="file-upload-abilities"
+                />
+                
+                <div className="flex gap-4">
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="gap-2"
+                  >
+                    <Upload className="h-4 w-4" />
+                    {isUploading ? "Uploading..." : "Select Icons"}
+                  </Button>
+                  
+                  <Button variant="outline" onClick={() => checkUploadedImages("abilities")} className="gap-2">
+                    <FolderOpen className="h-4 w-4" />
+                    Check Count
+                  </Button>
+                </div>
+
+                {uploadedCount.abilities !== null && (
+                  <p className="text-sm text-muted-foreground">
+                    Currently {uploadedCount.abilities} ability icons uploaded.
+                  </p>
+                )}
+
+                <UploadProgress isUploading={isUploading} progress={progress} results={results} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         <Card>
           <CardHeader>
-            <CardTitle>Naming Convention</CardTitle>
+            <CardTitle>Naming Conventions</CardTitle>
           </CardHeader>
           <CardContent className="prose dark:prose-invert max-w-none">
-            <p className="text-muted-foreground">
-              Image files should be named to match the <code>icon</code> or <code>back_icon</code> fields from the unit data:
-            </p>
-            <ul className="text-sm text-muted-foreground space-y-1">
-              <li><code>air_ancient_fragment_icon.png</code> → matches <code>"icon": "air_ancient_fragment_icon"</code></li>
-              <li><code>army_view_air_ancient_fragment.png</code> → matches <code>"back_icon": "army_view_air_ancient_fragment"</code></li>
-            </ul>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="font-medium mb-2">Unit Images</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li><code>air_ancient_fragment_icon.png</code></li>
+                  <li><code>army_view_air_ancient_fragment.png</code></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-medium mb-2">Ability Icons</h4>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li><code>ancient_lasershot_icon.png</code></li>
+                  <li><code>chem_cloud_icon.png</code></li>
+                  <li><code>chem_hose_icon.png</code></li>
+                </ul>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </main>
     </div>
+  );
+}
+
+function UploadProgress({ 
+  isUploading, 
+  progress, 
+  results 
+}: { 
+  isUploading: boolean; 
+  progress: { current: number; total: number; fileName: string }; 
+  results: { success: number; failed: number; errors: string[] } | null;
+}) {
+  return (
+    <>
+      {isUploading && (
+        <div className="space-y-2">
+          <Progress value={(progress.current / progress.total) * 100} />
+          <p className="text-sm text-muted-foreground">
+            Uploading {progress.current} of {progress.total}: {progress.fileName}
+          </p>
+        </div>
+      )}
+
+      {results && (
+        <div className="space-y-3 pt-4 border-t">
+          <div className="flex gap-6">
+            <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+              <CheckCircle className="h-5 w-5" />
+              <span className="font-medium">{results.success} succeeded</span>
+            </div>
+            {results.failed > 0 && (
+              <div className="flex items-center gap-2 text-destructive">
+                <XCircle className="h-5 w-5" />
+                <span className="font-medium">{results.failed} failed</span>
+              </div>
+            )}
+          </div>
+
+          {results.errors.length > 0 && (
+            <div className="bg-destructive/10 rounded-lg p-3">
+              <p className="font-medium text-destructive mb-2">Errors:</p>
+              <ul className="text-sm text-destructive space-y-1">
+                {results.errors.slice(0, 10).map((error, i) => (
+                  <li key={i}>{error}</li>
+                ))}
+                {results.errors.length > 10 && (
+                  <li>...and {results.errors.length - 10} more</li>
+                )}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </>
   );
 }
