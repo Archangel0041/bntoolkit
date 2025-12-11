@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { getUnitById } from "@/lib/units";
 import { UnitImage } from "@/components/units/UnitImage";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Crosshair } from "lucide-react";
 import type { EncounterUnit } from "@/types/encounters";
 import type { PartyUnit, DamagePreview, SelectedUnit, TargetArea } from "@/types/battleSimulator";
-import { ENEMY_GRID_LAYOUT, FRIENDLY_GRID_LAYOUT, getAffectedGridPositions } from "@/types/battleSimulator";
+import { ENEMY_GRID_LAYOUT, FRIENDLY_GRID_LAYOUT, GRID_ID_TO_COORDS, COORDS_TO_GRID_ID, getAffectedGridPositions } from "@/types/battleSimulator";
 
 interface BattleGridProps {
   isEnemy: boolean;
@@ -21,7 +22,7 @@ interface BattleGridProps {
   // Targeting reticle props - only shows when this grid is the TARGET side
   targetArea?: TargetArea;
   reticleGridId?: number;
-  onReticleClick?: (gridId: number) => void;
+  onReticleMove?: (gridId: number) => void;
   showReticle?: boolean; // Whether to show the reticle on this grid
 }
 
@@ -46,19 +47,102 @@ export function BattleGrid({
   onAddUnit,
   targetArea,
   reticleGridId,
-  onReticleClick,
+  onReticleMove,
   showReticle = false,
 }: BattleGridProps) {
   const { t } = useLanguage();
   const layout = isEnemy ? ENEMY_GRID_LAYOUT : FRIENDLY_GRID_LAYOUT;
+  const gridRef = useRef<HTMLDivElement>(null);
   const [draggedGridId, setDraggedGridId] = useState<number | null>(null);
   const [dragOverGridId, setDragOverGridId] = useState<number | null>(null);
+  const [isDraggingReticle, setIsDraggingReticle] = useState(false);
 
   // Calculate which grid positions are affected by the reticle (only if showReticle is true)
   const affectedPositions = showReticle && reticleGridId !== undefined && targetArea
     ? getAffectedGridPositions(reticleGridId, targetArea, isEnemy)
     : [];
 
+  // Keyboard controls for reticle movement
+  useEffect(() => {
+    if (!showReticle || reticleGridId === undefined || !onReticleMove) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle if this grid is focused or no specific element is focused
+      if (document.activeElement && document.activeElement !== document.body && 
+          !gridRef.current?.contains(document.activeElement)) return;
+
+      const coords = GRID_ID_TO_COORDS[reticleGridId];
+      if (!coords) return;
+
+      let newX = coords.x;
+      let newY = coords.y;
+
+      switch (e.key) {
+        case "ArrowLeft":
+          newX = Math.max(0, coords.x - 1);
+          break;
+        case "ArrowRight":
+          newX = Math.min(4, coords.x + 1);
+          break;
+        case "ArrowUp":
+          // Up moves toward back row (higher y)
+          newY = Math.min(2, coords.y + 1);
+          break;
+        case "ArrowDown":
+          // Down moves toward front row (lower y)
+          newY = Math.max(0, coords.y - 1);
+          break;
+        default:
+          return;
+      }
+
+      const newGridId = COORDS_TO_GRID_ID[`${newX},${newY}`];
+      if (newGridId !== undefined && newGridId !== reticleGridId) {
+        e.preventDefault();
+        onReticleMove(newGridId);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showReticle, reticleGridId, onReticleMove]);
+
+  // Drag handlers for reticle
+  const handleReticleDragStart = (e: React.DragEvent, gridId: number) => {
+    if (!showReticle || reticleGridId !== gridId) return;
+    e.dataTransfer.setData("application/x-reticle", gridId.toString());
+    e.dataTransfer.effectAllowed = "move";
+    setIsDraggingReticle(true);
+  };
+
+  const handleReticleDragOver = (e: React.DragEvent, gridId: number) => {
+    if (!showReticle) return;
+    // Check if we're dragging a reticle
+    if (e.dataTransfer.types.includes("application/x-reticle")) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      setDragOverGridId(gridId);
+    }
+  };
+
+  const handleReticleDrop = (e: React.DragEvent, targetGridId: number) => {
+    if (!showReticle) return;
+    const reticleData = e.dataTransfer.getData("application/x-reticle");
+    if (reticleData && onReticleMove) {
+      e.preventDefault();
+      e.stopPropagation();
+      onReticleMove(targetGridId);
+      setIsDraggingReticle(false);
+      setDragOverGridId(null);
+      return true;
+    }
+    return false;
+  };
+
+  const handleReticleDragEnd = () => {
+    setIsDraggingReticle(false);
+    setDragOverGridId(null);
+  };
   const getUnitAtPosition = (gridId: number) => {
     if (isEnemy) {
       return (units as EncounterUnit[]).find(u => u.grid_id === gridId);
@@ -71,6 +155,8 @@ export function BattleGrid({
   };
 
   const handleDragStart = (e: React.DragEvent, gridId: number, unitId: number) => {
+    // If reticle is showing, don't allow unit drag
+    if (showReticle) return;
     if (isEnemy) return;
     e.dataTransfer.setData("text/plain", gridId.toString());
     e.dataTransfer.setData("application/x-formation-unit", JSON.stringify({ gridId, unitId }));
@@ -78,6 +164,11 @@ export function BattleGrid({
   };
 
   const handleDragOver = (e: React.DragEvent, gridId: number) => {
+    // Handle reticle drag over
+    if (showReticle && e.dataTransfer.types.includes("application/x-reticle")) {
+      handleReticleDragOver(e, gridId);
+      return;
+    }
     if (isEnemy) return;
     e.preventDefault();
     setDragOverGridId(gridId);
@@ -88,6 +179,13 @@ export function BattleGrid({
   };
 
   const handleDrop = (e: React.DragEvent, targetGridId: number) => {
+    // Handle reticle drop first
+    if (showReticle && handleReticleDrop(e, targetGridId)) {
+      return;
+    }
+    
+    if (isEnemy) return;
+    e.preventDefault();
     if (isEnemy) return;
     e.preventDefault();
     
@@ -113,6 +211,7 @@ export function BattleGrid({
   const handleDragEnd = () => {
     setDraggedGridId(null);
     setDragOverGridId(null);
+    handleReticleDragEnd();
   };
 
   // Calculate remaining HP/Armor range after attack
@@ -142,37 +241,47 @@ export function BattleGrid({
     const isReticleCenter = showReticle && reticleGridId === gridId;
     
     const slotSize = "w-16 h-16 sm:w-18 sm:h-18";
-
-    // Handle clicking to move reticle position
-    const handleReticleAreaClick = (e: React.MouseEvent) => {
-      if (showReticle && onReticleClick && targetArea) {
-        e.stopPropagation(); // Prevent unit click
-        onReticleClick(gridId);
-      }
+    
+    // Get the label for this slot based on damage percent
+    const getDamageLabel = () => {
+      if (!affectedPos) return null;
+      if (affectedPos.damagePercent === 100) return "Target";
+      return `Splash ${affectedPos.damagePercent}%`;
     };
     
     if (!encounterUnit) {
       return (
         <div
           key={gridId}
-          className={cn(
-            slotSize,
-            "border border-dashed border-muted-foreground/20 rounded-md transition-all flex items-center justify-center",
-            isDragOver && "border-primary bg-primary/20 border-solid",
-            // Reticle highlighting for empty slots
-            isReticleCenter && "border-yellow-500 border-solid border-2 bg-yellow-500/20",
-            isAffectedByReticle && !isReticleCenter && "border-orange-500 border-solid bg-orange-500/10",
-            showReticle && targetArea && "cursor-crosshair"
-          )}
+          draggable={isReticleCenter}
+          onDragStart={(e) => isReticleCenter && handleReticleDragStart(e, gridId)}
           onDragOver={(e) => handleDragOver(e, gridId)}
           onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, gridId)}
-          onClick={handleReticleAreaClick}
+          onDragEnd={handleDragEnd}
+          className={cn(
+            slotSize,
+            "border border-dashed border-muted-foreground/20 rounded-md transition-all flex flex-col items-center justify-center relative",
+            isDragOver && showReticle && "border-yellow-400 bg-yellow-500/20 border-solid",
+            isDragOver && !showReticle && "border-primary bg-primary/20 border-solid",
+            // Reticle highlighting for empty slots
+            isReticleCenter && "border-yellow-500 border-solid border-2 bg-yellow-500/20",
+            isAffectedByReticle && !isReticleCenter && "border-orange-500 border-solid bg-orange-500/10",
+            isReticleCenter && "cursor-grab",
+            isDraggingReticle && isReticleCenter && "opacity-50"
+          )}
         >
-          {/* Show damage percent for AOE */}
-          {isAffectedByReticle && affectedPos && affectedPos.damagePercent !== 100 && (
-            <span className="text-[10px] font-bold text-orange-400">
-              {affectedPos.damagePercent}%
+          {/* Crosshair icon for reticle center */}
+          {isReticleCenter && (
+            <Crosshair className="w-6 h-6 text-yellow-500" />
+          )}
+          {/* Label for AOE tiles */}
+          {isAffectedByReticle && (
+            <span className={cn(
+              "text-[8px] font-bold px-1 rounded-sm",
+              affectedPos?.damagePercent === 100 ? "text-yellow-400" : "text-orange-400"
+            )}>
+              {getDamageLabel()}
             </span>
           )}
         </div>
@@ -202,6 +311,8 @@ export function BattleGrid({
     const isSelected = selectedUnit?.gridId === unitGridId && selectedUnit?.isEnemy === isEnemy;
 
     const handleClick = () => {
+      // If this is the reticle center, don't handle unit click
+      if (isReticleCenter) return;
       onUnitClick({
         unitId,
         gridId: unitGridId,
@@ -210,20 +321,18 @@ export function BattleGrid({
       });
     };
 
-    const handleSlotClick = () => {
-      // If reticle is shown and we have an AOE ability, clicking moves the reticle
-      if (showReticle && onReticleClick && targetArea) {
-        onReticleClick(gridId);
-      } else {
-        handleClick();
-      }
-    };
 
     const slotContent = (
       <div
-        onClick={handleSlotClick}
-        draggable={!isEnemy && !showReticle}
-        onDragStart={(e) => handleDragStart(e, gridId, unitId)}
+        onClick={handleClick}
+        draggable={isReticleCenter || (!isEnemy && !showReticle)}
+        onDragStart={(e) => {
+          if (isReticleCenter) {
+            handleReticleDragStart(e, gridId);
+          } else {
+            handleDragStart(e, gridId, unitId);
+          }
+        }}
         onDragOver={(e) => handleDragOver(e, gridId)}
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(e, gridId)}
@@ -236,13 +345,22 @@ export function BattleGrid({
             : "border-primary bg-primary/10 hover:bg-primary/20",
           isSelected && "ring-2 ring-offset-2 ring-yellow-500",
           isDragging && "opacity-50",
-          isDragOver && "ring-2 ring-primary",
+          isDragOver && showReticle && "ring-2 ring-yellow-400",
+          isDragOver && !showReticle && "ring-2 ring-primary",
           // Reticle highlighting for occupied slots
           isReticleCenter && "ring-2 ring-yellow-500 ring-offset-1",
           isAffectedByReticle && !isReticleCenter && "ring-2 ring-orange-500/70",
-          showReticle && targetArea && "cursor-crosshair"
+          isReticleCenter && "cursor-grab",
+          isDraggingReticle && isReticleCenter && "opacity-50"
         )}
       >
+        {/* Crosshair overlay for reticle center */}
+        {isReticleCenter && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+            <Crosshair className="w-8 h-8 text-yellow-500 drop-shadow-lg" />
+          </div>
+        )}
+        
         {unitData && (
           <UnitImage
             iconName={unitData.identity.icon}
@@ -251,10 +369,13 @@ export function BattleGrid({
           />
         )}
 
-        {/* AOE damage percent indicator - top right */}
-        {isAffectedByReticle && affectedPos && affectedPos.damagePercent !== 100 && (
-          <div className="absolute top-0.5 right-0.5 text-[8px] font-bold text-orange-400 bg-black/60 px-1 rounded-sm">
-            {affectedPos.damagePercent}%
+        {/* AOE label indicator - top right */}
+        {isAffectedByReticle && (
+          <div className={cn(
+            "absolute top-0.5 right-0.5 text-[7px] font-bold bg-black/70 px-1 rounded-sm",
+            affectedPos?.damagePercent === 100 ? "text-yellow-400" : "text-orange-400"
+          )}>
+            {getDamageLabel()}
           </div>
         )}
 
@@ -462,10 +583,15 @@ export function BattleGrid({
 
   return (
     <TooltipProvider>
-      <div className={cn(
-        "flex flex-col items-center gap-2 p-4 rounded-lg",
-        isEnemy ? "bg-destructive/5" : "bg-primary/5"
-      )}>
+      <div 
+        ref={gridRef}
+        tabIndex={showReticle ? 0 : undefined}
+        className={cn(
+          "flex flex-col items-center gap-2 p-4 rounded-lg outline-none",
+          isEnemy ? "bg-destructive/5" : "bg-primary/5",
+          showReticle && "focus:ring-2 focus:ring-yellow-500/50"
+        )}
+      >
         <div className="text-sm font-medium text-muted-foreground mb-2">
           {isEnemy ? "Enemy Formation" : "Your Formation"}
         </div>

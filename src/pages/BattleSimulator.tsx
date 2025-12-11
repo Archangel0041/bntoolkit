@@ -83,14 +83,15 @@ const BattleSimulator = () => {
     }
   }, [selectedUnit, selectedAbility, tempFormation.units, currentWaveUnits, enemyRankOverrides, enemyReticleGridId, friendlyReticleGridId]);
 
-  // Handle clicking on the grid to lock the reticle position
-  const handleEnemyGridClick = (gridId: number) => {
+  // Handle moving the reticle on enemy grid
+  const handleEnemyReticleMove = (gridId: number) => {
     if (selectedAbility && !selectedUnit?.isEnemy) {
       setEnemyReticleGridId(gridId);
     }
   };
 
-  const handleFriendlyGridClick = (gridId: number) => {
+  // Handle moving the reticle on friendly grid
+  const handleFriendlyReticleMove = (gridId: number) => {
     if (selectedAbility && selectedUnit?.isEnemy) {
       setFriendlyReticleGridId(gridId);
     }
@@ -197,7 +198,7 @@ const BattleSimulator = () => {
             rankOverrides={enemyRankOverrides}
             targetArea={selectedAbility?.targetArea}
             reticleGridId={enemyReticleGridId}
-            onReticleClick={handleEnemyGridClick}
+            onReticleMove={handleEnemyReticleMove}
             showReticle={!!selectedAbility && !selectedUnit?.isEnemy}
           />
 
@@ -261,7 +262,7 @@ const BattleSimulator = () => {
             onAddUnit={tempFormation.addUnit}
             targetArea={selectedAbility?.targetArea}
             reticleGridId={friendlyReticleGridId}
-            onReticleClick={handleFriendlyGridClick}
+            onReticleMove={handleFriendlyReticleMove}
             showReticle={!!selectedAbility && selectedUnit?.isEnemy}
           />
         </div>
