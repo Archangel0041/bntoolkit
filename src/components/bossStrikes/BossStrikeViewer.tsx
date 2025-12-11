@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,8 +22,13 @@ interface BossStrikeViewerProps {
 
 export function BossStrikeViewer({ bossStrike, bossStrikeId }: BossStrikeViewerProps) {
   const { t } = useLanguage();
+  const location = useLocation();
   const [selectedEncounterId, setSelectedEncounterId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState("tiers");
+  
+  // Back navigation info
+  const backPath = location.pathname;
+  const backLabel = "Back to Boss Strike";
 
   const tierCount = bossStrike.tier_info?.length ?? 0;
   const selectedEncounter = selectedEncounterId ? getEncounterById(selectedEncounterId) : null;
@@ -66,7 +71,7 @@ export function BossStrikeViewer({ bossStrike, bossStrikeId }: BossStrikeViewerP
         </TabsList>
 
         <TabsContent value="tiers" className="mt-4">
-          <TierRewardsSection tierInfo={bossStrike.tier_info} />
+          <TierRewardsSection tierInfo={bossStrike.tier_info} backPath={backPath} backLabel={backLabel} />
         </TabsContent>
 
         <TabsContent value="encounters" className="mt-4">
@@ -83,6 +88,8 @@ export function BossStrikeViewer({ bossStrike, bossStrikeId }: BossStrikeViewerP
                   encounter={selectedEncounter} 
                   encounterId={selectedEncounterId!}
                   bossStrike={bossStrike}
+                  backPath={backPath}
+                  backLabel={backLabel}
                 />
               ) : (
                 <Card>
@@ -103,7 +110,7 @@ export function BossStrikeViewer({ bossStrike, bossStrikeId }: BossStrikeViewerP
   );
 }
 
-function TierRewardsSection({ tierInfo }: { tierInfo?: TierInfo[] }) {
+function TierRewardsSection({ tierInfo, backPath, backLabel }: { tierInfo?: TierInfo[]; backPath: string; backLabel: string }) {
   const { t } = useLanguage();
 
   if (!tierInfo || tierInfo.length === 0) {
@@ -133,7 +140,7 @@ function TierRewardsSection({ tierInfo }: { tierInfo?: TierInfo[] }) {
               )}
               <div className="space-y-1">
                 {rewards.map((reward, i) => (
-                  <RewardItem key={i} reward={reward} t={t} />
+                  <RewardItem key={i} reward={reward} t={t} backPath={backPath} backLabel={backLabel} />
                 ))}
               </div>
             </CardContent>
@@ -144,7 +151,7 @@ function TierRewardsSection({ tierInfo }: { tierInfo?: TierInfo[] }) {
   );
 }
 
-function RewardItem({ reward, t }: { reward: { type: string; key: string; amount: number }; t: (key: string) => string }) {
+function RewardItem({ reward, t, backPath, backLabel }: { reward: { type: string; key: string; amount: number }; t: (key: string) => string; backPath: string; backLabel: string }) {
   if (reward.type === "unit") {
     const unit = getUnitById(parseInt(reward.key));
     const unitName = unit?.identity?.name ? t(unit.identity.name) : `Unit ${reward.key}`;
@@ -154,6 +161,7 @@ function RewardItem({ reward, t }: { reward: { type: string; key: string; amount
       <div className="flex justify-between text-sm">
         <Link 
           to={`/unit/${reward.key}`}
+          state={{ from: backPath, fromLabel: backLabel }}
           className="text-primary hover:underline"
         >
           {displayName}

@@ -19,7 +19,11 @@ export function UnitCard({ unit }: UnitCardProps) {
   const { t } = useLanguage();
   const { addToCompare, removeFromCompare, isInCompare, compareUnits } = useCompare();
 
-  const stats = unit.statsConfig?.stats[0];
+  // Use max rank stats by default
+  const allStats = unit.statsConfig?.stats || [];
+  const maxRank = allStats.length;
+  const stats = maxRank > 0 ? allStats[maxRank - 1] : undefined;
+  
   const inCompare = isInCompare(unit.id);
   const canAddToCompare = compareUnits.length < 2;
   
@@ -80,6 +84,7 @@ export function UnitCard({ unit }: UnitCardProps) {
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">
                   {classDisplayName}
+                  {maxRank > 1 && <span className="ml-1">• Rank 1-{maxRank}</span>}
                 </p>
               </div>
               <Button
@@ -102,6 +107,10 @@ export function UnitCard({ unit }: UnitCardProps) {
                   <img src={statIcons.power} alt="" className="h-3 w-3 object-contain" />
                   {stats.power}
                 </span>
+                <span className="flex items-center gap-1" title="Accuracy">
+                  <img src={statIcons.accuracy} alt="" className="h-3 w-3 object-contain" />
+                  {stats.accuracy}
+                </span>
                 <span className="flex items-center gap-1" title="Defense">
                   <img src={statIcons.defense} alt="" className="h-3 w-3 object-contain" />
                   {stats.defense}
@@ -116,7 +125,7 @@ export function UnitCard({ unit }: UnitCardProps) {
                 </span>
                 <span className="flex items-center gap-1" title="Critical">
                   <img src={statIcons.critical} alt="" className="h-3 w-3 object-contain" />
-                  {stats.critical}
+                  {stats.critical}%
                 </span>
               </div>
             )}

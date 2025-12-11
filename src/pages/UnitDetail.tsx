@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useLocation } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { CompareBar } from "@/components/units/CompareBar";
 import { StatSection, StatRow, DamageModsGrid } from "@/components/units/StatSection";
@@ -48,7 +48,7 @@ function capitalize(str: string): string {
 
 // Calculate damage at rank: Damage = Base Damage * (1 + 2 * 0.01 * Power)
 function calculateDamageAtRank(baseDamage: number, power: number): number {
-  return Math.round(baseDamage * (1 + 2 * 0.01 * power));
+  return Math.floor(baseDamage * (1 + 2 * 0.01 * power));
 }
 
 interface StatWithChangeProps {
@@ -92,6 +92,11 @@ export default function UnitDetail() {
   const { id } = useParams<{ id: string }>();
   const { t } = useLanguage();
   const { addToCompare, removeFromCompare, isInCompare, compareUnits } = useCompare();
+  const location = useLocation();
+  
+  // Get back navigation from location state
+  const backPath = (location.state as { from?: string; fromLabel?: string })?.from || "/";
+  const backLabel = (location.state as { from?: string; fromLabel?: string })?.fromLabel || "Back to Units";
 
   const unit = getUnitById(parseInt(id || "0"));
 
@@ -147,10 +152,11 @@ export default function UnitDetail() {
       <main className="container mx-auto px-4 py-6 space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
-            <Link to="/">
+            <Link to={backPath}>
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
+          <span className="text-sm text-muted-foreground">{backLabel}</span>
           {unit.identity.icon && (
             <img
               src={getUnitImageUrl(unit.identity.icon) || ""}
