@@ -199,34 +199,101 @@ export function BattleGrid({
           />
         )}
 
-        {/* HP/Armor bar at bottom when no damage preview */}
+        {/* HP/Armor bars at bottom when no damage preview */}
         {!damagePreview && (unitHp > 0 || unitArmor > 0) && (
-          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-0.5 py-0.5 flex justify-center gap-1 text-[8px] font-bold">
-            <span className="text-emerald-400 dark:text-emerald-300">{unitHp}</span>
+          <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-0.5 space-y-0.5">
+            {/* HP Bar */}
+            <div className="h-1.5 w-full bg-gray-700 rounded-sm overflow-hidden">
+              <div className="h-full bg-emerald-500" style={{ width: '100%' }} />
+            </div>
+            {/* Armor Bar */}
             {unitArmor > 0 && (
-              <span className="text-sky-400 dark:text-sky-300">{unitArmor}</span>
+              <div className="h-1.5 w-full bg-gray-700 rounded-sm overflow-hidden">
+                <div className="h-full bg-sky-500" style={{ width: '100%' }} />
+              </div>
             )}
           </div>
         )}
         
-        {/* Compact damage overlay - just show remaining HP/Armor range + dodge */}
+        {/* Damage preview bars */}
         {damagePreview && damagePreview.canTarget && (() => {
           const { minHpRemaining, maxHpRemaining, minArmorRemaining, maxArmorRemaining } = getRemainingRange(damagePreview);
+          
+          // Calculate percentages for HP bar
+          const minHpPercent = (minHpRemaining / damagePreview.targetHp) * 100;
+          const maxHpPercent = (maxHpRemaining / damagePreview.targetHp) * 100;
+          const minDamageHpPercent = 100 - maxHpPercent; // Guaranteed damage (red)
+          const rangeDamageHpPercent = maxHpPercent - minHpPercent; // Range damage (orange)
+          
+          // Calculate percentages for Armor bar
+          let minArmorPercent = 0;
+          let maxArmorPercent = 0;
+          let minDamageArmorPercent = 0;
+          let rangeDamageArmorPercent = 0;
+          if (damagePreview.targetHasArmor && damagePreview.targetArmorHp > 0) {
+            minArmorPercent = (minArmorRemaining / damagePreview.targetArmorHp) * 100;
+            maxArmorPercent = (maxArmorRemaining / damagePreview.targetArmorHp) * 100;
+            minDamageArmorPercent = 100 - maxArmorPercent;
+            rangeDamageArmorPercent = maxArmorPercent - minArmorPercent;
+          }
+          
           return (
-            <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center text-white text-[9px] font-bold p-0.5 leading-tight gap-0.5">
-              {/* Remaining HP range */}
-              <span className="text-emerald-400 dark:text-emerald-300">
-                {minHpRemaining === maxHpRemaining ? minHpRemaining : `${minHpRemaining}-${maxHpRemaining}`}
-              </span>
-              {/* Remaining Armor range */}
-              {damagePreview.targetHasArmor && (
-                <span className="text-sky-400 dark:text-sky-300">
-                  {minArmorRemaining === maxArmorRemaining ? minArmorRemaining : `${minArmorRemaining}-${maxArmorRemaining}`}
-                </span>
-              )}
-              {/* Dodge chance */}
+            <div className="absolute inset-0 bg-black/70 flex flex-col justify-end p-1">
+              {/* HP Bar with damage visualization */}
+              <div className="space-y-0.5">
+                <div className="h-2.5 w-full bg-gray-700 rounded-sm overflow-hidden flex">
+                  {/* Green: Remaining HP (minimum case) */}
+                  <div 
+                    className="h-full bg-emerald-500 transition-all" 
+                    style={{ width: `${minHpPercent}%` }} 
+                  />
+                  {/* Orange: Damage range (potential additional damage) */}
+                  {rangeDamageHpPercent > 0 && (
+                    <div 
+                      className="h-full bg-orange-500 transition-all" 
+                      style={{ width: `${rangeDamageHpPercent}%` }} 
+                    />
+                  )}
+                  {/* Red: Guaranteed damage */}
+                  {minDamageHpPercent > 0 && (
+                    <div 
+                      className="h-full bg-red-500 transition-all" 
+                      style={{ width: `${minDamageHpPercent}%` }} 
+                    />
+                  )}
+                </div>
+                
+                {/* Armor Bar with damage visualization */}
+                {damagePreview.targetHasArmor && (
+                  <div className="h-2.5 w-full bg-gray-700 rounded-sm overflow-hidden flex">
+                    {/* Blue: Remaining Armor (minimum case) */}
+                    <div 
+                      className="h-full bg-sky-500 transition-all" 
+                      style={{ width: `${minArmorPercent}%` }} 
+                    />
+                    {/* Orange: Damage range */}
+                    {rangeDamageArmorPercent > 0 && (
+                      <div 
+                        className="h-full bg-orange-500 transition-all" 
+                        style={{ width: `${rangeDamageArmorPercent}%` }} 
+                      />
+                    )}
+                    {/* Red: Guaranteed damage */}
+                    {minDamageArmorPercent > 0 && (
+                      <div 
+                        className="h-full bg-red-500 transition-all" 
+                        style={{ width: `${minDamageArmorPercent}%` }} 
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              {/* Dodge chance indicator */}
               {damagePreview.dodgeChance > 0 && (
-                <span className="text-yellow-400">{damagePreview.dodgeChance}%</span>
+                <div className="text-center text-[9px] font-bold text-yellow-400 mt-0.5">
+                  {damagePreview.dodgeChance}% dodge
+                </div>
               )}
             </div>
           );
