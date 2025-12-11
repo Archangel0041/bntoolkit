@@ -139,6 +139,12 @@ export function AbilitySelector({
                         <span>{info.suppressionMultiplier}x {info.suppressionBonus > 0 && `+${info.suppressionBonus}`}</span>
                       </>
                     )}
+                    {info.targetArea && (
+                      <>
+                        <span>Targeting:</span>
+                        <span>{info.targetArea.targetType === 1 ? "Single" : `AOE (${info.targetArea.data.length} tiles)`}</span>
+                      </>
+                    )}
                   </div>
                   
                   {/* Targeting categories */}

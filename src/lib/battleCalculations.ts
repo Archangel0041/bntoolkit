@@ -166,6 +166,24 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
       const maxDamage = calculateDamageAtRank(weapon.stats.base_damage_max, power);
       const offense = ability.stats.attack + accuracy;
 
+      // Parse target area data
+      const rawTargetArea = (ability.stats as any).target_area;
+      let targetArea = undefined;
+      if (rawTargetArea) {
+        targetArea = {
+          targetType: rawTargetArea.target_type || 1,
+          data: (rawTargetArea.data || []).map((d: any) => ({
+            x: d.pos?.x || 0,
+            y: d.pos?.y || 0,
+            damagePercent: d.damage_percent,
+            weight: d.weight,
+            order: d.order,
+          })),
+          random: rawTargetArea.random || false,
+          aoeOrderDelay: rawTargetArea.aoe_order_delay,
+        };
+      }
+
       abilities.push({
         abilityId,
         weaponName,
@@ -188,6 +206,7 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
         suppressionMultiplier: (ability.stats as any).damage_distraction || 1,
         suppressionBonus: (ability.stats as any).damage_distraction_bonus || 0,
         statusEffects: ability.stats.status_effects || {},
+        targetArea,
       });
     });
   });
