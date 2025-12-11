@@ -104,12 +104,19 @@ export function BattleGrid({
         
         {/* Damage overlay */}
         {damagePreview && damagePreview.canTarget && (
-          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white text-xs font-bold">
+          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-white text-[10px] font-bold p-1">
+            {/* HP damage display */}
             <span className="text-destructive">
-              {damagePreview.minDamage}-{damagePreview.maxDamage}
+              {damagePreview.minDamage.hpDamage}-{damagePreview.maxDamage.hpDamage} HP
             </span>
+            {/* Armor damage if target has armor */}
+            {damagePreview.targetHasArmor && (
+              <span className="text-blue-400">
+                {damagePreview.minDamage.armorDamage}-{damagePreview.maxDamage.armorDamage} Arm
+              </span>
+            )}
             {damagePreview.dodgeChance > 0 && (
-              <span className="text-yellow-400 text-[10px]">
+              <span className="text-yellow-400">
                 {damagePreview.dodgeChance}% dodge
               </span>
             )}

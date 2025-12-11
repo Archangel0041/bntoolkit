@@ -1,7 +1,9 @@
 import { getUnitById } from "@/lib/units";
 import { getAbilityById } from "@/lib/abilities";
-import type { AbilityInfo, DamagePreview, PartyUnit } from "@/types/battleSimulator";
+import type { AbilityInfo, DamagePreview, DamageResult, PartyUnit } from "@/types/battleSimulator";
+import { DAMAGE_TYPE_MAP } from "@/types/battleSimulator";
 import type { EncounterUnit } from "@/types/encounters";
+import type { DamageMods, UnitStats } from "@/types/units";
 
 // Calculate damage at rank: Damage = Base Damage * (1 + 2 * 0.01 * Power)
 export function calculateDamageAtRank(baseDamage: number, power: number): number {
@@ -12,6 +14,77 @@ export function calculateDamageAtRank(baseDamage: number, power: number): number
 export function calculateDodgeChance(defenderDefense: number, attackerOffense: number): number {
   const dodgeChance = defenderDefense - attackerOffense + 5;
   return Math.max(0, dodgeChance);
+}
+
+// Get damage modifier for a specific damage type
+export function getDamageModifier(damageMods: DamageMods | undefined, damageType: number): number {
+  if (!damageMods) return 1;
+  const modKey = DAMAGE_TYPE_MAP[damageType];
+  if (!modKey) return 1;
+  const mod = damageMods[modKey];
+  return mod !== undefined ? mod / 100 : 1; // Convert from percentage (e.g., 150 -> 1.5)
+}
+
+// Calculate damage with armor mechanics
+export function calculateDamageWithArmor(
+  rawDamage: number,
+  armorHp: number,
+  armorDamageMods: DamageMods | undefined,
+  hpDamageMods: DamageMods | undefined,
+  damageType: number,
+  armorPiercingPercent: number
+): DamageResult {
+  // If no armor, damage goes straight to HP
+  if (armorHp <= 0) {
+    const hpMod = getDamageModifier(hpDamageMods, damageType);
+    const hpDamage = Math.floor(rawDamage * hpMod);
+    return {
+      rawDamage,
+      armorDamage: 0,
+      hpDamage,
+      armorRemaining: 0,
+      effectiveMultiplier: hpMod,
+    };
+  }
+
+  // Calculate armor effectiveness
+  const armorMod = getDamageModifier(armorDamageMods, damageType);
+  
+  // Armor piercing: percentage of damage that bypasses armor entirely
+  const piercingDamage = Math.floor(rawDamage * armorPiercingPercent);
+  const armorableDamage = rawDamage - piercingDamage;
+  
+  // Effective armor capacity = armorHp / armorMod
+  // If armorMod is 0.6 (60% damage taken), armor blocks more raw damage
+  const effectiveArmorCapacity = armorMod > 0 ? Math.floor(armorHp / armorMod) : armorHp;
+  
+  let armorDamage = 0;
+  let damageToHp = piercingDamage;
+  let armorRemaining = armorHp;
+  
+  if (armorableDamage <= effectiveArmorCapacity) {
+    // Armor absorbs all armorable damage
+    armorDamage = Math.floor(armorableDamage * armorMod);
+    armorRemaining = armorHp - armorDamage;
+  } else {
+    // Armor is depleted, remainder goes to HP
+    armorDamage = armorHp;
+    armorRemaining = 0;
+    const overflowDamage = armorableDamage - effectiveArmorCapacity;
+    damageToHp += overflowDamage;
+  }
+  
+  // Apply HP damage modifier to the HP portion
+  const hpMod = getDamageModifier(hpDamageMods, damageType);
+  const hpDamage = Math.floor(damageToHp * hpMod);
+  
+  return {
+    rawDamage,
+    armorDamage,
+    hpDamage,
+    armorRemaining: Math.max(0, armorRemaining),
+    effectiveMultiplier: hpMod,
+  };
 }
 
 // Get all abilities for a unit at a specific rank
@@ -41,14 +114,19 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
         maxDamage,
         offense,
         shotsPerAttack: ability.stats.shots_per_attack,
+        attacksPerUse: (ability.stats as any).attacks_per_use || 1,
         lineOfFire: ability.stats.line_of_fire,
         targets: ability.stats.targets || [],
         damageType: ability.stats.damage_type,
         minRange: ability.stats.min_range,
         maxRange: ability.stats.max_range,
         cooldown: ability.stats.ability_cooldown,
+        globalCooldown: (ability.stats as any).global_cooldown || 0,
         armorPiercing: ability.stats.armor_piercing_percent,
         critPercent: ability.stats.critical_hit_percent,
+        chargeTime: (ability.stats as any).charge_time || 0,
+        suppressionMultiplier: (ability.stats as any).damage_distraction || 1,
+        suppressionBonus: (ability.stats as any).damage_distraction_bonus || 0,
       });
     });
   });
@@ -67,6 +145,12 @@ export function canTargetUnit(targetUnitId: number, abilityTargets: number[]): b
   return abilityTargets.some(targetTag => unitTags.includes(targetTag));
 }
 
+// Get unit stats at a specific rank
+function getUnitStatsAtRank(unitId: number, rank: number): UnitStats | undefined {
+  const unit = getUnitById(unitId);
+  return unit?.statsConfig?.stats?.[rank - 1];
+}
+
 // Calculate damage preview for all valid targets
 export function calculateDamagePreviewsForEnemy(
   attackerAbility: AbilityInfo,
@@ -78,17 +162,41 @@ export function calculateDamagePreviewsForEnemy(
     .map(enemyUnit => {
       const enemy = getUnitById(enemyUnit.unit_id);
       const enemyRank = enemyRankOverrides[enemyUnit.grid_id!] || (enemy?.statsConfig?.stats?.length || 1);
-      const enemyStats = enemy?.statsConfig?.stats?.[enemyRank - 1];
+      const enemyStats = getUnitStatsAtRank(enemyUnit.unit_id, enemyRank);
       const canTarget = canTargetUnit(enemyUnit.unit_id, attackerAbility.targets);
       const dodgeChance = calculateDodgeChance(enemyStats?.defense || 0, attackerAbility.offense);
+
+      const armorHp = enemyStats?.armor_hp || 0;
+      const hp = enemyStats?.hp || 0;
+      
+      const minResult = calculateDamageWithArmor(
+        attackerAbility.minDamage,
+        armorHp,
+        enemyStats?.armor_damage_mods,
+        enemyStats?.damage_mods,
+        attackerAbility.damageType,
+        attackerAbility.armorPiercing
+      );
+      
+      const maxResult = calculateDamageWithArmor(
+        attackerAbility.maxDamage,
+        armorHp,
+        enemyStats?.armor_damage_mods,
+        enemyStats?.damage_mods,
+        attackerAbility.damageType,
+        attackerAbility.armorPiercing
+      );
 
       return {
         targetGridId: enemyUnit.grid_id!,
         targetUnitId: enemyUnit.unit_id,
-        minDamage: attackerAbility.minDamage,
-        maxDamage: attackerAbility.maxDamage,
+        minDamage: minResult,
+        maxDamage: maxResult,
         dodgeChance,
         canTarget,
+        targetHasArmor: armorHp > 0,
+        targetArmorHp: armorHp,
+        targetHp: hp,
       };
     });
 }
@@ -98,18 +206,41 @@ export function calculateDamagePreviewsForFriendly(
   friendlyUnits: PartyUnit[]
 ): DamagePreview[] {
   return friendlyUnits.map(friendlyUnit => {
-    const unit = getUnitById(friendlyUnit.unitId);
-    const stats = unit?.statsConfig?.stats?.[friendlyUnit.rank - 1];
+    const stats = getUnitStatsAtRank(friendlyUnit.unitId, friendlyUnit.rank);
     const canTarget = canTargetUnit(friendlyUnit.unitId, attackerAbility.targets);
     const dodgeChance = calculateDodgeChance(stats?.defense || 0, attackerAbility.offense);
+
+    const armorHp = stats?.armor_hp || 0;
+    const hp = stats?.hp || 0;
+    
+    const minResult = calculateDamageWithArmor(
+      attackerAbility.minDamage,
+      armorHp,
+      stats?.armor_damage_mods,
+      stats?.damage_mods,
+      attackerAbility.damageType,
+      attackerAbility.armorPiercing
+    );
+    
+    const maxResult = calculateDamageWithArmor(
+      attackerAbility.maxDamage,
+      armorHp,
+      stats?.armor_damage_mods,
+      stats?.damage_mods,
+      attackerAbility.damageType,
+      attackerAbility.armorPiercing
+    );
 
     return {
       targetGridId: friendlyUnit.gridId,
       targetUnitId: friendlyUnit.unitId,
-      minDamage: attackerAbility.minDamage,
-      maxDamage: attackerAbility.maxDamage,
+      minDamage: minResult,
+      maxDamage: maxResult,
       dodgeChance,
       canTarget,
+      targetHasArmor: armorHp > 0,
+      targetArmorHp: armorHp,
+      targetHp: hp,
     };
   });
 }
