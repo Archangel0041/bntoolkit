@@ -96,10 +96,10 @@ const BattleSimulator = () => {
 
     if (selectedUnit.isEnemy) {
       // Enemy attacking friendly units
-      return calculateAoeDamagePreviewsForFriendly(selectedAbility, tempFormation.units, friendlyReticleGridId);
+      return calculateAoeDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units, friendlyReticleGridId);
     } else {
       // Friendly attacking enemy units
-      return calculateAoeDamagePreviewsForEnemy(selectedAbility, currentWaveUnits, enemyReticleGridId, enemyRankOverrides);
+      return calculateAoeDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, enemyReticleGridId, enemyRankOverrides);
     }
   }, [selectedUnit, selectedAbility, tempFormation.units, currentWaveUnits, enemyRankOverrides, enemyReticleGridId, friendlyReticleGridId]);
 

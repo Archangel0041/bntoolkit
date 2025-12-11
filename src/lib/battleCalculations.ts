@@ -2,8 +2,9 @@ import { getUnitById } from "@/lib/units";
 import { getAbilityById } from "@/lib/abilities";
 import { unitMatchesTargets } from "@/lib/tagHierarchy";
 import { getStatusEffect, getEffectDisplayNameTranslated, getEffectColor } from "@/lib/statusEffects";
+import { getBlockingUnits, checkLineOfFire, isTargetInRange, calculateRange } from "@/lib/battleTargeting";
 import type { AbilityInfo, DamagePreview, DamageResult, PartyUnit, StatusEffectPreview, TargetArea } from "@/types/battleSimulator";
-import { DAMAGE_TYPE_MAP, getAffectedGridPositions } from "@/types/battleSimulator";
+import { DAMAGE_TYPE_MAP, getAffectedGridPositions, getFixedAttackPositions } from "@/types/battleSimulator";
 import type { EncounterUnit } from "@/types/encounters";
 import type { DamageMods, UnitStats } from "@/types/units";
 
@@ -265,10 +266,12 @@ function calculateCritChance(baseCrit: number, critBonuses: Record<number, numbe
 // Calculate damage preview for all valid targets
 export function calculateDamagePreviewsForEnemy(
   attackerAbility: AbilityInfo,
+  attackerGridId: number,
   enemyUnits: EncounterUnit[],
   enemyRankOverrides: Record<number, number> = {}
 ): DamagePreview[] {
   const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
+  const blockingUnits = getBlockingUnits(enemyUnits, true);
   
   return enemyUnits
     .filter(u => u.grid_id !== undefined)
@@ -284,6 +287,19 @@ export function calculateDamagePreviewsForEnemy(
       const armorHp = enemyStats?.armor_hp || 0;
       const hp = enemyStats?.hp || 0;
       const immunities = enemy?.statsConfig?.status_effect_immunities || [];
+      
+      // Check range
+      const range = calculateRange(attackerGridId, enemyUnit.grid_id!, false);
+      const inRange = range >= attackerAbility.minRange && range <= attackerAbility.maxRange;
+      
+      // Check line of fire blocking
+      const blockCheck = checkLineOfFire(
+        attackerGridId,
+        enemyUnit.grid_id!,
+        attackerAbility.lineOfFire,
+        false,
+        blockingUnits
+      );
       
       const minResult = calculateDamageWithArmor(
         attackerAbility.minDamage,
@@ -328,15 +344,22 @@ export function calculateDamagePreviewsForEnemy(
         targetDefense: defense,
         statusEffects,
         damagePercent: 100,
+        inRange,
+        range,
+        isBlocked: blockCheck.isBlocked,
+        blockedByUnitId: blockCheck.blockedBy?.unitId,
+        blockReason: blockCheck.reason,
       };
     });
 }
 
 export function calculateDamagePreviewsForFriendly(
   attackerAbility: AbilityInfo,
+  attackerGridId: number,
   friendlyUnits: PartyUnit[]
 ): DamagePreview[] {
   const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
+  const blockingUnits = getBlockingUnits(friendlyUnits, false);
   
   return friendlyUnits.map(friendlyUnit => {
     const unit = getUnitById(friendlyUnit.unitId);
@@ -349,6 +372,19 @@ export function calculateDamagePreviewsForFriendly(
     const armorHp = stats?.armor_hp || 0;
     const hp = stats?.hp || 0;
     const immunities = unit?.statsConfig?.status_effect_immunities || [];
+    
+    // Check range
+    const range = calculateRange(attackerGridId, friendlyUnit.gridId, true);
+    const inRange = range >= attackerAbility.minRange && range <= attackerAbility.maxRange;
+    
+    // Check line of fire blocking
+    const blockCheck = checkLineOfFire(
+      attackerGridId,
+      friendlyUnit.gridId,
+      attackerAbility.lineOfFire,
+      true,
+      blockingUnits
+    );
     
     const minResult = calculateDamageWithArmor(
       attackerAbility.minDamage,
@@ -393,6 +429,11 @@ export function calculateDamagePreviewsForFriendly(
       targetDefense: defense,
       statusEffects,
       damagePercent: 100,
+      inRange,
+      range,
+      isBlocked: blockCheck.isBlocked,
+      blockedByUnitId: blockCheck.blockedBy?.unitId,
+      blockReason: blockCheck.reason,
     };
   });
 }
@@ -400,12 +441,14 @@ export function calculateDamagePreviewsForFriendly(
 // Calculate damage previews with AOE pattern applied at reticle position
 export function calculateAoeDamagePreviewsForEnemy(
   attackerAbility: AbilityInfo,
+  attackerGridId: number,
   enemyUnits: EncounterUnit[],
   reticleGridId: number,
   enemyRankOverrides: Record<number, number> = {}
 ): DamagePreview[] {
   const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
   const affectedPositions = getAffectedGridPositions(reticleGridId, attackerAbility.targetArea, true);
+  const blockingUnits = getBlockingUnits(enemyUnits, true);
   
   // Create a map of gridId -> damagePercent
   const damagePercentMap = new Map<number, number>();
@@ -427,6 +470,19 @@ export function calculateAoeDamagePreviewsForEnemy(
       const armorHp = enemyStats?.armor_hp || 0;
       const hp = enemyStats?.hp || 0;
       const immunities = enemy?.statsConfig?.status_effect_immunities || [];
+      
+      // Check range
+      const range = calculateRange(attackerGridId, enemyUnit.grid_id!, false);
+      const inRange = range >= attackerAbility.minRange && range <= attackerAbility.maxRange;
+      
+      // Check line of fire blocking
+      const blockCheck = checkLineOfFire(
+        attackerGridId,
+        enemyUnit.grid_id!,
+        attackerAbility.lineOfFire,
+        false,
+        blockingUnits
+      );
       
       // Apply damage percent modifier to damage
       const damagePercent = damagePercentMap.get(enemyUnit.grid_id!) || 100;
@@ -476,17 +532,24 @@ export function calculateAoeDamagePreviewsForEnemy(
         targetDefense: defense,
         statusEffects,
         damagePercent,
+        inRange,
+        range,
+        isBlocked: blockCheck.isBlocked,
+        blockedByUnitId: blockCheck.blockedBy?.unitId,
+        blockReason: blockCheck.reason,
       };
     });
 }
 
 export function calculateAoeDamagePreviewsForFriendly(
   attackerAbility: AbilityInfo,
+  attackerGridId: number,
   friendlyUnits: PartyUnit[],
   reticleGridId: number
 ): DamagePreview[] {
   const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
   const affectedPositions = getAffectedGridPositions(reticleGridId, attackerAbility.targetArea, false);
+  const blockingUnits = getBlockingUnits(friendlyUnits, false);
   
   // Create a map of gridId -> damagePercent
   const damagePercentMap = new Map<number, number>();
@@ -507,6 +570,19 @@ export function calculateAoeDamagePreviewsForFriendly(
       const armorHp = stats?.armor_hp || 0;
       const hp = stats?.hp || 0;
       const immunities = unit?.statsConfig?.status_effect_immunities || [];
+      
+      // Check range
+      const range = calculateRange(attackerGridId, friendlyUnit.gridId, true);
+      const inRange = range >= attackerAbility.minRange && range <= attackerAbility.maxRange;
+      
+      // Check line of fire blocking
+      const blockCheck = checkLineOfFire(
+        attackerGridId,
+        friendlyUnit.gridId,
+        attackerAbility.lineOfFire,
+        true,
+        blockingUnits
+      );
       
       // Apply damage percent modifier
       const damagePercent = damagePercentMap.get(friendlyUnit.gridId) || 100;
@@ -556,6 +632,11 @@ export function calculateAoeDamagePreviewsForFriendly(
         targetDefense: defense,
         statusEffects,
         damagePercent,
+        inRange,
+        range,
+        isBlocked: blockCheck.isBlocked,
+        blockedByUnitId: blockCheck.blockedBy?.unitId,
+        blockReason: blockCheck.reason,
       };
     });
 }
