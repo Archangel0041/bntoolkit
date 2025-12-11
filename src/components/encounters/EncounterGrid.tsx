@@ -132,7 +132,7 @@ export function EncounterGrid({ units, showPlayerUnits, compact = false, backPat
             </div>
             
             {stats && (
-              <div className="grid grid-cols-4 gap-x-2 gap-y-1 text-xs border-t pt-2">
+              <div className="grid grid-cols-4 gap-x-4 gap-y-1 text-xs border-t pt-2">
                 <span className="flex items-center gap-1" title="HP">
                   <img src={statIcons.hp} alt="" className="h-3 w-3" />
                   {stats.hp}

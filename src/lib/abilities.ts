@@ -12,7 +12,7 @@ export interface AbilityStats {
   max_range: number;
   min_range: number;
   shots_per_attack: number;
-  targets: number[];
+  targets?: number[];
   status_effects?: Record<string, number>;
 }
 
