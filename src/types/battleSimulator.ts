@@ -1,3 +1,5 @@
+import type { DamageMods } from "@/types/units";
+
 export interface PartyUnit {
   unitId: number;
   gridId: number;
@@ -26,23 +28,39 @@ export interface AbilityInfo {
   maxDamage: number;
   offense: number;
   shotsPerAttack: number;
+  attacksPerUse: number;
   lineOfFire: number | undefined;
   targets: number[];
   damageType: number;
   minRange: number;
   maxRange: number;
   cooldown: number;
+  globalCooldown: number;
   armorPiercing: number;
   critPercent: number;
+  chargeTime: number;
+  suppressionMultiplier: number;
+  suppressionBonus: number;
+}
+
+export interface DamageResult {
+  rawDamage: number;
+  armorDamage: number;
+  hpDamage: number;
+  armorRemaining: number;
+  effectiveMultiplier: number;
 }
 
 export interface DamagePreview {
   targetGridId: number;
   targetUnitId: number;
-  minDamage: number;
-  maxDamage: number;
+  minDamage: DamageResult;
+  maxDamage: DamageResult;
   dodgeChance: number;
   canTarget: boolean;
+  targetHasArmor: boolean;
+  targetArmorHp: number;
+  targetHp: number;
 }
 
 // Row mapping: preferred_row 1 = front (row 1), 2 = middle (row 2), 3 = back (row 3)
@@ -62,4 +80,13 @@ export const ENEMY_GRID_LAYOUT = {
   ROW_1: [4, 3, 2, 1, 0],
   ROW_2: [9, 8, 7, 6, 5],
   ROW_3: [13, 12, 11],
+} as const;
+
+// Damage type IDs to property names mapping
+export const DAMAGE_TYPE_MAP: Record<number, keyof DamageMods> = {
+  1: "piercing",
+  2: "explosive",
+  3: "fire",
+  4: "cold",
+  5: "crushing",
 } as const;
