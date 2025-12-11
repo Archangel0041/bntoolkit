@@ -1,7 +1,8 @@
 import { getUnitById } from "@/lib/units";
 import { getAbilityById } from "@/lib/abilities";
 import { unitMatchesTargets } from "@/lib/tagHierarchy";
-import type { AbilityInfo, DamagePreview, DamageResult, PartyUnit } from "@/types/battleSimulator";
+import { getStatusEffect, getEffectDisplayNameTranslated, getEffectColor } from "@/lib/statusEffects";
+import type { AbilityInfo, DamagePreview, DamageResult, PartyUnit, StatusEffectPreview } from "@/types/battleSimulator";
 import { DAMAGE_TYPE_MAP } from "@/types/battleSimulator";
 import type { EncounterUnit } from "@/types/encounters";
 import type { DamageMods, UnitStats } from "@/types/units";
@@ -91,6 +92,60 @@ export function calculateDamageWithArmor(
   };
 }
 
+// Multiply damage result by number of shots
+function multiplyDamageResult(result: DamageResult, shots: number): DamageResult {
+  return {
+    rawDamage: result.rawDamage * shots,
+    armorDamage: result.armorDamage * shots,
+    hpDamage: result.hpDamage * shots,
+    armorRemaining: result.armorRemaining, // Armor remaining doesn't multiply
+    effectiveMultiplier: result.effectiveMultiplier,
+  };
+}
+
+// Calculate status effect previews for a target
+function calculateStatusEffectPreviews(
+  statusEffects: Record<string, number>,
+  abilityDamage: number,
+  targetImmunities: number[]
+): StatusEffectPreview[] {
+  const previews: StatusEffectPreview[] = [];
+  
+  for (const [effectIdStr, chance] of Object.entries(statusEffects)) {
+    const effectId = parseInt(effectIdStr);
+    const effect = getStatusEffect(effectId);
+    if (!effect) continue;
+    
+    const isImmune = targetImmunities.includes(effect.family);
+    const name = getEffectDisplayNameTranslated(effectId);
+    const color = getEffectColor(effectId);
+    
+    // Calculate DoT damage if applicable
+    let dotDamage = 0;
+    if (effect.dot_ability_damage_mult || effect.dot_bonus_damage) {
+      const mult = effect.dot_ability_damage_mult || 0;
+      const bonus = effect.dot_bonus_damage || 0;
+      dotDamage = Math.floor(abilityDamage * mult + bonus);
+    }
+    
+    const isStun = effect.stun_block_action === true || effect.stun_block_movement === true;
+    
+    previews.push({
+      effectId,
+      name,
+      chance,
+      duration: effect.duration,
+      damageType: effect.dot_damage_type || null,
+      dotDamage,
+      isImmune,
+      isStun,
+      color,
+    });
+  }
+  
+  return previews;
+}
+
 // Get all abilities for a unit at a specific rank
 export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
   const unit = getUnitById(unitId);
@@ -132,6 +187,7 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
         chargeTime: (ability.stats as any).charge_time || 0,
         suppressionMultiplier: (ability.stats as any).damage_distraction || 1,
         suppressionBonus: (ability.stats as any).damage_distraction_bonus || 0,
+        statusEffects: ability.stats.status_effects || {},
       });
     });
   });
@@ -173,6 +229,8 @@ export function calculateDamagePreviewsForEnemy(
   enemyUnits: EncounterUnit[],
   enemyRankOverrides: Record<number, number> = {}
 ): DamagePreview[] {
+  const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
+  
   return enemyUnits
     .filter(u => u.grid_id !== undefined)
     .map(enemyUnit => {
@@ -186,6 +244,7 @@ export function calculateDamagePreviewsForEnemy(
 
       const armorHp = enemyStats?.armor_hp || 0;
       const hp = enemyStats?.hp || 0;
+      const immunities = enemy?.statsConfig?.status_effect_immunities || [];
       
       const minResult = calculateDamageWithArmor(
         attackerAbility.minDamage,
@@ -204,12 +263,23 @@ export function calculateDamagePreviewsForEnemy(
         attackerAbility.damageType,
         attackerAbility.armorPiercing
       );
+      
+      // Calculate status effect previews
+      const avgDamage = Math.floor((attackerAbility.minDamage + attackerAbility.maxDamage) / 2);
+      const statusEffects = calculateStatusEffectPreviews(
+        attackerAbility.statusEffects,
+        avgDamage,
+        immunities
+      );
 
       return {
         targetGridId: enemyUnit.grid_id!,
         targetUnitId: enemyUnit.unit_id,
         minDamage: minResult,
         maxDamage: maxResult,
+        totalShots,
+        minTotalDamage: multiplyDamageResult(minResult, totalShots),
+        maxTotalDamage: multiplyDamageResult(maxResult, totalShots),
         dodgeChance,
         critChance,
         canTarget,
@@ -217,6 +287,7 @@ export function calculateDamagePreviewsForEnemy(
         targetArmorHp: armorHp,
         targetHp: hp,
         targetDefense: defense,
+        statusEffects,
       };
     });
 }
@@ -225,6 +296,8 @@ export function calculateDamagePreviewsForFriendly(
   attackerAbility: AbilityInfo,
   friendlyUnits: PartyUnit[]
 ): DamagePreview[] {
+  const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
+  
   return friendlyUnits.map(friendlyUnit => {
     const unit = getUnitById(friendlyUnit.unitId);
     const stats = getUnitStatsAtRank(friendlyUnit.unitId, friendlyUnit.rank);
@@ -235,6 +308,7 @@ export function calculateDamagePreviewsForFriendly(
 
     const armorHp = stats?.armor_hp || 0;
     const hp = stats?.hp || 0;
+    const immunities = unit?.statsConfig?.status_effect_immunities || [];
     
     const minResult = calculateDamageWithArmor(
       attackerAbility.minDamage,
@@ -253,12 +327,23 @@ export function calculateDamagePreviewsForFriendly(
       attackerAbility.damageType,
       attackerAbility.armorPiercing
     );
+    
+    // Calculate status effect previews
+    const avgDamage = Math.floor((attackerAbility.minDamage + attackerAbility.maxDamage) / 2);
+    const statusEffects = calculateStatusEffectPreviews(
+      attackerAbility.statusEffects,
+      avgDamage,
+      immunities
+    );
 
     return {
       targetGridId: friendlyUnit.gridId,
       targetUnitId: friendlyUnit.unitId,
       minDamage: minResult,
       maxDamage: maxResult,
+      totalShots,
+      minTotalDamage: multiplyDamageResult(minResult, totalShots),
+      maxTotalDamage: multiplyDamageResult(maxResult, totalShots),
       dodgeChance,
       critChance,
       canTarget,
@@ -266,6 +351,7 @@ export function calculateDamagePreviewsForFriendly(
       targetArmorHp: armorHp,
       targetHp: hp,
       targetDefense: defense,
+      statusEffects,
     };
   });
 }
