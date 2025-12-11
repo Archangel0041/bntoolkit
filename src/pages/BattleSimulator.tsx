@@ -220,6 +220,8 @@ const BattleSimulator = () => {
             onUnitClick={handleUnitClick}
             damagePreviews={selectedUnit?.isEnemy ? damagePreviews : []}
             onMoveUnit={tempFormation.moveUnit}
+            onRemoveUnit={tempFormation.removeUnit}
+            onAddUnit={tempFormation.addUnit}
           />
         </div>
 
@@ -256,6 +258,25 @@ const BattleSimulator = () => {
               <Save className="h-3 w-3" />
               Save as Party
             </Button>
+
+            {selectedParty && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  updateParty({
+                    ...selectedParty,
+                    units: [...tempFormation.units],
+                  });
+                  toast.success(`Updated party: ${selectedParty.name}`);
+                }}
+                disabled={tempFormation.units.length === 0}
+                className="gap-1"
+              >
+                <Save className="h-3 w-3" />
+                Update Party
+              </Button>
+            )}
 
             <Button 
               variant="outline" 

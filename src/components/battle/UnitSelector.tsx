@@ -40,6 +40,7 @@ export function UnitSelector({
   const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Filter to only show friendly units (side 1)
   const friendlyUnits = allUnits.filter(u => u.identity.side === 1);
@@ -76,8 +77,44 @@ export function UnitSelector({
     setSearchQuery("");
   };
 
+  // Drag handlers for dragging units from the party list to add to formation
+  const handleDragStartFromList = (e: React.DragEvent, unitId: number) => {
+    e.dataTransfer.setData("application/x-selector-unit", JSON.stringify({ unitId }));
+  };
+
+  // Drop handler for removing units from formation
+  const handleDropToRemove = (e: React.DragEvent) => {
+    e.preventDefault();
+    const formationData = e.dataTransfer.getData("application/x-formation-unit");
+    if (formationData) {
+      const { gridId } = JSON.parse(formationData);
+      onRemoveUnit(gridId);
+    }
+    setIsDragOver(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    // Only accept formation units being dragged
+    if (e.dataTransfer.types.includes("application/x-formation-unit")) {
+      e.preventDefault();
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
   return (
-    <div className="space-y-4">
+    <div 
+      className={cn(
+        "space-y-4 p-4 rounded-lg border-2 border-dashed transition-colors",
+        isDragOver ? "border-destructive bg-destructive/10" : "border-transparent"
+      )}
+      onDrop={handleDropToRemove}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+    >
       <div className="flex items-center gap-2">
         <h3 className="text-sm font-medium">Party Units</h3>
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -102,7 +139,9 @@ export function UnitSelector({
                 <button
                   key={unit.id}
                   onClick={() => handleAddUnit(unit.id)}
-                  className="flex items-center gap-2 p-2 rounded-lg border hover:bg-accent transition-colors text-left"
+                  draggable
+                  onDragStart={(e) => handleDragStartFromList(e, unit.id)}
+                  className="flex items-center gap-2 p-2 rounded-lg border hover:bg-accent transition-colors text-left cursor-grab active:cursor-grabbing"
                 >
                   <UnitImage
                     iconName={unit.identity.icon}
@@ -138,7 +177,9 @@ export function UnitSelector({
             return (
               <div
                 key={partyUnit.gridId}
-                className="flex items-center gap-2 p-2 rounded-lg border bg-card"
+                className="flex items-center gap-2 p-2 rounded-lg border bg-card cursor-grab active:cursor-grabbing"
+                draggable
+                onDragStart={(e) => handleDragStartFromList(e, partyUnit.unitId)}
               >
                 {unit && (
                   <UnitImage
