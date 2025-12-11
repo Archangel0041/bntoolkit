@@ -5,8 +5,8 @@ import { UnitImage } from "@/components/units/UnitImage";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import type { EncounterUnit } from "@/types/encounters";
-import type { PartyUnit, DamagePreview, SelectedUnit, StatusEffectPreview } from "@/types/battleSimulator";
-import { ENEMY_GRID_LAYOUT, FRIENDLY_GRID_LAYOUT, DAMAGE_TYPE_MAP } from "@/types/battleSimulator";
+import type { PartyUnit, DamagePreview, SelectedUnit } from "@/types/battleSimulator";
+import { ENEMY_GRID_LAYOUT, FRIENDLY_GRID_LAYOUT } from "@/types/battleSimulator";
 
 interface BattleGridProps {
   isEnemy: boolean;
@@ -84,6 +84,21 @@ export function BattleGrid({
     setDragOverGridId(null);
   };
 
+  // Calculate remaining HP/Armor range after attack
+  const getRemainingRange = (preview: DamagePreview) => {
+    const minHpRemaining = Math.max(0, preview.targetHp - preview.maxTotalDamage.hpDamage);
+    const maxHpRemaining = Math.max(0, preview.targetHp - preview.minTotalDamage.hpDamage);
+    
+    let minArmorRemaining = 0;
+    let maxArmorRemaining = 0;
+    if (preview.targetHasArmor) {
+      minArmorRemaining = Math.max(0, preview.targetArmorHp - preview.maxTotalDamage.armorDamage);
+      maxArmorRemaining = Math.max(0, preview.targetArmorHp - preview.minTotalDamage.armorDamage);
+    }
+    
+    return { minHpRemaining, maxHpRemaining, minArmorRemaining, maxArmorRemaining };
+  };
+
   const renderSlot = (gridId: number) => {
     const encounterUnit = getUnitAtPosition(gridId);
     const damagePreview = getDamagePreview(gridId);
@@ -139,12 +154,6 @@ export function BattleGrid({
       });
     };
 
-    // Calculate final HP after all hits
-    const getFinalHp = (preview: DamagePreview) => {
-      const avgHpDamage = Math.floor((preview.minTotalDamage.hpDamage + preview.maxTotalDamage.hpDamage) / 2);
-      return Math.max(0, preview.targetHp - avgHpDamage);
-    };
-
     const slotContent = (
       <div
         onClick={handleClick}
@@ -183,46 +192,24 @@ export function BattleGrid({
           </div>
         )}
         
-        {/* Compact damage overlay */}
-        {damagePreview && damagePreview.canTarget && (
-          <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center text-white text-[8px] font-bold p-0.5 leading-tight gap-0.5">
-            {/* Current HP/Armor */}
-            <div className="flex gap-1">
-              <span className="text-emerald-400 dark:text-emerald-300">{damagePreview.targetHp}</span>
+        {/* Compact damage overlay - just show remaining HP/Armor range */}
+        {damagePreview && damagePreview.canTarget && (() => {
+          const { minHpRemaining, maxHpRemaining, minArmorRemaining, maxArmorRemaining } = getRemainingRange(damagePreview);
+          return (
+            <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center text-white text-[9px] font-bold p-0.5 leading-tight gap-0.5">
+              {/* Remaining HP range */}
+              <span className="text-emerald-400 dark:text-emerald-300">
+                {minHpRemaining === maxHpRemaining ? minHpRemaining : `${minHpRemaining}-${maxHpRemaining}`}
+              </span>
+              {/* Remaining Armor range */}
               {damagePreview.targetHasArmor && (
-                <span className="text-sky-400 dark:text-sky-300">{damagePreview.targetArmorHp}</span>
+                <span className="text-sky-400 dark:text-sky-300">
+                  {minArmorRemaining === maxArmorRemaining ? minArmorRemaining : `${minArmorRemaining}-${maxArmorRemaining}`}
+                </span>
               )}
             </div>
-            {/* Total damage (multi-hit) */}
-            <span className="text-destructive text-[10px]">
-              {damagePreview.minTotalDamage.hpDamage}-{damagePreview.maxTotalDamage.hpDamage}
-              {damagePreview.totalShots > 1 && <span className="text-muted-foreground"> x{damagePreview.totalShots}</span>}
-            </span>
-            {/* Dodge and Crit */}
-            <div className="flex gap-1">
-              {damagePreview.dodgeChance > 0 && (
-                <span className="text-yellow-400">{damagePreview.dodgeChance}%D</span>
-              )}
-              {damagePreview.critChance > 0 && (
-                <span className="text-orange-400">{damagePreview.critChance}%C</span>
-              )}
-            </div>
-            {/* Status effect indicators */}
-            {damagePreview.statusEffects.length > 0 && (
-              <div className="flex gap-0.5">
-                {damagePreview.statusEffects.slice(0, 2).map(se => (
-                  <span 
-                    key={se.effectId} 
-                    className={cn("text-[7px]", se.isImmune && "line-through opacity-50")}
-                    style={{ color: se.color }}
-                  >
-                    {se.name.slice(0, 3)}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+          );
+        })()}
         
         {/* Cannot target overlay */}
         {damagePreview && !damagePreview.canTarget && (
@@ -235,6 +222,8 @@ export function BattleGrid({
 
     // Wrap with tooltip for detailed info
     if (damagePreview && damagePreview.canTarget) {
+      const { minHpRemaining, maxHpRemaining, minArmorRemaining, maxArmorRemaining } = getRemainingRange(damagePreview);
+      
       return (
         <Tooltip key={gridId}>
           <TooltipTrigger asChild>
@@ -244,118 +233,75 @@ export function BattleGrid({
             <div className="text-xs space-y-1.5">
               <p className="font-semibold">{unitName}</p>
               
-              {/* Current HP/Armor */}
-              <div className="flex gap-3 text-muted-foreground">
-                <span>HP: <span className="text-emerald-500 dark:text-emerald-400 font-medium">{damagePreview.targetHp}</span></span>
-                {damagePreview.targetHasArmor && (
-                  <span>Armor: <span className="text-sky-500 dark:text-sky-400 font-medium">{damagePreview.targetArmorHp}</span></span>
-                )}
-                <span>Def: <span className="text-foreground">{damagePreview.targetDefense}</span></span>
-              </div>
-
-              {/* Per-hit damage */}
-              <div className="border-t pt-1.5 space-y-0.5">
-                <p className="text-muted-foreground font-medium">
-                  Per Hit {damagePreview.totalShots > 1 && `(${damagePreview.totalShots} hits)`}:
-                </p>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">HP Damage:</span>
-                  <span className="text-destructive font-medium">
-                    {damagePreview.minDamage.hpDamage} - {damagePreview.maxDamage.hpDamage}
+              {/* Current -> After */}
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">HP:</span>
+                  <span className="text-emerald-500 dark:text-emerald-400">{damagePreview.targetHp}</span>
+                  <span className="text-muted-foreground">→</span>
+                  <span className="text-emerald-500 dark:text-emerald-400 font-medium">
+                    {minHpRemaining === maxHpRemaining ? minHpRemaining : `${minHpRemaining}-${maxHpRemaining}`}
                   </span>
                 </div>
                 {damagePreview.targetHasArmor && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Armor Damage:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground">Armor:</span>
+                    <span className="text-sky-500 dark:text-sky-400">{damagePreview.targetArmorHp}</span>
+                    <span className="text-muted-foreground">→</span>
                     <span className="text-sky-500 dark:text-sky-400 font-medium">
-                      {damagePreview.minDamage.armorDamage} - {damagePreview.maxDamage.armorDamage}
+                      {minArmorRemaining === maxArmorRemaining ? minArmorRemaining : `${minArmorRemaining}-${maxArmorRemaining}`}
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Total damage if multi-hit */}
-              {damagePreview.totalShots > 1 && (
-                <div className="border-t pt-1.5 space-y-0.5">
-                  <p className="text-muted-foreground font-medium">Total ({damagePreview.totalShots} hits):</p>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">HP Damage:</span>
-                    <span className="text-destructive font-medium">
-                      {damagePreview.minTotalDamage.hpDamage} - {damagePreview.maxTotalDamage.hpDamage}
-                    </span>
-                  </div>
-                  {damagePreview.targetHasArmor && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Armor Damage:</span>
-                      <span className="text-sky-500 dark:text-sky-400 font-medium">
-                        {damagePreview.minTotalDamage.armorDamage} - {damagePreview.maxTotalDamage.armorDamage}
+              {/* Damage dealt */}
+              <div className="border-t pt-1.5 space-y-0.5">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    Damage{damagePreview.totalShots > 1 && ` (${damagePreview.totalShots} hits)`}:
+                  </span>
+                  <span className="text-destructive font-medium">
+                    {damagePreview.minTotalDamage.hpDamage}-{damagePreview.maxTotalDamage.hpDamage} HP
+                    {damagePreview.targetHasArmor && (
+                      <span className="text-sky-500 dark:text-sky-400 ml-1">
+                        +{damagePreview.minTotalDamage.armorDamage}-{damagePreview.maxTotalDamage.armorDamage} Arm
                       </span>
-                    </div>
-                  )}
+                    )}
+                  </span>
                 </div>
-              )}
+              </div>
 
               {/* Chances */}
               <div className="border-t pt-1.5 flex gap-4">
-                <div>
-                  <span className="text-muted-foreground">Dodge: </span>
-                  <span className={cn(
-                    "font-medium",
-                    damagePreview.dodgeChance > 0 ? "text-yellow-500 dark:text-yellow-400" : "text-foreground"
-                  )}>
-                    {damagePreview.dodgeChance}%
-                  </span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Crit: </span>
-                  <span className={cn(
-                    "font-medium",
-                    damagePreview.critChance > 0 ? "text-orange-500 dark:text-orange-400" : "text-foreground"
-                  )}>
-                    {damagePreview.critChance}%
-                  </span>
-                </div>
+                <span className="text-muted-foreground">
+                  Dodge: <span className={cn("font-medium", damagePreview.dodgeChance > 0 && "text-yellow-500 dark:text-yellow-400")}>{damagePreview.dodgeChance}%</span>
+                </span>
+                <span className="text-muted-foreground">
+                  Crit: <span className={cn("font-medium", damagePreview.critChance > 0 && "text-orange-500 dark:text-orange-400")}>{damagePreview.critChance}%</span>
+                </span>
               </div>
 
               {/* Status Effects */}
               {damagePreview.statusEffects.length > 0 && (
-                <div className="border-t pt-1.5 space-y-1">
-                  <p className="text-muted-foreground font-medium">Status Effects:</p>
+                <div className="border-t pt-1.5 space-y-0.5">
                   {damagePreview.statusEffects.map(se => (
                     <div 
                       key={se.effectId} 
-                      className={cn("flex justify-between items-center", se.isImmune && "opacity-50")}
+                      className={cn("flex justify-between text-[10px]", se.isImmune && "opacity-50")}
                     >
-                      <span style={{ color: se.color }} className="font-medium">
-                        {se.name}
-                        {se.isImmune && <span className="text-muted-foreground ml-1">(IMMUNE)</span>}
+                      <span style={{ color: se.color }}>
+                        {se.name}{se.isImmune && " (IMMUNE)"}
                       </span>
                       <span className="text-muted-foreground">
                         {se.chance}% • {se.duration}t
-                        {se.dotDamage > 0 && (
-                          <span className="text-destructive ml-1">
-                            {se.dotDamage} {se.damageType ? DAMAGE_TYPE_NAMES[se.damageType] : ""}
-                          </span>
-                        )}
+                        {se.dotDamage > 0 && <span className="text-destructive ml-1">{se.dotDamage}/t</span>}
                         {se.isStun && <span className="text-purple-400 ml-1">Stun</span>}
                       </span>
                     </div>
                   ))}
                 </div>
               )}
-
-              {/* Final HP estimate */}
-              <div className="border-t pt-1.5">
-                <span className="text-muted-foreground">After attack: </span>
-                <span className="text-emerald-500 dark:text-emerald-400 font-semibold">
-                  ~{getFinalHp(damagePreview)} HP
-                </span>
-                {damagePreview.targetHasArmor && damagePreview.maxTotalDamage.armorRemaining < damagePreview.targetArmorHp && (
-                  <span className="text-sky-500 dark:text-sky-400 ml-2">
-                    ~{Math.floor((damagePreview.minTotalDamage.armorRemaining + damagePreview.maxTotalDamage.armorRemaining) / 2)} Armor
-                  </span>
-                )}
-              </div>
             </div>
           </TooltipContent>
         </Tooltip>
