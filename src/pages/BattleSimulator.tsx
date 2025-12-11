@@ -1,0 +1,226 @@
+import { useState, useMemo, useEffect } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Header } from "@/components/Header";
+import { BattleGrid } from "@/components/battle/BattleGrid";
+import { AbilitySelector } from "@/components/battle/AbilitySelector";
+import { UnitSelector } from "@/components/battle/UnitSelector";
+import { PartyManager } from "@/components/battle/PartyManager";
+import { useParties } from "@/hooks/useParties";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { getEncounterById, getEncounterWaves } from "@/lib/encounters";
+import { getUnitById } from "@/lib/units";
+import { getUnitAbilities, calculateDamagePreviewsForEnemy, calculateDamagePreviewsForFriendly } from "@/lib/battleCalculations";
+import { UnitImage } from "@/components/units/UnitImage";
+import { cn } from "@/lib/utils";
+import type { SelectedUnit, AbilityInfo, DamagePreview } from "@/types/battleSimulator";
+
+const BattleSimulator = () => {
+  const { encounterId } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { t } = useLanguage();
+
+  const {
+    parties,
+    selectedParty,
+    selectedPartyId,
+    setSelectedPartyId,
+    createParty,
+    removeParty,
+    addUnit,
+    removeUnit,
+    setUnitRank,
+    renameParty,
+  } = useParties();
+
+  const [currentWave, setCurrentWave] = useState(0);
+  const [selectedUnit, setSelectedUnit] = useState<SelectedUnit | null>(null);
+  const [selectedAbilityId, setSelectedAbilityId] = useState<number | null>(null);
+  const [enemyRankOverrides, setEnemyRankOverrides] = useState<Record<number, number>>({});
+
+  const encounter = encounterId ? getEncounterById(parseInt(encounterId)) : null;
+  const waves = encounter ? getEncounterWaves(encounter) : [];
+  const currentWaveUnits = waves[currentWave] || [];
+
+  const backPath = (location.state as any)?.from || "/";
+
+  // Get abilities for selected unit
+  const selectedUnitAbilities = useMemo<AbilityInfo[]>(() => {
+    if (!selectedUnit) return [];
+    return getUnitAbilities(selectedUnit.unitId, selectedUnit.rank);
+  }, [selectedUnit]);
+
+  // Reset ability selection when unit changes
+  useEffect(() => {
+    setSelectedAbilityId(null);
+  }, [selectedUnit?.unitId, selectedUnit?.gridId]);
+
+  // Calculate damage previews
+  const damagePreviews = useMemo<DamagePreview[]>(() => {
+    if (!selectedUnit || !selectedAbilityId) return [];
+
+    const ability = selectedUnitAbilities.find(a => a.abilityId === selectedAbilityId);
+    if (!ability) return [];
+
+    if (selectedUnit.isEnemy) {
+      // Enemy attacking friendly units
+      if (!selectedParty) return [];
+      return calculateDamagePreviewsForFriendly(ability, selectedParty.units);
+    } else {
+      // Friendly attacking enemy units
+      return calculateDamagePreviewsForEnemy(ability, currentWaveUnits, enemyRankOverrides);
+    }
+  }, [selectedUnit, selectedAbilityId, selectedUnitAbilities, selectedParty, currentWaveUnits, enemyRankOverrides]);
+
+  const handleUnitClick = (unit: SelectedUnit) => {
+    if (selectedUnit?.unitId === unit.unitId && selectedUnit?.gridId === unit.gridId && selectedUnit?.isEnemy === unit.isEnemy) {
+      setSelectedUnit(null);
+    } else {
+      setSelectedUnit(unit);
+    }
+  };
+
+  const handleEnemyRankChange = (gridId: number, rank: number) => {
+    setEnemyRankOverrides(prev => ({ ...prev, [gridId]: rank }));
+    if (selectedUnit?.gridId === gridId && selectedUnit?.isEnemy) {
+      setSelectedUnit(prev => prev ? { ...prev, rank } : null);
+    }
+  };
+
+  const selectedUnitData = selectedUnit ? getUnitById(selectedUnit.unitId) : null;
+  const selectedUnitName = selectedUnitData ? t(selectedUnitData.identity.name) : "";
+  const selectedUnitMaxRank = selectedUnitData?.statsConfig?.stats?.length || 1;
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Header />
+      <main className="container mx-auto px-4 py-6 space-y-6">
+        {/* Back navigation and title */}
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(backPath)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold">Battle Simulator</h1>
+            {encounter && (
+              <p className="text-muted-foreground">
+                {t(encounter.name || `Encounter ${encounterId}`)}
+                <Badge variant="outline" className="ml-2">ID: {encounterId}</Badge>
+                {encounter.level && <Badge variant="secondary" className="ml-2">Lv. {encounter.level}</Badge>}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Wave selector */}
+        {waves.length > 1 && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              disabled={currentWave === 0}
+              onClick={() => setCurrentWave(prev => prev - 1)}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-medium">
+              Wave {currentWave + 1} of {waves.length}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              disabled={currentWave === waves.length - 1}
+              onClick={() => setCurrentWave(prev => prev + 1)}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
+        {/* Battle grids */}
+        <div className="grid gap-4">
+          {/* Enemy grid at top */}
+          <BattleGrid
+            isEnemy={true}
+            units={currentWaveUnits}
+            selectedUnit={selectedUnit}
+            onUnitClick={handleUnitClick}
+            damagePreviews={!selectedUnit?.isEnemy ? damagePreviews : []}
+            rankOverrides={enemyRankOverrides}
+          />
+
+          {/* Divider with selected unit info */}
+          <div className="border-y py-4">
+            {selectedUnit && selectedUnitData ? (
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <UnitImage
+                    iconName={selectedUnitData.identity.icon}
+                    alt={selectedUnitName}
+                    className="w-12 h-12 rounded"
+                  />
+                  <div>
+                    <p className="font-semibold">{selectedUnitName}</p>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>{selectedUnit.isEnemy ? "Enemy" : "Friendly"}</span>
+                      <span>•</span>
+                      <span>Rank {selectedUnit.rank}/{selectedUnitMaxRank}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Ability selector */}
+                <AbilitySelector
+                  abilities={selectedUnitAbilities}
+                  selectedAbilityId={selectedAbilityId}
+                  onSelectAbility={setSelectedAbilityId}
+                  className="flex-1 max-w-2xl"
+                />
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground">
+                Click on a unit to see its abilities and damage calculations
+              </p>
+            )}
+          </div>
+
+          {/* Friendly grid at bottom */}
+          <BattleGrid
+            isEnemy={false}
+            units={selectedParty?.units || []}
+            selectedUnit={selectedUnit}
+            onUnitClick={handleUnitClick}
+            damagePreviews={selectedUnit?.isEnemy ? damagePreviews : []}
+          />
+        </div>
+
+        {/* Party management */}
+        <div className="border-t pt-6 space-y-4">
+          <PartyManager
+            parties={parties}
+            selectedPartyId={selectedPartyId}
+            onSelectParty={setSelectedPartyId}
+            onCreateParty={createParty}
+            onDeleteParty={removeParty}
+            onRenameParty={renameParty}
+          />
+
+          {selectedParty && (
+            <UnitSelector
+              partyUnits={selectedParty.units}
+              onAddUnit={addUnit}
+              onRemoveUnit={removeUnit}
+              onUpdateRank={setUnitRank}
+            />
+          )}
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default BattleSimulator;
