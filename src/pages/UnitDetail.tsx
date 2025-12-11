@@ -27,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { 
   ArrowLeft, Swords, Clock, Coins, Wrench, Plus, Check, Activity, Shield
 } from "lucide-react";
+import { UnitTag, UnitTagLabels } from "@/data/gameEnums";
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
@@ -198,7 +199,7 @@ export default function UnitDetail() {
         <div className="flex flex-wrap gap-2">
           {unit.identity.tags.map((tag) => (
             <Badge key={tag} variant="outline">
-              #{tag}
+              {UnitTagLabels[tag] || `#${tag}`}
             </Badge>
           ))}
         </div>
@@ -354,7 +355,7 @@ export default function UnitDetail() {
                           <div className="mt-2 text-sm">
                             <span className="text-muted-foreground">Targets: </span>
                             <span className="font-medium">
-                              {ability.stats.targets.map(tagId => `#${tagId}`).join(", ")}
+                              {ability.stats.targets.map(tagId => UnitTagLabels[tagId] || `#${tagId}`).join(", ")}
                             </span>
                           </div>
                         )}
