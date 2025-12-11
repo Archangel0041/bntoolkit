@@ -16,6 +16,8 @@ interface BattleGridProps {
   damagePreviews?: DamagePreview[];
   rankOverrides?: Record<number, number>;
   onMoveUnit?: (fromGridId: number, toGridId: number) => void;
+  onRemoveUnit?: (gridId: number) => void;
+  onAddUnit?: (unitId: number, gridId: number) => void;
 }
 
 const DAMAGE_TYPE_NAMES: Record<number, string> = {
@@ -35,6 +37,8 @@ export function BattleGrid({
   damagePreviews = [],
   rankOverrides = {},
   onMoveUnit,
+  onRemoveUnit,
+  onAddUnit,
 }: BattleGridProps) {
   const { t } = useLanguage();
   const layout = isEnemy ? ENEMY_GRID_LAYOUT : FRIENDLY_GRID_LAYOUT;
@@ -52,9 +56,10 @@ export function BattleGrid({
     return damagePreviews.find(dp => dp.targetGridId === gridId);
   };
 
-  const handleDragStart = (e: React.DragEvent, gridId: number) => {
+  const handleDragStart = (e: React.DragEvent, gridId: number, unitId: number) => {
     if (isEnemy) return;
     e.dataTransfer.setData("text/plain", gridId.toString());
+    e.dataTransfer.setData("application/x-formation-unit", JSON.stringify({ gridId, unitId }));
     setDraggedGridId(gridId);
   };
 
@@ -71,6 +76,18 @@ export function BattleGrid({
   const handleDrop = (e: React.DragEvent, targetGridId: number) => {
     if (isEnemy) return;
     e.preventDefault();
+    
+    // Check if it's a unit being dragged from the party selector
+    const selectorData = e.dataTransfer.getData("application/x-selector-unit");
+    if (selectorData && onAddUnit) {
+      const { unitId } = JSON.parse(selectorData);
+      onAddUnit(unitId, targetGridId);
+      setDraggedGridId(null);
+      setDragOverGridId(null);
+      return;
+    }
+    
+    // Otherwise handle internal grid move
     const fromGridId = parseInt(e.dataTransfer.getData("text/plain"));
     if (fromGridId !== targetGridId && onMoveUnit) {
       onMoveUnit(fromGridId, targetGridId);
@@ -158,7 +175,7 @@ export function BattleGrid({
       <div
         onClick={handleClick}
         draggable={!isEnemy}
-        onDragStart={(e) => handleDragStart(e, gridId)}
+        onDragStart={(e) => handleDragStart(e, gridId, unitId)}
         onDragOver={(e) => handleDragOver(e, gridId)}
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(e, gridId)}
