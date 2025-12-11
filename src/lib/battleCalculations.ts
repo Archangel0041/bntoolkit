@@ -212,15 +212,22 @@ function getUnitStatsAtRank(unitId: number, rank: number): UnitStats | undefined
   return unit?.statsConfig?.stats?.[rank - 1];
 }
 
-// Calculate crit chance based on base crit + class bonus
+// Calculate crit chance based on base crit + tag-based bonuses
 function calculateCritChance(baseCrit: number, critBonuses: Record<number, number>, targetUnitId: number): number {
   const targetUnit = getUnitById(targetUnitId);
   if (!targetUnit) return baseCrit;
   
-  const className = targetUnit.identity.class_name;
-  const classBonus = critBonuses[className] || 0;
+  // critBonuses are keyed by tag IDs - check if target has any matching tags
+  const unitTags = targetUnit.identity.tags;
+  let totalBonus = 0;
   
-  return baseCrit + classBonus;
+  for (const tag of unitTags) {
+    if (critBonuses[tag]) {
+      totalBonus += critBonuses[tag];
+    }
+  }
+  
+  return baseCrit + totalBonus;
 }
 
 // Calculate damage preview for all valid targets
