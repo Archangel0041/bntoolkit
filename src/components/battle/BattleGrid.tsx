@@ -238,64 +238,66 @@ export function BattleGrid({
           }
           
           return (
-            <div className="absolute bottom-0 left-0 right-0 p-0.5">
-              {/* HP Bar with damage visualization */}
-              <div className="space-y-0.5">
-                <div className="h-1.5 w-full bg-gray-700/80 rounded-sm overflow-hidden flex">
-                  {/* Green: Remaining HP (minimum case) */}
-                  <div 
-                    className="h-full bg-emerald-500 transition-all" 
-                    style={{ width: `${minHpPercent}%` }} 
-                  />
-                  {/* Orange: Damage range (potential additional damage) */}
-                  {rangeDamageHpPercent > 0 && (
-                    <div 
-                      className="h-full bg-orange-500 transition-all" 
-                      style={{ width: `${rangeDamageHpPercent}%` }} 
-                    />
-                  )}
-                  {/* Red: Guaranteed damage */}
-                  {minDamageHpPercent > 0 && (
-                    <div 
-                      className="h-full bg-red-500 transition-all" 
-                      style={{ width: `${minDamageHpPercent}%` }} 
-                    />
-                  )}
+            <>
+              {/* Dodge chance indicator - top left */}
+              {damagePreview.dodgeChance > 0 && (
+                <div className="absolute top-0.5 left-0.5 text-[8px] font-bold text-yellow-400 bg-black/60 px-1 rounded-sm">
+                  {damagePreview.dodgeChance}%
                 </div>
-                
-                {/* Armor Bar with damage visualization */}
-                {damagePreview.targetHasArmor && (
+              )}
+              
+              <div className="absolute bottom-0 left-0 right-0 p-0.5">
+                {/* HP Bar with damage visualization */}
+                <div className="space-y-0.5">
                   <div className="h-1.5 w-full bg-gray-700/80 rounded-sm overflow-hidden flex">
-                    {/* Blue: Remaining Armor (minimum case) */}
+                    {/* Green: Remaining HP (minimum case) */}
                     <div 
-                      className="h-full bg-sky-500 transition-all" 
-                      style={{ width: `${minArmorPercent}%` }} 
+                      className="h-full bg-emerald-500 transition-all" 
+                      style={{ width: `${minHpPercent}%` }} 
                     />
-                    {/* Orange: Damage range */}
-                    {rangeDamageArmorPercent > 0 && (
+                    {/* Orange: Damage range (potential additional damage) */}
+                    {rangeDamageHpPercent > 0 && (
                       <div 
                         className="h-full bg-orange-500 transition-all" 
-                        style={{ width: `${rangeDamageArmorPercent}%` }} 
+                        style={{ width: `${rangeDamageHpPercent}%` }} 
                       />
                     )}
                     {/* Red: Guaranteed damage */}
-                    {minDamageArmorPercent > 0 && (
+                    {minDamageHpPercent > 0 && (
                       <div 
                         className="h-full bg-red-500 transition-all" 
-                        style={{ width: `${minDamageArmorPercent}%` }} 
+                        style={{ width: `${minDamageHpPercent}%` }} 
                       />
                     )}
                   </div>
-                )}
-                
-                {/* Dodge chance indicator */}
-                {damagePreview.dodgeChance > 0 && (
-                  <div className="text-center text-[8px] font-bold text-yellow-400 bg-black/50 rounded-sm">
-                    {damagePreview.dodgeChance}%
-                  </div>
-                )}
+                  
+                  {/* Armor Bar with damage visualization */}
+                  {damagePreview.targetHasArmor && (
+                    <div className="h-1.5 w-full bg-gray-700/80 rounded-sm overflow-hidden flex">
+                      {/* Blue: Remaining Armor (minimum case) */}
+                      <div 
+                        className="h-full bg-sky-500 transition-all" 
+                        style={{ width: `${minArmorPercent}%` }} 
+                      />
+                      {/* Orange: Damage range */}
+                      {rangeDamageArmorPercent > 0 && (
+                        <div 
+                          className="h-full bg-orange-500 transition-all" 
+                          style={{ width: `${rangeDamageArmorPercent}%` }} 
+                        />
+                      )}
+                      {/* Red: Guaranteed damage */}
+                      {minDamageArmorPercent > 0 && (
+                        <div 
+                          className="h-full bg-red-500 transition-all" 
+                          style={{ width: `${minDamageArmorPercent}%` }} 
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            </>
           );
         })()}
         
