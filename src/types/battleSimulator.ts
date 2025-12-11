@@ -213,11 +213,12 @@ export function getAffectedGridPositions(
 }
 
 // Get fixed attack pattern positions relative to attacker's grid position
+// Fixed attacks hit specific positions relative to the attacker - they can't be aimed
 export function getFixedAttackPositions(
   attackerGridId: number,
   targetArea: TargetArea | undefined,
   isAttackerFriendly: boolean
-): { gridId: number; damagePercent: number }[] {
+): { gridId: number; damagePercent: number; isOnEnemyGrid: boolean }[] {
   if (!targetArea || targetArea.data.length === 0) {
     return [];
   }
@@ -225,43 +226,85 @@ export function getFixedAttackPositions(
   const attackerCoords = GRID_ID_TO_COORDS[attackerGridId];
   if (!attackerCoords) return [];
 
-  const affected: { gridId: number; damagePercent: number }[] = [];
+  const affected: { gridId: number; damagePercent: number; isOnEnemyGrid: boolean }[] = [];
 
-  // For fixed attacks, the y positions in data are absolute offsets from the attacker
-  // Negative y = toward enemy, Positive y = toward friendly side
-  // When attacking as friendly (bottom), enemy is above (y decreases)
-  // When attacking as enemy (top), friendly is below (y increases)
+  // For fixed attacks, the y positions in data represent distance toward enemy:
+  // y = -1 means 1 row toward enemy from attacker
+  // y = -2 means 2 rows toward enemy from attacker
+  // etc.
+  
+  // Friendly grid y: 0 = front, 1 = middle, 2 = back (attacker positions)
+  // Enemy grid y: 0 = front (closest to friendly), 1 = middle, 2 = back
+  
+  // When friendly attacks:
+  // - Attacker at y=0 (front row): y=-1 hits enemy y=0, y=-2 hits enemy y=1, y=-3 hits enemy y=2
+  // - Attacker at y=1 (middle row): y=-1 stays on friendly grid (front row), y=-2 hits enemy y=0
+  // - Attacker at y=2 (back row): y=-1 hits friendly y=1, y=-2 hits friendly y=0, y=-3 hits enemy y=0
 
   for (const pos of targetArea.data) {
-    // From friendly attacker perspective: negative Y goes toward enemy grid (which has y=0,1,2 going back)
-    // The attack data y offsets are relative: -1 = one row toward enemy, -2 = two rows toward enemy
-    const yOffset = isAttackerFriendly ? pos.y : -pos.y;
-    
     const newX = attackerCoords.x + pos.x;
-    const newY = attackerCoords.y + yOffset;
     
-    // For fixed attacks targeting the enemy side, we need to map to enemy grid coordinates
-    // The "enemy grid" from friendly perspective starts at y=-3 (enemy back row), y=-2 (enemy middle), y=-1 (enemy front)
-    // But we store enemy grid with y=0,1,2 (front to back)
+    // Calculate the effective y position
+    // For friendly: negative y means toward enemy (decreasing our y, then crossing to enemy grid)
+    // For enemy: negative y means toward friendly (decreasing our y, then crossing to friendly grid)
     
-    // If targeting enemy (newY < 0), convert to enemy grid coords
     let targetGridId: number | undefined;
+    let isOnEnemyGrid = false;
     
-    if (newY < 0 && isAttackerFriendly) {
-      // Convert negative Y to enemy grid (y=0 is enemy front row, y=2 is enemy back)
-      const enemyY = Math.abs(newY) - 1; // -1 -> 0, -2 -> 1, -3 -> 2
-      const coordKey = `${newX},${enemyY}`;
-      targetGridId = COORDS_TO_GRID_ID[coordKey];
-    } else if (newY >= 0) {
-      // Still on same side
-      const coordKey = `${newX},${newY}`;
-      targetGridId = COORDS_TO_GRID_ID[coordKey];
+    if (isAttackerFriendly) {
+      // Friendly attacker
+      const rowsTowardEnemy = Math.abs(pos.y); // How many rows toward enemy (pos.y is negative)
+      const attackerRowFromFront = attackerCoords.y; // 0 = front, 2 = back
+      
+      // Rows on friendly side that the attack passes through
+      // If attacker is at y=2 (back) and goes 3 rows toward enemy:
+      // - 1st row: friendly y=1
+      // - 2nd row: friendly y=0  
+      // - 3rd row: enemy y=0
+      
+      const rowsOnFriendlySide = attackerRowFromFront; // Number of friendly rows in front of attacker
+      
+      if (rowsTowardEnemy <= rowsOnFriendlySide) {
+        // Still on friendly grid
+        const newY = attackerCoords.y - rowsTowardEnemy;
+        const coordKey = `${newX},${newY}`;
+        targetGridId = COORDS_TO_GRID_ID[coordKey];
+        isOnEnemyGrid = false;
+      } else {
+        // Crossed to enemy grid
+        const rowsIntoEnemyGrid = rowsTowardEnemy - rowsOnFriendlySide - 1; // -1 for the gap between grids
+        const enemyY = rowsIntoEnemyGrid; // 0 = enemy front row
+        const coordKey = `${newX},${enemyY}`;
+        targetGridId = COORDS_TO_GRID_ID[coordKey];
+        isOnEnemyGrid = true;
+      }
+    } else {
+      // Enemy attacker (mirror logic)
+      const rowsTowardFriendly = Math.abs(pos.y);
+      const attackerRowFromFront = attackerCoords.y;
+      const rowsOnEnemySide = attackerRowFromFront;
+      
+      if (rowsTowardFriendly <= rowsOnEnemySide) {
+        // Still on enemy grid
+        const newY = attackerCoords.y - rowsTowardFriendly;
+        const coordKey = `${newX},${newY}`;
+        targetGridId = COORDS_TO_GRID_ID[coordKey];
+        isOnEnemyGrid = true;
+      } else {
+        // Crossed to friendly grid
+        const rowsIntoFriendlyGrid = rowsTowardFriendly - rowsOnEnemySide - 1;
+        const friendlyY = rowsIntoFriendlyGrid;
+        const coordKey = `${newX},${friendlyY}`;
+        targetGridId = COORDS_TO_GRID_ID[coordKey];
+        isOnEnemyGrid = false;
+      }
     }
     
     if (targetGridId !== undefined) {
       affected.push({
         gridId: targetGridId,
         damagePercent: pos.damagePercent || 100,
+        isOnEnemyGrid,
       });
     }
   }
