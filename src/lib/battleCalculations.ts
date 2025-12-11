@@ -125,6 +125,7 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
         globalCooldown: (ability.stats as any).global_cooldown || 0,
         armorPiercing: ability.stats.armor_piercing_percent,
         critPercent: ability.stats.critical_hit_percent,
+        critBonuses: (ability.stats as any).critical_bonuses || {},
         chargeTime: (ability.stats as any).charge_time || 0,
         suppressionMultiplier: (ability.stats as any).damage_distraction || 1,
         suppressionBonus: (ability.stats as any).damage_distraction_bonus || 0,
@@ -152,6 +153,17 @@ function getUnitStatsAtRank(unitId: number, rank: number): UnitStats | undefined
   return unit?.statsConfig?.stats?.[rank - 1];
 }
 
+// Calculate crit chance based on base crit + class bonus
+function calculateCritChance(baseCrit: number, critBonuses: Record<number, number>, targetUnitId: number): number {
+  const targetUnit = getUnitById(targetUnitId);
+  if (!targetUnit) return baseCrit;
+  
+  const className = targetUnit.identity.class_name;
+  const classBonus = critBonuses[className] || 0;
+  
+  return baseCrit + classBonus;
+}
+
 // Calculate damage preview for all valid targets
 export function calculateDamagePreviewsForEnemy(
   attackerAbility: AbilityInfo,
@@ -165,7 +177,9 @@ export function calculateDamagePreviewsForEnemy(
       const enemyRank = enemyRankOverrides[enemyUnit.grid_id!] || (enemy?.statsConfig?.stats?.length || 1);
       const enemyStats = getUnitStatsAtRank(enemyUnit.unit_id, enemyRank);
       const canTarget = canTargetUnit(enemyUnit.unit_id, attackerAbility.targets);
-      const dodgeChance = calculateDodgeChance(enemyStats?.defense || 0, attackerAbility.offense);
+      const defense = enemyStats?.defense || 0;
+      const dodgeChance = calculateDodgeChance(defense, attackerAbility.offense);
+      const critChance = calculateCritChance(attackerAbility.critPercent, attackerAbility.critBonuses, enemyUnit.unit_id);
 
       const armorHp = enemyStats?.armor_hp || 0;
       const hp = enemyStats?.hp || 0;
@@ -194,10 +208,12 @@ export function calculateDamagePreviewsForEnemy(
         minDamage: minResult,
         maxDamage: maxResult,
         dodgeChance,
+        critChance,
         canTarget,
         targetHasArmor: armorHp > 0,
         targetArmorHp: armorHp,
         targetHp: hp,
+        targetDefense: defense,
       };
     });
 }
@@ -207,9 +223,12 @@ export function calculateDamagePreviewsForFriendly(
   friendlyUnits: PartyUnit[]
 ): DamagePreview[] {
   return friendlyUnits.map(friendlyUnit => {
+    const unit = getUnitById(friendlyUnit.unitId);
     const stats = getUnitStatsAtRank(friendlyUnit.unitId, friendlyUnit.rank);
     const canTarget = canTargetUnit(friendlyUnit.unitId, attackerAbility.targets);
-    const dodgeChance = calculateDodgeChance(stats?.defense || 0, attackerAbility.offense);
+    const defense = stats?.defense || 0;
+    const dodgeChance = calculateDodgeChance(defense, attackerAbility.offense);
+    const critChance = calculateCritChance(attackerAbility.critPercent, attackerAbility.critBonuses, friendlyUnit.unitId);
 
     const armorHp = stats?.armor_hp || 0;
     const hp = stats?.hp || 0;
@@ -238,10 +257,12 @@ export function calculateDamagePreviewsForFriendly(
       minDamage: minResult,
       maxDamage: maxResult,
       dodgeChance,
+      critChance,
       canTarget,
       targetHasArmor: armorHp > 0,
       targetArmorHp: armorHp,
       targetHp: hp,
+      targetDefense: defense,
     };
   });
 }

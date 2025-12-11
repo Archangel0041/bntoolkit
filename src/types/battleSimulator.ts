@@ -43,6 +43,7 @@ export interface AbilityInfo {
   globalCooldown: number;
   armorPiercing: number;
   critPercent: number;
+  critBonuses: Record<number, number>; // class_name -> bonus crit %
   chargeTime: number;
   suppressionMultiplier: number;
   suppressionBonus: number;
@@ -62,10 +63,12 @@ export interface DamagePreview {
   minDamage: DamageResult;
   maxDamage: DamageResult;
   dodgeChance: number;
+  critChance: number;
   canTarget: boolean;
   targetHasArmor: boolean;
   targetArmorHp: number;
   targetHp: number;
+  targetDefense: number;
 }
 
 // Row mapping: preferred_row 1 = front (row 1), 2 = middle (row 2), 3 = back (row 3)

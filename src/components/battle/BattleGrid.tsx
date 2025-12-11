@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { getUnitById } from "@/lib/units";
 import { UnitImage } from "@/components/units/UnitImage";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import type { EncounterUnit } from "@/types/encounters";
 import type { PartyUnit, DamagePreview, SelectedUnit } from "@/types/battleSimulator";
 import { ENEMY_GRID_LAYOUT, FRIENDLY_GRID_LAYOUT } from "@/types/battleSimulator";
@@ -43,7 +44,7 @@ export function BattleGrid({
   };
 
   const handleDragStart = (e: React.DragEvent, gridId: number) => {
-    if (isEnemy) return; // Only allow dragging friendly units
+    if (isEnemy) return;
     e.dataTransfer.setData("text/plain", gridId.toString());
     setDraggedGridId(gridId);
   };
@@ -124,9 +125,14 @@ export function BattleGrid({
       });
     };
 
-    return (
+    // Calculate final HP after damage for compact display
+    const getFinalHp = (preview: DamagePreview) => {
+      const avgHpDamage = Math.floor((preview.minDamage.hpDamage + preview.maxDamage.hpDamage) / 2);
+      return Math.max(0, preview.targetHp - avgHpDamage);
+    };
+
+    const slotContent = (
       <div
-        key={gridId}
         onClick={handleClick}
         draggable={!isEnemy}
         onDragStart={(e) => handleDragStart(e, gridId)}
@@ -153,24 +159,22 @@ export function BattleGrid({
           />
         )}
         
-        {/* Damage overlay */}
+        {/* Compact damage overlay - shows final HP and key stats */}
         {damagePreview && damagePreview.canTarget && (
-          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-white text-[10px] font-bold p-1">
-            {/* HP damage display */}
-            <span className="text-destructive">
-              {damagePreview.minDamage.hpDamage}-{damagePreview.maxDamage.hpDamage} HP
+          <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center text-white text-[9px] font-bold p-0.5 leading-tight">
+            {/* Final HP estimate */}
+            <span className="text-destructive text-[11px]">
+              → {getFinalHp(damagePreview)} HP
             </span>
-            {/* Armor damage if target has armor */}
-            {damagePreview.targetHasArmor && (
-              <span className="text-blue-400">
-                {damagePreview.minDamage.armorDamage}-{damagePreview.maxDamage.armorDamage} Arm
-              </span>
-            )}
-            {damagePreview.dodgeChance > 0 && (
-              <span className="text-yellow-400">
-                {damagePreview.dodgeChance}% dodge
-              </span>
-            )}
+            {/* Dodge and Crit */}
+            <div className="flex gap-1 text-[8px]">
+              {damagePreview.dodgeChance > 0 && (
+                <span className="text-yellow-400">{damagePreview.dodgeChance}%D</span>
+              )}
+              {damagePreview.critChance > 0 && (
+                <span className="text-orange-400">{damagePreview.critChance}%C</span>
+              )}
+            </div>
           </div>
         )}
         
@@ -182,44 +186,130 @@ export function BattleGrid({
         )}
       </div>
     );
+
+    // Wrap with tooltip for detailed info
+    if (damagePreview && damagePreview.canTarget) {
+      return (
+        <Tooltip key={gridId}>
+          <TooltipTrigger asChild>
+            {slotContent}
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-xs p-2">
+            <div className="text-xs space-y-1.5">
+              <p className="font-semibold">{unitName}</p>
+              
+              {/* Current HP/Armor */}
+              <div className="flex gap-3 text-muted-foreground">
+                <span>HP: <span className="text-foreground">{damagePreview.targetHp}</span></span>
+                {damagePreview.targetHasArmor && (
+                  <span>Armor: <span className="text-blue-400">{damagePreview.targetArmorHp}</span></span>
+                )}
+                <span>Def: <span className="text-foreground">{damagePreview.targetDefense}</span></span>
+              </div>
+
+              {/* Damage breakdown */}
+              <div className="border-t pt-1.5 space-y-0.5">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">HP Damage:</span>
+                  <span className="text-destructive font-medium">
+                    {damagePreview.minDamage.hpDamage} - {damagePreview.maxDamage.hpDamage}
+                  </span>
+                </div>
+                {damagePreview.targetHasArmor && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Armor Damage:</span>
+                    <span className="text-blue-400 font-medium">
+                      {damagePreview.minDamage.armorDamage} - {damagePreview.maxDamage.armorDamage}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Raw Damage:</span>
+                  <span className="font-medium">
+                    {damagePreview.minDamage.rawDamage} - {damagePreview.maxDamage.rawDamage}
+                  </span>
+                </div>
+              </div>
+
+              {/* Chances */}
+              <div className="border-t pt-1.5 flex gap-4">
+                <div>
+                  <span className="text-muted-foreground">Dodge: </span>
+                  <span className={cn(
+                    "font-medium",
+                    damagePreview.dodgeChance > 0 ? "text-yellow-400" : "text-foreground"
+                  )}>
+                    {damagePreview.dodgeChance}%
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Crit: </span>
+                  <span className={cn(
+                    "font-medium",
+                    damagePreview.critChance > 0 ? "text-orange-400" : "text-foreground"
+                  )}>
+                    {damagePreview.critChance}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Final HP estimate */}
+              <div className="border-t pt-1.5">
+                <span className="text-muted-foreground">After attack: </span>
+                <span className="text-destructive font-semibold">
+                  ~{getFinalHp(damagePreview)} HP
+                </span>
+                {damagePreview.targetHasArmor && damagePreview.maxDamage.armorRemaining < damagePreview.targetArmorHp && (
+                  <span className="text-blue-400 ml-2">
+                    ~{Math.floor((damagePreview.minDamage.armorRemaining + damagePreview.maxDamage.armorRemaining) / 2)} Armor
+                  </span>
+                )}
+              </div>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      );
+    }
+
+    return <div key={gridId}>{slotContent}</div>;
   };
 
   return (
-    <div className={cn(
-      "flex flex-col items-center gap-2 p-4 rounded-lg",
-      isEnemy ? "bg-destructive/5" : "bg-primary/5"
-    )}>
-      <div className="text-sm font-medium text-muted-foreground mb-2">
-        {isEnemy ? "Enemy Formation" : "Your Formation"}
+    <TooltipProvider>
+      <div className={cn(
+        "flex flex-col items-center gap-2 p-4 rounded-lg",
+        isEnemy ? "bg-destructive/5" : "bg-primary/5"
+      )}>
+        <div className="text-sm font-medium text-muted-foreground mb-2">
+          {isEnemy ? "Enemy Formation" : "Your Formation"}
+        </div>
+        
+        {isEnemy ? (
+          <>
+            <div className="flex gap-1 justify-center">
+              {layout.ROW_3.map(gridId => renderSlot(gridId))}
+            </div>
+            <div className="flex gap-1">
+              {layout.ROW_2.map(gridId => renderSlot(gridId))}
+            </div>
+            <div className="flex gap-1">
+              {layout.ROW_1.map(gridId => renderSlot(gridId))}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex gap-1">
+              {layout.ROW_1.map(gridId => renderSlot(gridId))}
+            </div>
+            <div className="flex gap-1">
+              {layout.ROW_2.map(gridId => renderSlot(gridId))}
+            </div>
+            <div className="flex gap-1 justify-center">
+              {layout.ROW_3.map(gridId => renderSlot(gridId))}
+            </div>
+          </>
+        )}
       </div>
-      
-      {isEnemy ? (
-        <>
-          {/* Enemy: Row 3 at top, Row 1 at bottom */}
-          <div className="flex gap-1 justify-center">
-            {layout.ROW_3.map(gridId => renderSlot(gridId))}
-          </div>
-          <div className="flex gap-1">
-            {layout.ROW_2.map(gridId => renderSlot(gridId))}
-          </div>
-          <div className="flex gap-1">
-            {layout.ROW_1.map(gridId => renderSlot(gridId))}
-          </div>
-        </>
-      ) : (
-        <>
-          {/* Friendly: Row 1 at top (closest to enemy), Row 3 at bottom */}
-          <div className="flex gap-1">
-            {layout.ROW_1.map(gridId => renderSlot(gridId))}
-          </div>
-          <div className="flex gap-1">
-            {layout.ROW_2.map(gridId => renderSlot(gridId))}
-          </div>
-          <div className="flex gap-1 justify-center">
-            {layout.ROW_3.map(gridId => renderSlot(gridId))}
-          </div>
-        </>
-      )}
-    </div>
+    </TooltipProvider>
   );
 }
