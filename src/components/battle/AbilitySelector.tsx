@@ -4,7 +4,40 @@ import { getAbilityImageUrl } from "@/lib/abilityImages";
 import { getDamageTypeIconUrl } from "@/lib/damageImages";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
+import { expandTargetTags } from "@/lib/tagHierarchy";
 import type { AbilityInfo } from "@/types/battleSimulator";
+
+// Main targeting categories
+const TARGETING_CATEGORIES = {
+  air: { tag: 39, label: "Air", color: "bg-sky-500/20 text-sky-700 dark:text-sky-300 border-sky-500/50" },
+  ground: { tag: 24, label: "Ground", color: "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/50" },
+  sea: { tag: 15, label: "Sea", color: "bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/50" },
+};
+
+function getTargetingCategories(targets: number[]): { canTarget: string[]; cannotTarget: string[] } {
+  if (targets.length === 0) {
+    return { canTarget: ["Air", "Ground", "Sea"], cannotTarget: [] };
+  }
+  
+  const expandedTargets = expandTargetTags(targets);
+  const canTarget: string[] = [];
+  const cannotTarget: string[] = [];
+  
+  if (targets.includes(51) || expandedTargets.includes(51)) {
+    return { canTarget: ["Air", "Ground", "Sea"], cannotTarget: [] };
+  }
+  
+  for (const [key, { tag, label }] of Object.entries(TARGETING_CATEGORIES)) {
+    if (targets.includes(tag) || expandedTargets.includes(tag)) {
+      canTarget.push(label);
+    } else {
+      cannotTarget.push(label);
+    }
+  }
+  
+  return { canTarget, cannotTarget };
+}
 
 interface AbilitySelectorProps {
   abilities: AbilityInfo[];
@@ -107,6 +140,39 @@ export function AbilitySelector({
                       </>
                     )}
                   </div>
+                  
+                  {/* Targeting categories */}
+                  {(() => {
+                    const { canTarget, cannotTarget } = getTargetingCategories(info.targets);
+                    return (
+                      <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t">
+                        <span className="text-muted-foreground">Targets:</span>
+                        {canTarget.map(cat => (
+                          <Badge 
+                            key={cat} 
+                            variant="outline" 
+                            className={cn(
+                              "text-[10px] px-1.5 py-0",
+                              cat === "Air" && TARGETING_CATEGORIES.air.color,
+                              cat === "Ground" && TARGETING_CATEGORIES.ground.color,
+                              cat === "Sea" && TARGETING_CATEGORIES.sea.color
+                            )}
+                          >
+                            ✓ {cat}
+                          </Badge>
+                        ))}
+                        {cannotTarget.map(cat => (
+                          <Badge 
+                            key={cat} 
+                            variant="outline" 
+                            className="text-[10px] px-1.5 py-0 bg-muted/50 text-muted-foreground line-through"
+                          >
+                            {cat}
+                          </Badge>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               </TooltipContent>
             </Tooltip>
