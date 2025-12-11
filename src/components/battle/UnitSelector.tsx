@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Trash2 } from "lucide-react";
 import { allUnits } from "@/lib/units";
+import { UnitSide } from "@/data/gameEnums";
 import type { PartyUnit } from "@/types/battleSimulator";
 import { getNextAvailablePosition } from "@/lib/battleCalculations";
 import { cn } from "@/lib/utils";
@@ -42,10 +43,10 @@ export function UnitSelector({
   const [searchQuery, setSearchQuery] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
 
-  // Filter to only show friendly units (side 1)
-  const friendlyUnits = allUnits.filter(u => u.identity.side === 1);
+  // Filter to only show Player units (side 1)
+  const playerUnits = allUnits.filter(u => u.identity.side === UnitSide.Player);
   
-  const filteredUnits = friendlyUnits.filter(unit => {
+  const filteredUnits = playerUnits.filter(unit => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     const name = t(unit.identity.name).toLowerCase();

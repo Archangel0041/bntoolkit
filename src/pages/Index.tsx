@@ -9,15 +9,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { EncounterLookup } from "@/components/encounters/EncounterLookup";
 import { BossStrikeLookup } from "@/components/bossStrikes/BossStrikeLookup";
 import { Users, Crosshair, Trophy } from "lucide-react";
-
-const SIDE_LABELS: Record<number, string> = {
-  1: "Friendly",
-  2: "Enemy",
-  3: "Unknown",
-  4: "Cast (NPCs)",
-  5: "Bosses",
-  6: "Test",
-};
+import { UnitSide } from "@/data/gameEnums";
 
 const Index = () => {
   const { t } = useLanguage();
@@ -41,12 +33,12 @@ const Index = () => {
   }, [searchQuery, selectedTags, nanopodFilter, t]);
 
   const unitsBySide = useMemo(() => ({
-    friendly: filteredUnits.filter(u => u.identity.side === 1),
-    enemy: filteredUnits.filter(u => u.identity.side === 2),
-    unknown: filteredUnits.filter(u => u.identity.side === 3),
-    cast: filteredUnits.filter(u => u.identity.side === 4),
-    bosses: filteredUnits.filter(u => u.identity.side === 5),
-    test: filteredUnits.filter(u => u.identity.side === 6),
+    player: filteredUnits.filter(u => u.identity.side === UnitSide.Player),
+    hostile: filteredUnits.filter(u => u.identity.side === UnitSide.Hostile),
+    neutral: filteredUnits.filter(u => u.identity.side === UnitSide.Neutral),
+    hero: filteredUnits.filter(u => u.identity.side === UnitSide.Hero),
+    villain: filteredUnits.filter(u => u.identity.side === UnitSide.Villain),
+    test: filteredUnits.filter(u => u.identity.side === UnitSide.Test),
   }), [filteredUnits]);
 
   return (
@@ -91,27 +83,27 @@ const Index = () => {
               Showing {filteredUnits.length} of {allUnits.length} units
             </div>
 
-            <Tabs defaultValue="friendly" className="w-full">
+            <Tabs defaultValue="player" className="w-full">
               <TabsList className="flex flex-wrap h-auto gap-1">
-                <TabsTrigger value="friendly">
-                  Friendly ({unitsBySide.friendly.length})
+                <TabsTrigger value="player">
+                  Player ({unitsBySide.player.length})
                 </TabsTrigger>
-                <TabsTrigger value="enemy">
-                  Enemy ({unitsBySide.enemy.length})
+                <TabsTrigger value="hostile">
+                  Hostile ({unitsBySide.hostile.length})
                 </TabsTrigger>
-                {unitsBySide.bosses.length > 0 && (
-                  <TabsTrigger value="bosses">
-                    Bosses ({unitsBySide.bosses.length})
+                {unitsBySide.villain.length > 0 && (
+                  <TabsTrigger value="villain">
+                    Villain ({unitsBySide.villain.length})
                   </TabsTrigger>
                 )}
-                {unitsBySide.cast.length > 0 && (
-                  <TabsTrigger value="cast">
-                    Cast/NPCs ({unitsBySide.cast.length})
+                {unitsBySide.hero.length > 0 && (
+                  <TabsTrigger value="hero">
+                    Hero ({unitsBySide.hero.length})
                   </TabsTrigger>
                 )}
-                {unitsBySide.unknown.length > 0 && (
-                  <TabsTrigger value="unknown">
-                    Unknown ({unitsBySide.unknown.length})
+                {unitsBySide.neutral.length > 0 && (
+                  <TabsTrigger value="neutral">
+                    Neutral ({unitsBySide.neutral.length})
                   </TabsTrigger>
                 )}
                 {unitsBySide.test.length > 0 && (
@@ -120,20 +112,20 @@ const Index = () => {
                   </TabsTrigger>
                 )}
               </TabsList>
-              <TabsContent value="friendly" className="mt-6">
-                <UnitGrid units={unitsBySide.friendly} />
+              <TabsContent value="player" className="mt-6">
+                <UnitGrid units={unitsBySide.player} />
               </TabsContent>
-              <TabsContent value="enemy" className="mt-6">
-                <UnitGrid units={unitsBySide.enemy} />
+              <TabsContent value="hostile" className="mt-6">
+                <UnitGrid units={unitsBySide.hostile} />
               </TabsContent>
-              <TabsContent value="bosses" className="mt-6">
-                <UnitGrid units={unitsBySide.bosses} />
+              <TabsContent value="villain" className="mt-6">
+                <UnitGrid units={unitsBySide.villain} />
               </TabsContent>
-              <TabsContent value="cast" className="mt-6">
-                <UnitGrid units={unitsBySide.cast} />
+              <TabsContent value="hero" className="mt-6">
+                <UnitGrid units={unitsBySide.hero} />
               </TabsContent>
-              <TabsContent value="unknown" className="mt-6">
-                <UnitGrid units={unitsBySide.unknown} />
+              <TabsContent value="neutral" className="mt-6">
+                <UnitGrid units={unitsBySide.neutral} />
               </TabsContent>
               <TabsContent value="test" className="mt-6">
                 <UnitGrid units={unitsBySide.test} />
