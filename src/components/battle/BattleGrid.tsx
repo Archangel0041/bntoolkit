@@ -202,16 +202,16 @@ export function BattleGrid({
         {/* HP/Armor bars at bottom when no damage preview */}
         {!damagePreview && (unitHp > 0 || unitArmor > 0) && (
           <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-0.5 space-y-0.5">
-            {/* HP Bar */}
-            <div className="h-1.5 w-full bg-gray-700 rounded-sm overflow-hidden">
-              <div className="h-full bg-emerald-500" style={{ width: '100%' }} />
-            </div>
-            {/* Armor Bar */}
+            {/* Armor Bar (above HP) */}
             {unitArmor > 0 && (
-              <div className="h-1.5 w-full bg-gray-700 rounded-sm overflow-hidden">
+              <div className="h-1.5 w-full bg-gray-700 overflow-hidden">
                 <div className="h-full bg-sky-500" style={{ width: '100%' }} />
               </div>
             )}
+            {/* HP Bar (at bottom) */}
+            <div className="h-1.5 w-full bg-gray-700 overflow-hidden">
+              <div className="h-full bg-emerald-500" style={{ width: '100%' }} />
+            </div>
           </div>
         )}
         
@@ -247,33 +247,10 @@ export function BattleGrid({
               )}
               
               <div className="absolute bottom-0 left-0 right-0 p-0.5">
-                {/* HP Bar with damage visualization */}
                 <div className="space-y-0.5">
-                  <div className="h-1.5 w-full bg-gray-700/80 rounded-sm overflow-hidden flex">
-                    {/* Green: Remaining HP (minimum case) */}
-                    <div 
-                      className="h-full bg-emerald-500 transition-all" 
-                      style={{ width: `${minHpPercent}%` }} 
-                    />
-                    {/* Orange: Damage range (potential additional damage) */}
-                    {rangeDamageHpPercent > 0 && (
-                      <div 
-                        className="h-full bg-orange-500 transition-all" 
-                        style={{ width: `${rangeDamageHpPercent}%` }} 
-                      />
-                    )}
-                    {/* Red: Guaranteed damage */}
-                    {minDamageHpPercent > 0 && (
-                      <div 
-                        className="h-full bg-red-500 transition-all" 
-                        style={{ width: `${minDamageHpPercent}%` }} 
-                      />
-                    )}
-                  </div>
-                  
-                  {/* Armor Bar with damage visualization */}
+                  {/* Armor Bar with damage visualization (above HP) */}
                   {damagePreview.targetHasArmor && (
-                    <div className="h-1.5 w-full bg-gray-700/80 rounded-sm overflow-hidden flex">
+                    <div className="h-1.5 w-full bg-gray-700/80 overflow-hidden flex">
                       {/* Blue: Remaining Armor (minimum case) */}
                       <div 
                         className="h-full bg-sky-500 transition-all" 
@@ -295,6 +272,29 @@ export function BattleGrid({
                       )}
                     </div>
                   )}
+                  
+                  {/* HP Bar with damage visualization (at bottom) */}
+                  <div className="h-1.5 w-full bg-gray-700/80 overflow-hidden flex">
+                    {/* Green: Remaining HP (minimum case) */}
+                    <div 
+                      className="h-full bg-emerald-500 transition-all" 
+                      style={{ width: `${minHpPercent}%` }} 
+                    />
+                    {/* Orange: Damage range (potential additional damage) */}
+                    {rangeDamageHpPercent > 0 && (
+                      <div 
+                        className="h-full bg-orange-500 transition-all" 
+                        style={{ width: `${rangeDamageHpPercent}%` }} 
+                      />
+                    )}
+                    {/* Red: Guaranteed damage */}
+                    {minDamageHpPercent > 0 && (
+                      <div 
+                        className="h-full bg-red-500 transition-all" 
+                        style={{ width: `${minDamageHpPercent}%` }} 
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
             </>
