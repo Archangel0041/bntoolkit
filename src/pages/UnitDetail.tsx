@@ -156,7 +156,6 @@ export default function UnitDetail() {
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <span className="text-sm text-muted-foreground">{backLabel}</span>
           {unit.identity.icon && (
             <img
               src={getUnitImageUrl(unit.identity.icon) || ""}
@@ -325,7 +324,7 @@ export default function UnitDetail() {
                             </div>
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 text-sm">
                           <StatRow label="Min Damage" value={minDamage} highlight />
                           <StatRow label="Max Damage" value={maxDamage} highlight />
                           <StatRow label="Offense" value={offense} highlight />
@@ -340,16 +339,24 @@ export default function UnitDetail() {
                           )}
                         </div>
                         
+                        {/* Targets */}
+                        {ability.stats.targets && ability.stats.targets.length > 0 && (
+                          <div className="mt-2 text-sm">
+                            <span className="text-muted-foreground">Targets: </span>
+                            <span className="font-medium">
+                              {ability.stats.targets.map(tagId => `#${tagId}`).join(", ")}
+                            </span>
+                          </div>
+                        )}
+                        
                         {/* Weapon Stats */}
                         <div className="mt-3 pt-3 border-t">
                           <p className="text-xs text-muted-foreground mb-2">Weapon: {t(weapon.name)}</p>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-1 text-sm">
                             <StatRow label="Base Min" value={weapon.stats.base_damage_min} />
                             <StatRow label="Base Max" value={weapon.stats.base_damage_max} />
                             <StatRow label="Ammo" value={weapon.stats.ammo === -1 ? "∞" : weapon.stats.ammo} />
-                            {weapon.stats.reload_time !== undefined && (
-                              <StatRow label="Reload" value={weapon.stats.reload_time} />
-                            )}
+                            <StatRow label="Reload" value={weapon.stats.reload_time ?? "-"} />
                           </div>
                         </div>
                         
