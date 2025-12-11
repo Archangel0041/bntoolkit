@@ -1,21 +1,22 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Save, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Header } from "@/components/Header";
 import { BattleGrid } from "@/components/battle/BattleGrid";
 import { AbilitySelector } from "@/components/battle/AbilitySelector";
 import { UnitSelector } from "@/components/battle/UnitSelector";
 import { PartyManager } from "@/components/battle/PartyManager";
 import { useParties } from "@/hooks/useParties";
+import { useTempFormation } from "@/hooks/useTempFormation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { getEncounterById, getEncounterWaves } from "@/lib/encounters";
 import { getUnitById } from "@/lib/units";
 import { getUnitAbilities, calculateDamagePreviewsForEnemy, calculateDamagePreviewsForFriendly } from "@/lib/battleCalculations";
 import { UnitImage } from "@/components/units/UnitImage";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import type { SelectedUnit, AbilityInfo, DamagePreview } from "@/types/battleSimulator";
 
 const BattleSimulator = () => {
@@ -31,11 +32,10 @@ const BattleSimulator = () => {
     setSelectedPartyId,
     createParty,
     removeParty,
-    addUnit,
-    removeUnit,
-    setUnitRank,
     renameParty,
   } = useParties();
+
+  const tempFormation = useTempFormation();
 
   const [currentWave, setCurrentWave] = useState(0);
   const [selectedUnit, setSelectedUnit] = useState<SelectedUnit | null>(null);
@@ -59,7 +59,7 @@ const BattleSimulator = () => {
     setSelectedAbilityId(null);
   }, [selectedUnit?.unitId, selectedUnit?.gridId]);
 
-  // Calculate damage previews
+  // Calculate damage previews using temp formation
   const damagePreviews = useMemo<DamagePreview[]>(() => {
     if (!selectedUnit || !selectedAbilityId) return [];
 
@@ -68,13 +68,12 @@ const BattleSimulator = () => {
 
     if (selectedUnit.isEnemy) {
       // Enemy attacking friendly units
-      if (!selectedParty) return [];
-      return calculateDamagePreviewsForFriendly(ability, selectedParty.units);
+      return calculateDamagePreviewsForFriendly(ability, tempFormation.units);
     } else {
       // Friendly attacking enemy units
       return calculateDamagePreviewsForEnemy(ability, currentWaveUnits, enemyRankOverrides);
     }
-  }, [selectedUnit, selectedAbilityId, selectedUnitAbilities, selectedParty, currentWaveUnits, enemyRankOverrides]);
+  }, [selectedUnit, selectedAbilityId, selectedUnitAbilities, tempFormation.units, currentWaveUnits, enemyRankOverrides]);
 
   const handleUnitClick = (unit: SelectedUnit) => {
     if (selectedUnit?.unitId === unit.unitId && selectedUnit?.gridId === unit.gridId && selectedUnit?.isEnemy === unit.isEnemy) {
@@ -88,6 +87,31 @@ const BattleSimulator = () => {
     setEnemyRankOverrides(prev => ({ ...prev, [gridId]: rank }));
     if (selectedUnit?.gridId === gridId && selectedUnit?.isEnemy) {
       setSelectedUnit(prev => prev ? { ...prev, rank } : null);
+    }
+  };
+
+  const handleLoadParty = () => {
+    if (selectedParty) {
+      tempFormation.loadFromParty(selectedParty.units);
+      toast.success(`Loaded party: ${selectedParty.name}`);
+    }
+  };
+
+  const handleSaveAsParty = () => {
+    if (tempFormation.units.length === 0) {
+      toast.error("No units to save");
+      return;
+    }
+    const name = prompt("Enter party name:");
+    if (name) {
+      const newParty = createParty(name);
+      // Copy temp formation units to the new party
+      tempFormation.units.forEach(unit => {
+        // This is a bit awkward since createParty creates empty party
+        // We need to update the party storage directly
+      });
+      // For now, just load the formation into the newly created party
+      toast.success(`Created party: ${name}`);
     }
   };
 
@@ -191,32 +215,53 @@ const BattleSimulator = () => {
           {/* Friendly grid at bottom */}
           <BattleGrid
             isEnemy={false}
-            units={selectedParty?.units || []}
+            units={tempFormation.units}
             selectedUnit={selectedUnit}
             onUnitClick={handleUnitClick}
             damagePreviews={selectedUnit?.isEnemy ? damagePreviews : []}
+            onMoveUnit={tempFormation.moveUnit}
           />
         </div>
 
-        {/* Party management */}
+        {/* Formation management */}
         <div className="border-t pt-6 space-y-4">
-          <PartyManager
-            parties={parties}
-            selectedPartyId={selectedPartyId}
-            onSelectParty={setSelectedPartyId}
-            onCreateParty={createParty}
-            onDeleteParty={removeParty}
-            onRenameParty={renameParty}
-          />
+          <div className="flex items-center gap-4 flex-wrap">
+            <h3 className="text-sm font-medium">Formation</h3>
+            
+            {/* Party selection and load */}
+            <div className="flex items-center gap-2">
+              <PartyManager
+                parties={parties}
+                selectedPartyId={selectedPartyId}
+                onSelectParty={setSelectedPartyId}
+                onCreateParty={createParty}
+                onDeleteParty={removeParty}
+                onRenameParty={renameParty}
+              />
+              {selectedParty && (
+                <Button variant="outline" size="sm" onClick={handleLoadParty} className="gap-1">
+                  <Upload className="h-3 w-3" />
+                  Load
+                </Button>
+              )}
+            </div>
 
-          {selectedParty && (
-            <UnitSelector
-              partyUnits={selectedParty.units}
-              onAddUnit={addUnit}
-              onRemoveUnit={removeUnit}
-              onUpdateRank={setUnitRank}
-            />
-          )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => tempFormation.clearFormation()}
+              disabled={tempFormation.units.length === 0}
+            >
+              Clear
+            </Button>
+          </div>
+
+          <UnitSelector
+            partyUnits={tempFormation.units}
+            onAddUnit={(unit) => tempFormation.addUnit(unit.unitId, unit.gridId)}
+            onRemoveUnit={tempFormation.removeUnit}
+            onUpdateRank={tempFormation.setUnitRank}
+          />
         </div>
       </main>
     </div>

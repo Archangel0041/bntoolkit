@@ -14,6 +14,11 @@ export interface Party {
   updatedAt: number;
 }
 
+// Temporary formation state (not saved to storage)
+export interface TempFormation {
+  units: PartyUnit[];
+}
+
 export interface SelectedUnit {
   unitId: number;
   gridId: number;
