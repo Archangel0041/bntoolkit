@@ -387,38 +387,31 @@ export default function UnitDetail() {
                         {ability.stats.targets && ability.stats.targets.length > 0 && (() => {
                           const { canTarget, cannotTarget } = getTargetingCategories(ability.stats.targets);
                           return (
-                            <div className="mt-2 text-sm space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-muted-foreground">Targets:</span>
-                                <span className="font-medium">
-                                  {ability.stats.targets.map(tagId => UnitTagLabels[tagId] || `#${tagId}`).join(", ")}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {canTarget.map(cat => (
-                                  <Badge 
-                                    key={cat} 
-                                    variant="outline" 
-                                    className={cn(
-                                      "text-xs",
-                                      cat === "Air" && TARGETING_CATEGORIES.air.color,
-                                      cat === "Ground" && TARGETING_CATEGORIES.ground.color,
-                                      cat === "Sea" && TARGETING_CATEGORIES.sea.color
-                                    )}
-                                  >
-                                    ✓ {cat}
-                                  </Badge>
-                                ))}
-                                {cannotTarget.map(cat => (
-                                  <Badge 
-                                    key={cat} 
-                                    variant="outline" 
-                                    className="text-xs bg-muted/50 text-muted-foreground line-through"
-                                  >
-                                    {cat}
-                                  </Badge>
-                                ))}
-                              </div>
+                            <div className="mt-2 flex items-center gap-2 flex-wrap">
+                              <span className="text-sm text-muted-foreground">Targets:</span>
+                              {canTarget.map(cat => (
+                                <Badge 
+                                  key={cat} 
+                                  variant="outline" 
+                                  className={cn(
+                                    "text-xs",
+                                    cat === "Air" && TARGETING_CATEGORIES.air.color,
+                                    cat === "Ground" && TARGETING_CATEGORIES.ground.color,
+                                    cat === "Sea" && TARGETING_CATEGORIES.sea.color
+                                  )}
+                                >
+                                  ✓ {cat}
+                                </Badge>
+                              ))}
+                              {cannotTarget.map(cat => (
+                                <Badge 
+                                  key={cat} 
+                                  variant="outline" 
+                                  className="text-xs bg-muted/50 text-muted-foreground line-through"
+                                >
+                                  {cat}
+                                </Badge>
+                              ))}
                             </div>
                           );
                         })()}
