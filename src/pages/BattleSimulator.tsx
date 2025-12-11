@@ -235,10 +235,15 @@ const BattleSimulator = () => {
                   className="flex-1 max-w-xl"
                 />
                 
-                {/* Pattern diagram for AOE abilities */}
-                {selectedAbility?.targetArea && (
+                {/* Pattern diagram for abilities */}
+                {selectedAbility && (
                   <TargetingPatternDiagram 
                     targetArea={selectedAbility.targetArea}
+                    lineOfFire={selectedAbility.lineOfFire}
+                    attackDirection={selectedAbility.attackDirection}
+                    minRange={selectedAbility.minRange}
+                    maxRange={selectedAbility.maxRange}
+                    isFixed={selectedAbility.isFixed}
                     className="ml-4"
                   />
                 )}
