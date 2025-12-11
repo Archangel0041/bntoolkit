@@ -47,6 +47,19 @@ export interface AbilityInfo {
   chargeTime: number;
   suppressionMultiplier: number;
   suppressionBonus: number;
+  statusEffects: Record<string, number>; // effect_id -> chance %
+}
+
+export interface StatusEffectPreview {
+  effectId: number;
+  name: string;
+  chance: number;
+  duration: number;
+  damageType: number | null;
+  dotDamage: number; // Calculated DoT damage per tick
+  isImmune: boolean;
+  isStun: boolean;
+  color: string;
 }
 
 export interface DamageResult {
@@ -62,6 +75,10 @@ export interface DamagePreview {
   targetUnitId: number;
   minDamage: DamageResult;
   maxDamage: DamageResult;
+  // Multi-hit totals (shots_per_attack * attacks_per_use)
+  totalShots: number;
+  minTotalDamage: DamageResult;
+  maxTotalDamage: DamageResult;
   dodgeChance: number;
   critChance: number;
   canTarget: boolean;
@@ -69,6 +86,7 @@ export interface DamagePreview {
   targetArmorHp: number;
   targetHp: number;
   targetDefense: number;
+  statusEffects: StatusEffectPreview[];
 }
 
 // Row mapping: preferred_row 1 = front (row 1), 2 = middle (row 2), 3 = back (row 3)
