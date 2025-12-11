@@ -13,9 +13,11 @@ interface EncounterViewerProps {
   encounter: Encounter;
   encounterId: string | number;
   bossStrike?: BossStrike;
+  backPath?: string;
+  backLabel?: string;
 }
 
-export function EncounterViewer({ encounter, encounterId, bossStrike }: EncounterViewerProps) {
+export function EncounterViewer({ encounter, encounterId, bossStrike, backPath, backLabel }: EncounterViewerProps) {
   const { t } = useLanguage();
   const waves = getEncounterWaves(encounter);
   const [activeWave, setActiveWave] = useState("0");
@@ -45,6 +47,8 @@ export function EncounterViewer({ encounter, encounterId, bossStrike }: Encounte
             <EncounterGrid 
               units={waves[0]} 
               showPlayerUnits={encounter.player_units}
+              backPath={backPath}
+              backLabel={backLabel}
             />
             {basePoints > 0 && (
               <WavePointsDisplay 
@@ -69,6 +73,8 @@ export function EncounterViewer({ encounter, encounterId, bossStrike }: Encounte
                   <EncounterGrid 
                     units={waveUnits} 
                     showPlayerUnits={index === 0 ? encounter.player_units : undefined}
+                    backPath={backPath}
+                    backLabel={backLabel}
                   />
                   {basePoints > 0 && (
                     <WavePointsDisplay 
