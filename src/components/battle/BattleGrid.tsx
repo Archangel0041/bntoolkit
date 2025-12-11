@@ -18,13 +18,11 @@ interface BattleGridProps {
   onMoveUnit?: (fromGridId: number, toGridId: number) => void;
   onRemoveUnit?: (gridId: number) => void;
   onAddUnit?: (unitId: number, gridId: number) => void;
-  // Targeting reticle props
+  // Targeting reticle props - only shows when this grid is the TARGET side
   targetArea?: TargetArea;
-  hoveredGridId?: number | null;
-  onHoverGrid?: (gridId: number | null) => void;
-  // Locked reticle position
   reticleGridId?: number;
   onReticleClick?: (gridId: number) => void;
+  showReticle?: boolean; // Whether to show the reticle on this grid
 }
 
 const DAMAGE_TYPE_NAMES: Record<number, string> = {
@@ -47,22 +45,18 @@ export function BattleGrid({
   onRemoveUnit,
   onAddUnit,
   targetArea,
-  hoveredGridId,
-  onHoverGrid,
   reticleGridId,
   onReticleClick,
+  showReticle = false,
 }: BattleGridProps) {
   const { t } = useLanguage();
   const layout = isEnemy ? ENEMY_GRID_LAYOUT : FRIENDLY_GRID_LAYOUT;
   const [draggedGridId, setDraggedGridId] = useState<number | null>(null);
   const [dragOverGridId, setDragOverGridId] = useState<number | null>(null);
 
-  // Use hovered position if available, otherwise use locked reticle position
-  const activeReticleGridId = hoveredGridId ?? reticleGridId ?? null;
-
-  // Calculate which grid positions are affected by the reticle
-  const affectedPositions = activeReticleGridId !== null && targetArea
-    ? getAffectedGridPositions(activeReticleGridId, targetArea, isEnemy)
+  // Calculate which grid positions are affected by the reticle (only if showReticle is true)
+  const affectedPositions = showReticle && reticleGridId !== undefined && targetArea
+    ? getAffectedGridPositions(reticleGridId, targetArea, isEnemy)
     : [];
 
   const getUnitAtPosition = (gridId: number) => {
@@ -142,30 +136,16 @@ export function BattleGrid({
     const isDragging = draggedGridId === gridId;
     const isDragOver = dragOverGridId === gridId;
     
-    // Check if this grid is affected by AOE reticle
+    // Check if this grid is affected by AOE reticle (only when showReticle is true)
     const affectedPos = affectedPositions.find(p => p.gridId === gridId);
-    const isAffectedByReticle = affectedPos !== undefined;
-    const isReticleCenter = activeReticleGridId === gridId;
-    const isLockedReticle = reticleGridId === gridId && hoveredGridId === null;
+    const isAffectedByReticle = showReticle && affectedPos !== undefined;
+    const isReticleCenter = showReticle && reticleGridId === gridId;
     
     const slotSize = "w-16 h-16 sm:w-18 sm:h-18";
-    
-    // Handle mouse events for targeting reticle
-    const handleMouseEnter = () => {
-      if (onHoverGrid && targetArea) {
-        onHoverGrid(gridId);
-      }
-    };
-    
-    const handleMouseLeave = () => {
-      if (onHoverGrid && targetArea) {
-        onHoverGrid(null);
-      }
-    };
 
-    // Handle clicking to lock reticle position
+    // Handle clicking to move reticle position
     const handleReticleAreaClick = (e: React.MouseEvent) => {
-      if (onReticleClick && targetArea) {
+      if (showReticle && onReticleClick && targetArea) {
         e.stopPropagation(); // Prevent unit click
         onReticleClick(gridId);
       }
@@ -182,15 +162,11 @@ export function BattleGrid({
             // Reticle highlighting for empty slots
             isReticleCenter && "border-yellow-500 border-solid border-2 bg-yellow-500/20",
             isAffectedByReticle && !isReticleCenter && "border-orange-500 border-solid bg-orange-500/10",
-            // Locked reticle indicator
-            isLockedReticle && !isReticleCenter && "ring-2 ring-yellow-500/50",
-            targetArea && "cursor-crosshair"
+            showReticle && targetArea && "cursor-crosshair"
           )}
           onDragOver={(e) => handleDragOver(e, gridId)}
           onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, gridId)}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
           onClick={handleReticleAreaClick}
         >
           {/* Show damage percent for AOE */}
@@ -234,17 +210,24 @@ export function BattleGrid({
       });
     };
 
+    const handleSlotClick = () => {
+      // If reticle is shown and we have an AOE ability, clicking moves the reticle
+      if (showReticle && onReticleClick && targetArea) {
+        onReticleClick(gridId);
+      } else {
+        handleClick();
+      }
+    };
+
     const slotContent = (
       <div
-        onClick={handleClick}
-        draggable={!isEnemy}
+        onClick={handleSlotClick}
+        draggable={!isEnemy && !showReticle}
         onDragStart={(e) => handleDragStart(e, gridId, unitId)}
         onDragOver={(e) => handleDragOver(e, gridId)}
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(e, gridId)}
         onDragEnd={handleDragEnd}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
         className={cn(
           slotSize,
           "border rounded-md flex flex-col items-center justify-center overflow-hidden transition-all cursor-pointer relative",
@@ -256,7 +239,8 @@ export function BattleGrid({
           isDragOver && "ring-2 ring-primary",
           // Reticle highlighting for occupied slots
           isReticleCenter && "ring-2 ring-yellow-500 ring-offset-1",
-          isAffectedByReticle && !isReticleCenter && "ring-2 ring-orange-500/70"
+          isAffectedByReticle && !isReticleCenter && "ring-2 ring-orange-500/70",
+          showReticle && targetArea && "cursor-crosshair"
         )}
       >
         {unitData && (

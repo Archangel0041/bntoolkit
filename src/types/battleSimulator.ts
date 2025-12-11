@@ -163,18 +163,16 @@ export const COORDS_TO_GRID_ID: Record<string, number> = {
 };
 
 // Get grid positions affected by an AOE ability centered on a target position
+// Coordinate system from data: x: -1=left, 0=same, 1=right; y: -1=down(toward front), 0=same, 1=up(toward back)
 export function getAffectedGridPositions(
   targetGridId: number,
   targetArea: TargetArea | undefined,
-  isEnemy: boolean
+  isTargetOnEnemyGrid: boolean
 ): { gridId: number; damagePercent: number }[] {
   // If no target area or single target type with no data, just return the target
   if (!targetArea || targetArea.data.length === 0) {
     return [{ gridId: targetGridId, damagePercent: 100 }];
   }
-
-  // For target_type 1 (single/fixed), positions are relative to the attacker, not the target
-  // For target_type 2 (AOE), positions are relative to the selected target
 
   const targetCoords = GRID_ID_TO_COORDS[targetGridId];
   if (!targetCoords) return [{ gridId: targetGridId, damagePercent: 100 }];
@@ -182,12 +180,17 @@ export function getAffectedGridPositions(
   const affected: { gridId: number; damagePercent: number }[] = [];
 
   for (const pos of targetArea.data) {
-    // Y direction: negative Y in data means towards enemy (forward), positive means toward friendly (backward)
-    // For enemy grid, we need to flip the y direction since we're attacking from below
-    const yOffset = isEnemy ? -pos.y : pos.y;
+    // Data coordinates: x: -1=left, 0=same, 1=right
+    // Data coordinates: y: -1=down(toward row 0/front), 0=same, 1=up(toward row 2/back)
+    // Grid y: 0=front (row 1), 1=middle (row 2), 2=back (row 3)
+    
+    // When targeting enemy grid from friendly side:
+    // - y=1 in data means "up" which is toward enemy back row (higher y in grid coords)
+    // - y=-1 in data means "down" which is toward enemy front row (lower y in grid coords)
+    // The grid y increases toward the back, so we add pos.y directly
     
     const newX = targetCoords.x + pos.x;
-    const newY = targetCoords.y + yOffset;
+    const newY = targetCoords.y + pos.y; // y=1 moves toward back (higher y), y=-1 moves toward front (lower y)
     
     // Check if this is a valid grid position
     const coordKey = `${newX},${newY}`;
