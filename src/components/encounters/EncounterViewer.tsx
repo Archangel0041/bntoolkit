@@ -1,7 +1,10 @@
 import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Swords } from "lucide-react";
 import { EncounterGrid } from "./EncounterGrid";
 import { getEncounterWaves } from "@/lib/encounters";
 import type { Encounter } from "@/types/encounters";
@@ -19,6 +22,8 @@ interface EncounterViewerProps {
 
 export function EncounterViewer({ encounter, encounterId, bossStrike, backPath, backLabel }: EncounterViewerProps) {
   const { t } = useLanguage();
+  const navigate = useNavigate();
+  const location = useLocation();
   const waves = getEncounterWaves(encounter);
   const [activeWave, setActiveWave] = useState("0");
 
@@ -29,6 +34,12 @@ export function EncounterViewer({ encounter, encounterId, bossStrike, backPath, 
   const basePoints = bossStrike?.default_progress_cost?.awarded_points ?? 0;
   const pointsPerWave = basePoints > 0 ? Math.floor(basePoints / waves.length) : 0;
 
+  const handleSimulate = () => {
+    navigate(`/battle/${encounterId}`, { 
+      state: { from: backPath || location.pathname } 
+    });
+  };
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -37,6 +48,10 @@ export function EncounterViewer({ encounter, encounterId, bossStrike, backPath, 
           <Badge variant="outline">ID: {encounterId}</Badge>
           {encounter.level && <Badge variant="secondary">Lv. {encounter.level}</Badge>}
           {waves.length > 1 && <Badge>{waves.length} Waves</Badge>}
+          <Button variant="outline" size="sm" className="ml-auto gap-1" onClick={handleSimulate}>
+            <Swords className="h-4 w-4" />
+            Simulate
+          </Button>
         </div>
       </CardHeader>
       <CardContent>
