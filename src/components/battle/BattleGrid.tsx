@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { getUnitById } from "@/lib/units";
 import { UnitImage } from "@/components/units/UnitImage";
@@ -13,6 +14,7 @@ interface BattleGridProps {
   onUnitClick: (unit: SelectedUnit) => void;
   damagePreviews?: DamagePreview[];
   rankOverrides?: Record<number, number>;
+  onMoveUnit?: (fromGridId: number, toGridId: number) => void;
 }
 
 export function BattleGrid({
@@ -22,9 +24,12 @@ export function BattleGrid({
   onUnitClick,
   damagePreviews = [],
   rankOverrides = {},
+  onMoveUnit,
 }: BattleGridProps) {
   const { t } = useLanguage();
   const layout = isEnemy ? ENEMY_GRID_LAYOUT : FRIENDLY_GRID_LAYOUT;
+  const [draggedGridId, setDraggedGridId] = useState<number | null>(null);
+  const [dragOverGridId, setDragOverGridId] = useState<number | null>(null);
 
   const getUnitAtPosition = (gridId: number) => {
     if (isEnemy) {
@@ -37,9 +42,43 @@ export function BattleGrid({
     return damagePreviews.find(dp => dp.targetGridId === gridId);
   };
 
+  const handleDragStart = (e: React.DragEvent, gridId: number) => {
+    if (isEnemy) return; // Only allow dragging friendly units
+    e.dataTransfer.setData("text/plain", gridId.toString());
+    setDraggedGridId(gridId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, gridId: number) => {
+    if (isEnemy) return;
+    e.preventDefault();
+    setDragOverGridId(gridId);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverGridId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetGridId: number) => {
+    if (isEnemy) return;
+    e.preventDefault();
+    const fromGridId = parseInt(e.dataTransfer.getData("text/plain"));
+    if (fromGridId !== targetGridId && onMoveUnit) {
+      onMoveUnit(fromGridId, targetGridId);
+    }
+    setDraggedGridId(null);
+    setDragOverGridId(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedGridId(null);
+    setDragOverGridId(null);
+  };
+
   const renderSlot = (gridId: number) => {
     const encounterUnit = getUnitAtPosition(gridId);
     const damagePreview = getDamagePreview(gridId);
+    const isDragging = draggedGridId === gridId;
+    const isDragOver = dragOverGridId === gridId;
     
     const slotSize = "w-16 h-16 sm:w-20 sm:h-20";
     
@@ -49,8 +88,12 @@ export function BattleGrid({
           key={gridId}
           className={cn(
             slotSize,
-            "border border-dashed border-muted-foreground/20 rounded-md"
+            "border border-dashed border-muted-foreground/20 rounded-md transition-all",
+            isDragOver && "border-primary bg-primary/20 border-solid"
           )}
+          onDragOver={(e) => handleDragOver(e, gridId)}
+          onDragLeave={handleDragLeave}
+          onDrop={(e) => handleDrop(e, gridId)}
         />
       );
     }
@@ -85,13 +128,21 @@ export function BattleGrid({
       <div
         key={gridId}
         onClick={handleClick}
+        draggable={!isEnemy}
+        onDragStart={(e) => handleDragStart(e, gridId)}
+        onDragOver={(e) => handleDragOver(e, gridId)}
+        onDragLeave={handleDragLeave}
+        onDrop={(e) => handleDrop(e, gridId)}
+        onDragEnd={handleDragEnd}
         className={cn(
           slotSize,
           "border rounded-md flex flex-col items-center justify-center overflow-hidden transition-all cursor-pointer relative",
           isEnemy 
             ? "border-destructive/50 bg-destructive/10 hover:bg-destructive/20" 
             : "border-primary bg-primary/10 hover:bg-primary/20",
-          isSelected && "ring-2 ring-offset-2 ring-yellow-500"
+          isSelected && "ring-2 ring-offset-2 ring-yellow-500",
+          isDragging && "opacity-50",
+          isDragOver && "ring-2 ring-primary"
         )}
       >
         {unitData && (

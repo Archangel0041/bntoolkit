@@ -1,5 +1,6 @@
 import { getUnitById } from "@/lib/units";
 import { getAbilityById } from "@/lib/abilities";
+import { unitMatchesTargets } from "@/lib/tagHierarchy";
 import type { AbilityInfo, DamagePreview, DamageResult, PartyUnit } from "@/types/battleSimulator";
 import { DAMAGE_TYPE_MAP } from "@/types/battleSimulator";
 import type { EncounterUnit } from "@/types/encounters";
@@ -134,7 +135,7 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
   return abilities;
 }
 
-// Check if a unit can be targeted by an ability based on tags
+// Check if a unit can be targeted by an ability based on tags (with hierarchy)
 export function canTargetUnit(targetUnitId: number, abilityTargets: number[]): boolean {
   if (abilityTargets.length === 0) return true; // No restrictions
   
@@ -142,7 +143,7 @@ export function canTargetUnit(targetUnitId: number, abilityTargets: number[]): b
   if (!targetUnit) return false;
 
   const unitTags = targetUnit.identity.tags;
-  return abilityTargets.some(targetTag => unitTags.includes(targetTag));
+  return unitMatchesTargets(unitTags, abilityTargets);
 }
 
 // Get unit stats at a specific rank
