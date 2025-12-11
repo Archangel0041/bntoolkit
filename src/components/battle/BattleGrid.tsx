@@ -192,7 +192,7 @@ export function BattleGrid({
           </div>
         )}
         
-        {/* Compact damage overlay - just show remaining HP/Armor range */}
+        {/* Compact damage overlay - just show remaining HP/Armor range + dodge */}
         {damagePreview && damagePreview.canTarget && (() => {
           const { minHpRemaining, maxHpRemaining, minArmorRemaining, maxArmorRemaining } = getRemainingRange(damagePreview);
           return (
@@ -206,6 +206,10 @@ export function BattleGrid({
                 <span className="text-sky-400 dark:text-sky-300">
                   {minArmorRemaining === maxArmorRemaining ? minArmorRemaining : `${minArmorRemaining}-${maxArmorRemaining}`}
                 </span>
+              )}
+              {/* Dodge chance */}
+              {damagePreview.dodgeChance > 0 && (
+                <span className="text-yellow-400">{damagePreview.dodgeChance}%</span>
               )}
             </div>
           );
