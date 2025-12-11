@@ -28,6 +28,39 @@ import {
   ArrowLeft, Swords, Clock, Coins, Wrench, Plus, Check, Activity, Shield
 } from "lucide-react";
 import { UnitTag, UnitTagLabels } from "@/data/gameEnums";
+import { expandTargetTags } from "@/lib/tagHierarchy";
+
+// Main targeting categories
+const TARGETING_CATEGORIES = {
+  air: { tag: 39, label: "Air", color: "bg-sky-500/20 text-sky-700 dark:text-sky-300 border-sky-500/50" },
+  ground: { tag: 24, label: "Ground", color: "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/50" },
+  sea: { tag: 15, label: "Sea", color: "bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/50" },
+};
+
+function getTargetingCategories(targets: number[]): { canTarget: string[]; cannotTarget: string[] } {
+  if (targets.length === 0) {
+    return { canTarget: ["Air", "Ground", "Sea"], cannotTarget: [] };
+  }
+  
+  const expandedTargets = expandTargetTags(targets);
+  const canTarget: string[] = [];
+  const cannotTarget: string[] = [];
+  
+  // Check if targets Unit (51) which means everything
+  if (targets.includes(51) || expandedTargets.includes(51)) {
+    return { canTarget: ["Air", "Ground", "Sea"], cannotTarget: [] };
+  }
+  
+  for (const [key, { tag, label }] of Object.entries(TARGETING_CATEGORIES)) {
+    if (targets.includes(tag) || expandedTargets.includes(tag)) {
+      canTarget.push(label);
+    } else {
+      cannotTarget.push(label);
+    }
+  }
+  
+  return { canTarget, cannotTarget };
+}
 
 function formatDuration(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
@@ -351,14 +384,44 @@ export default function UnitDetail() {
                         </div>
                         
                         {/* Targets */}
-                        {ability.stats.targets && ability.stats.targets.length > 0 && (
-                          <div className="mt-2 text-sm">
-                            <span className="text-muted-foreground">Targets: </span>
-                            <span className="font-medium">
-                              {ability.stats.targets.map(tagId => UnitTagLabels[tagId] || `#${tagId}`).join(", ")}
-                            </span>
-                          </div>
-                        )}
+                        {ability.stats.targets && ability.stats.targets.length > 0 && (() => {
+                          const { canTarget, cannotTarget } = getTargetingCategories(ability.stats.targets);
+                          return (
+                            <div className="mt-2 text-sm space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-muted-foreground">Targets:</span>
+                                <span className="font-medium">
+                                  {ability.stats.targets.map(tagId => UnitTagLabels[tagId] || `#${tagId}`).join(", ")}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {canTarget.map(cat => (
+                                  <Badge 
+                                    key={cat} 
+                                    variant="outline" 
+                                    className={cn(
+                                      "text-xs",
+                                      cat === "Air" && TARGETING_CATEGORIES.air.color,
+                                      cat === "Ground" && TARGETING_CATEGORIES.ground.color,
+                                      cat === "Sea" && TARGETING_CATEGORIES.sea.color
+                                    )}
+                                  >
+                                    ✓ {cat}
+                                  </Badge>
+                                ))}
+                                {cannotTarget.map(cat => (
+                                  <Badge 
+                                    key={cat} 
+                                    variant="outline" 
+                                    className="text-xs bg-muted/50 text-muted-foreground line-through"
+                                  >
+                                    {cat}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
                         
                         {/* Weapon Stats */}
                         <div className="mt-3 pt-3 border-t">
