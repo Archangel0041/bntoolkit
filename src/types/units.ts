@@ -13,6 +13,7 @@ export interface WeaponStats {
   base_damage_max: number;
   base_damage_min: number;
   range_bonus: number;
+  reload_time?: number;
 }
 
 export interface Weapon {

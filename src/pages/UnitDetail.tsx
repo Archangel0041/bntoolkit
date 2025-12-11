@@ -46,6 +46,11 @@ function capitalize(str: string): string {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+// Calculate damage at rank: Damage = Base Damage * (1 + 2 * 0.01 * Power)
+function calculateDamageAtRank(baseDamage: number, power: number): number {
+  return Math.round(baseDamage * (1 + 2 * 0.01 * power));
+}
+
 interface StatWithChangeProps {
   label: string;
   value: number | string;
@@ -280,6 +285,14 @@ export default function UnitDetail() {
                     const damageTypeName = getDamageTypeName(damageType);
                     const damageTypeIconUrl = getDamageTypeIconUrl(damageType);
                     
+                    // Calculate damage at current rank using power
+                    const currentPower = stats?.power || 0;
+                    const minDamage = calculateDamageAtRank(weapon.stats.base_damage_min, currentPower);
+                    const maxDamage = calculateDamageAtRank(weapon.stats.base_damage_max, currentPower);
+                    
+                    // Calculate offense = ability attack + unit accuracy
+                    const offense = ability.stats.attack + (stats?.accuracy || 0);
+                    
                     return (
                       <div key={`${weaponKey}-${abilId}`} className="p-4 bg-muted/50 rounded-lg">
                         <div className="flex items-center gap-3 mb-3">
@@ -307,6 +320,9 @@ export default function UnitDetail() {
                           </div>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+                          <StatRow label="Min Damage" value={minDamage} highlight />
+                          <StatRow label="Max Damage" value={maxDamage} highlight />
+                          <StatRow label="Offense" value={offense} highlight />
                           <StatRow label="Attack" value={ability.stats.attack} />
                           <StatRow label="Crit %" value={`${ability.stats.critical_hit_percent}%`} />
                           <StatRow label="Cooldown" value={ability.stats.ability_cooldown} />
@@ -314,9 +330,23 @@ export default function UnitDetail() {
                           <StatRow label="Range" value={`${ability.stats.min_range}-${ability.stats.max_range}`} />
                           <StatRow label="Shots" value={ability.stats.shots_per_attack} />
                           {ability.stats.armor_piercing_percent > 0 && (
-                            <StatRow label="Armor Pierce" value={`${ability.stats.armor_piercing_percent}%`} />
+                            <StatRow label="Armor Pierce" value={`${Math.round(ability.stats.armor_piercing_percent * 100)}%`} />
                           )}
                         </div>
+                        
+                        {/* Weapon Stats */}
+                        <div className="mt-3 pt-3 border-t">
+                          <p className="text-xs text-muted-foreground mb-2">Weapon: {t(weapon.name)}</p>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                            <StatRow label="Base Min" value={weapon.stats.base_damage_min} />
+                            <StatRow label="Base Max" value={weapon.stats.base_damage_max} />
+                            <StatRow label="Ammo" value={weapon.stats.ammo === -1 ? "∞" : weapon.stats.ammo} />
+                            {weapon.stats.reload_time !== undefined && (
+                              <StatRow label="Reload" value={weapon.stats.reload_time} />
+                            )}
+                          </div>
+                        </div>
+                        
                         {ability.stats.status_effects && Object.keys(ability.stats.status_effects).length > 0 && (
                           <div className="mt-3 pt-3 border-t">
                             <p className="text-xs text-muted-foreground mb-2">Inflicts Status Effects:</p>
