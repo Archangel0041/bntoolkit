@@ -236,14 +236,16 @@ export function getFixedAttackPositions(
   // Friendly grid y: 0 = front, 1 = middle, 2 = back (attacker positions)
   // Enemy grid y: 0 = front (closest to friendly), 1 = middle, 2 = back
   
+  // IMPORTANT: The grids face each other, so x positions need to be mirrored
+  // when crossing to the enemy grid. A unit at x=0 (left from player view)
+  // attacks an enemy at x=4 (also left from player view, but mirrored in coords)
+  
   // When friendly attacks:
   // - Attacker at y=0 (front row): y=-1 hits enemy y=0, y=-2 hits enemy y=1, y=-3 hits enemy y=2
   // - Attacker at y=1 (middle row): y=-1 stays on friendly grid (front row), y=-2 hits enemy y=0
   // - Attacker at y=2 (back row): y=-1 hits friendly y=1, y=-2 hits friendly y=0, y=-3 hits enemy y=0
 
   for (const pos of targetArea.data) {
-    const newX = attackerCoords.x + pos.x;
-    
     // Calculate the effective y position
     // For friendly: negative y means toward enemy (decreasing our y, then crossing to enemy grid)
     // For enemy: negative y means toward friendly (decreasing our y, then crossing to friendly grid)
@@ -257,21 +259,21 @@ export function getFixedAttackPositions(
       const attackerRowFromFront = attackerCoords.y; // 0 = front, 2 = back
       
       // Rows on friendly side that the attack passes through
-      // If attacker is at y=2 (back) and goes 3 rows toward enemy:
-      // - 1st row: friendly y=1
-      // - 2nd row: friendly y=0  
-      // - 3rd row: enemy y=0
-      
       const rowsOnFriendlySide = attackerRowFromFront; // Number of friendly rows in front of attacker
       
       if (rowsTowardEnemy <= rowsOnFriendlySide) {
-        // Still on friendly grid
+        // Still on friendly grid - x position stays the same
+        const newX = attackerCoords.x + pos.x;
         const newY = attackerCoords.y - rowsTowardEnemy;
         const coordKey = `${newX},${newY}`;
         targetGridId = COORDS_TO_GRID_ID[coordKey];
         isOnEnemyGrid = false;
       } else {
-        // Crossed to enemy grid
+        // Crossed to enemy grid - mirror the x position!
+        // Player's left (x=0) hits enemy's left (which is displayed as x=4 in mirrored coords)
+        const mirroredX = 4 - attackerCoords.x; // Mirror: 0->4, 1->3, 2->2, 3->1, 4->0
+        const newX = mirroredX + pos.x; // Apply the x offset after mirroring
+        
         const rowsIntoEnemyGrid = rowsTowardEnemy - rowsOnFriendlySide - 1; // -1 for the gap between grids
         const enemyY = rowsIntoEnemyGrid; // 0 = enemy front row
         const coordKey = `${newX},${enemyY}`;
@@ -279,19 +281,23 @@ export function getFixedAttackPositions(
         isOnEnemyGrid = true;
       }
     } else {
-      // Enemy attacker (mirror logic)
+      // Enemy attacker - mirror logic
       const rowsTowardFriendly = Math.abs(pos.y);
       const attackerRowFromFront = attackerCoords.y;
       const rowsOnEnemySide = attackerRowFromFront;
       
       if (rowsTowardFriendly <= rowsOnEnemySide) {
-        // Still on enemy grid
+        // Still on enemy grid - x position stays the same
+        const newX = attackerCoords.x + pos.x;
         const newY = attackerCoords.y - rowsTowardFriendly;
         const coordKey = `${newX},${newY}`;
         targetGridId = COORDS_TO_GRID_ID[coordKey];
         isOnEnemyGrid = true;
       } else {
-        // Crossed to friendly grid
+        // Crossed to friendly grid - mirror the x position!
+        const mirroredX = 4 - attackerCoords.x;
+        const newX = mirroredX + pos.x;
+        
         const rowsIntoFriendlyGrid = rowsTowardFriendly - rowsOnEnemySide - 1;
         const friendlyY = rowsIntoFriendlyGrid;
         const coordKey = `${newX},${friendlyY}`;
