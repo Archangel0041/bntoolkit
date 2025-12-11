@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { getAbilityById, getLineOfFireLabel } from "@/lib/abilities";
+import { getAbilityById } from "@/lib/abilities";
 import { getAbilityImageUrl } from "@/lib/abilityImages";
 import { getDamageTypeIconUrl } from "@/lib/damageImages";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -7,6 +7,8 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/comp
 import { Badge } from "@/components/ui/badge";
 import { expandTargetTags } from "@/lib/tagHierarchy";
 import type { AbilityInfo } from "@/types/battleSimulator";
+import { LineOfFireLabels } from "@/types/battleSimulator";
+import { AttackDirection } from "@/data/gameEnums";
 
 // Main targeting categories
 const TARGETING_CATEGORIES = {
@@ -72,7 +74,6 @@ export function AbilitySelector({
           const iconUrl = getAbilityImageUrl(ability.icon);
           const dmgTypeIcon = getDamageTypeIconUrl(info.damageType);
           const isSelected = selectedAbilityId === info.abilityId;
-          const lofLabel = getLineOfFireLabel(info.lineOfFire);
           const totalShots = info.shotsPerAttack * info.attacksPerUse;
 
           return (
@@ -115,10 +116,12 @@ export function AbilitySelector({
                     <span>{info.offense}</span>
                     <span>Range:</span>
                     <span>{info.minRange}-{info.maxRange}</span>
-                    {lofLabel && (
+                    <span>Line of Fire:</span>
+                    <span>{LineOfFireLabels[info.lineOfFire] || "Direct"}</span>
+                    {info.attackDirection === AttackDirection.Back && (
                       <>
-                        <span>Line of Fire:</span>
-                        <span>{lofLabel}</span>
+                        <span>Direction:</span>
+                        <span className="text-purple-400">Back Attack</span>
                       </>
                     )}
                     <span>Cooldown:</span>
@@ -139,10 +142,16 @@ export function AbilitySelector({
                         <span>{info.suppressionMultiplier}x {info.suppressionBonus > 0 && `+${info.suppressionBonus}`}</span>
                       </>
                     )}
-                    {info.targetArea && (
+                    {info.isFixed && (
                       <>
-                        <span>Targeting:</span>
-                        <span>{info.targetArea.targetType === 1 ? "Single" : `AOE (${info.targetArea.data.length} tiles)`}</span>
+                        <span>Pattern:</span>
+                        <span className="text-amber-400">Fixed</span>
+                      </>
+                    )}
+                    {info.targetArea && !info.isFixed && info.targetArea.targetType === 2 && (
+                      <>
+                        <span>Pattern:</span>
+                        <span>AOE ({info.targetArea.data.length} tiles)</span>
                       </>
                     )}
                   </div>

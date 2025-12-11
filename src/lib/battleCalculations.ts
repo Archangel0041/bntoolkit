@@ -169,6 +169,8 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
       // Parse target area data
       const rawTargetArea = (ability.stats as any).target_area;
       let targetArea = undefined;
+      let isFixed = false;
+      
       if (rawTargetArea) {
         targetArea = {
           targetType: rawTargetArea.target_type || 1,
@@ -182,7 +184,16 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
           random: rawTargetArea.random || false,
           aoeOrderDelay: rawTargetArea.aoe_order_delay,
         };
+        
+        // Fixed attacks have target_type 1 but have multiple positions in data
+        // (single target uses target_type 1 with just the center position)
+        // If target_type is 1 AND there are positions with non-zero offsets, it's fixed
+        isFixed = rawTargetArea.target_type === 1 && 
+          targetArea.data.some((d: any) => d.x !== 0 || d.y !== 0);
       }
+
+      const attackDirection = ability.stats.attack_direction || 1;
+      const lineOfFire = ability.stats.line_of_fire ?? 1; // Default to Direct
 
       abilities.push({
         abilityId,
@@ -192,7 +203,8 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
         offense,
         shotsPerAttack: ability.stats.shots_per_attack,
         attacksPerUse: (ability.stats as any).attacks_per_use || 1,
-        lineOfFire: ability.stats.line_of_fire,
+        lineOfFire,
+        attackDirection,
         targets: ability.stats.targets || [],
         damageType: ability.stats.damage_type,
         minRange: ability.stats.min_range,
@@ -207,6 +219,7 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
         suppressionBonus: (ability.stats as any).damage_distraction_bonus || 0,
         statusEffects: ability.stats.status_effects || {},
         targetArea,
+        isFixed,
       });
     });
   });
