@@ -23,7 +23,9 @@ interface BattleGridProps {
   targetArea?: TargetArea;
   reticleGridId?: number;
   onReticleMove?: (gridId: number) => void;
-  showReticle?: boolean; // Whether to show the reticle on this grid
+  showReticle?: boolean; // Whether to show the movable reticle on this grid
+  // Fixed attack pattern positions (pre-calculated based on attacker position)
+  fixedAttackPositions?: { gridId: number; damagePercent: number }[];
 }
 
 const DAMAGE_TYPE_NAMES: Record<number, string> = {
@@ -49,6 +51,7 @@ export function BattleGrid({
   reticleGridId,
   onReticleMove,
   showReticle = false,
+  fixedAttackPositions = [],
 }: BattleGridProps) {
   const { t } = useLanguage();
   const layout = isEnemy ? ENEMY_GRID_LAYOUT : FRIENDLY_GRID_LAYOUT;
@@ -57,10 +60,15 @@ export function BattleGrid({
   const [dragOverGridId, setDragOverGridId] = useState<number | null>(null);
   const [isDraggingReticle, setIsDraggingReticle] = useState(false);
 
-  // Calculate which grid positions are affected by the reticle (only if showReticle is true)
-  const affectedPositions = showReticle && reticleGridId !== undefined && targetArea
-    ? getAffectedGridPositions(reticleGridId, targetArea, isEnemy)
-    : [];
+  // For movable reticles, calculate affected positions. For fixed attacks, use fixedAttackPositions
+  const affectedPositions = fixedAttackPositions.length > 0
+    ? fixedAttackPositions
+    : (showReticle && reticleGridId !== undefined && targetArea
+        ? getAffectedGridPositions(reticleGridId, targetArea, isEnemy)
+        : []);
+  
+  // Whether we're showing any targeting pattern (movable or fixed)
+  const hasTargetingPattern = affectedPositions.length > 0;
 
   // Keyboard controls for reticle movement
   useEffect(() => {
@@ -235,10 +243,13 @@ export function BattleGrid({
     const isDragging = draggedGridId === gridId;
     const isDragOver = dragOverGridId === gridId;
     
-    // Check if this grid is affected by AOE reticle (only when showReticle is true)
+    // Check if this grid is affected by targeting pattern
     const affectedPos = affectedPositions.find(p => p.gridId === gridId);
-    const isAffectedByReticle = showReticle && affectedPos !== undefined;
+    const isAffectedByPattern = affectedPos !== undefined;
+    // Reticle center only for movable reticles, not fixed patterns
     const isReticleCenter = showReticle && reticleGridId === gridId;
+    // For fixed patterns, highlight all affected tiles (no special "center")
+    const isFixedPatternTile = fixedAttackPositions.length > 0 && affectedPos !== undefined;
     
     const slotSize = "w-16 h-16 sm:w-18 sm:h-18";
     
@@ -246,7 +257,7 @@ export function BattleGrid({
     const getDamageLabel = () => {
       if (!affectedPos) return null;
       if (affectedPos.damagePercent === 100) return "Target";
-      return `Splash ${affectedPos.damagePercent}%`;
+      return `${affectedPos.damagePercent}%`;
     };
     
     if (!encounterUnit) {
@@ -264,22 +275,24 @@ export function BattleGrid({
             "border border-dashed border-muted-foreground/20 rounded-md transition-all flex flex-col items-center justify-center relative",
             isDragOver && showReticle && "border-yellow-400 bg-yellow-500/20 border-solid",
             isDragOver && !showReticle && "border-primary bg-primary/20 border-solid",
-            // Reticle highlighting for empty slots
-            isReticleCenter && "border-yellow-500 border-solid border-2 bg-yellow-500/20",
-            isAffectedByReticle && !isReticleCenter && "border-orange-500 border-solid bg-orange-500/10",
-            isReticleCenter && "cursor-grab",
+            // Movable reticle highlighting
+            isReticleCenter && "border-yellow-500 border-solid border-2 bg-yellow-500/20 cursor-grab",
+            showReticle && isAffectedByPattern && !isReticleCenter && "border-orange-500 border-solid bg-orange-500/10",
+            // Fixed pattern highlighting (use red/orange gradient for cone effect)
+            isFixedPatternTile && affectedPos?.damagePercent === 100 && "border-red-500 border-solid border-2 bg-red-500/20",
+            isFixedPatternTile && affectedPos?.damagePercent !== 100 && "border-orange-500 border-solid bg-orange-500/15",
             isDraggingReticle && isReticleCenter && "opacity-50"
           )}
         >
-          {/* Crosshair icon for reticle center */}
+          {/* Crosshair icon for movable reticle center */}
           {isReticleCenter && (
             <Crosshair className="w-6 h-6 text-yellow-500" />
           )}
-          {/* Label for AOE tiles */}
-          {isAffectedByReticle && (
+          {/* Label for affected tiles */}
+          {isAffectedByPattern && (
             <span className={cn(
               "text-[8px] font-bold px-1 rounded-sm",
-              affectedPos?.damagePercent === 100 ? "text-yellow-400" : "text-orange-400"
+              affectedPos?.damagePercent === 100 ? "text-red-400" : "text-orange-400"
             )}>
               {getDamageLabel()}
             </span>
@@ -347,14 +360,16 @@ export function BattleGrid({
           isDragging && "opacity-50",
           isDragOver && showReticle && "ring-2 ring-yellow-400",
           isDragOver && !showReticle && "ring-2 ring-primary",
-          // Reticle highlighting for occupied slots
-          isReticleCenter && "ring-2 ring-yellow-500 ring-offset-1",
-          isAffectedByReticle && !isReticleCenter && "ring-2 ring-orange-500/70",
-          isReticleCenter && "cursor-grab",
+          // Movable reticle highlighting for occupied slots
+          isReticleCenter && "ring-2 ring-yellow-500 ring-offset-1 cursor-grab",
+          showReticle && isAffectedByPattern && !isReticleCenter && "ring-2 ring-orange-500/70",
+          // Fixed pattern highlighting for occupied slots
+          isFixedPatternTile && affectedPos?.damagePercent === 100 && "ring-2 ring-red-500 ring-offset-1",
+          isFixedPatternTile && affectedPos?.damagePercent !== 100 && "ring-2 ring-orange-500/70",
           isDraggingReticle && isReticleCenter && "opacity-50"
         )}
       >
-        {/* Crosshair overlay for reticle center */}
+        {/* Crosshair overlay for movable reticle center */}
         {isReticleCenter && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
             <Crosshair className="w-8 h-8 text-yellow-500 drop-shadow-lg" />
@@ -369,11 +384,11 @@ export function BattleGrid({
           />
         )}
 
-        {/* AOE label indicator - top right */}
-        {isAffectedByReticle && (
+        {/* Targeting pattern label indicator - top right */}
+        {isAffectedByPattern && (
           <div className={cn(
             "absolute top-0.5 right-0.5 text-[7px] font-bold bg-black/70 px-1 rounded-sm",
-            affectedPos?.damagePercent === 100 ? "text-yellow-400" : "text-orange-400"
+            affectedPos?.damagePercent === 100 ? "text-red-400" : "text-orange-400"
           )}>
             {getDamageLabel()}
           </div>

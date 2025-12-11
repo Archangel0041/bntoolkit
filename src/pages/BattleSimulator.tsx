@@ -15,6 +15,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { getEncounterById, getEncounterWaves } from "@/lib/encounters";
 import { getUnitById } from "@/lib/units";
 import { getUnitAbilities, calculateAoeDamagePreviewsForEnemy, calculateAoeDamagePreviewsForFriendly } from "@/lib/battleCalculations";
+import { getFixedAttackPositions } from "@/types/battleSimulator";
 import { UnitImage } from "@/components/units/UnitImage";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -70,7 +71,26 @@ const BattleSimulator = () => {
     return selectedUnitAbilities.find(a => a.abilityId === selectedAbilityId) || null;
   }, [selectedAbilityId, selectedUnitAbilities]);
 
-  // Calculate damage previews using AOE at reticle position
+  // Calculate fixed attack positions based on attacker's grid position
+  const fixedAttackPositions = useMemo(() => {
+    if (!selectedUnit || !selectedAbility?.isFixed || !selectedAbility.targetArea) {
+      return { enemyGrid: [], friendlyGrid: [] };
+    }
+
+    const positions = getFixedAttackPositions(
+      selectedUnit.gridId,
+      selectedAbility.targetArea,
+      !selectedUnit.isEnemy // isAttackerFriendly
+    );
+
+    // Separate positions by which grid they're on
+    const enemyGrid = positions.filter(p => p.isOnEnemyGrid);
+    const friendlyGrid = positions.filter(p => !p.isOnEnemyGrid);
+
+    return { enemyGrid, friendlyGrid };
+  }, [selectedUnit, selectedAbility]);
+
+  // Calculate damage previews using AOE at reticle position (or fixed positions)
   const damagePreviews = useMemo<DamagePreview[]>(() => {
     if (!selectedUnit || !selectedAbility) return [];
 
@@ -83,16 +103,16 @@ const BattleSimulator = () => {
     }
   }, [selectedUnit, selectedAbility, tempFormation.units, currentWaveUnits, enemyRankOverrides, enemyReticleGridId, friendlyReticleGridId]);
 
-  // Handle moving the reticle on enemy grid
+  // Handle moving the reticle on enemy grid (only for movable reticles)
   const handleEnemyReticleMove = (gridId: number) => {
-    if (selectedAbility && !selectedUnit?.isEnemy) {
+    if (selectedAbility && !selectedAbility.isFixed && !selectedUnit?.isEnemy) {
       setEnemyReticleGridId(gridId);
     }
   };
 
-  // Handle moving the reticle on friendly grid
+  // Handle moving the reticle on friendly grid (only for movable reticles)
   const handleFriendlyReticleMove = (gridId: number) => {
-    if (selectedAbility && selectedUnit?.isEnemy) {
+    if (selectedAbility && !selectedAbility.isFixed && selectedUnit?.isEnemy) {
       setFriendlyReticleGridId(gridId);
     }
   };
@@ -188,7 +208,7 @@ const BattleSimulator = () => {
 
         {/* Battle grids */}
         <div className="grid gap-4">
-          {/* Enemy grid at top - show reticle when FRIENDLY unit is attacking */}
+          {/* Enemy grid at top - show reticle when FRIENDLY unit is attacking with movable AOE */}
           <BattleGrid
             isEnemy={true}
             units={currentWaveUnits}
@@ -199,7 +219,8 @@ const BattleSimulator = () => {
             targetArea={selectedAbility?.targetArea}
             reticleGridId={enemyReticleGridId}
             onReticleMove={handleEnemyReticleMove}
-            showReticle={!!selectedAbility && !selectedUnit?.isEnemy}
+            showReticle={!!selectedAbility && !selectedAbility.isFixed && !selectedUnit?.isEnemy}
+            fixedAttackPositions={!selectedUnit?.isEnemy ? fixedAttackPositions.enemyGrid : fixedAttackPositions.friendlyGrid}
           />
 
           {/* Divider with selected unit info */}
@@ -250,7 +271,7 @@ const BattleSimulator = () => {
             )}
           </div>
 
-          {/* Friendly grid at bottom - show reticle when ENEMY unit is attacking */}
+          {/* Friendly grid at bottom - show reticle when ENEMY unit is attacking with movable AOE */}
           <BattleGrid
             isEnemy={false}
             units={tempFormation.units}
@@ -263,7 +284,8 @@ const BattleSimulator = () => {
             targetArea={selectedAbility?.targetArea}
             reticleGridId={friendlyReticleGridId}
             onReticleMove={handleFriendlyReticleMove}
-            showReticle={!!selectedAbility && selectedUnit?.isEnemy}
+            showReticle={!!selectedAbility && !selectedAbility.isFixed && selectedUnit?.isEnemy}
+            fixedAttackPositions={selectedUnit?.isEnemy ? fixedAttackPositions.friendlyGrid : []}
           />
         </div>
 
