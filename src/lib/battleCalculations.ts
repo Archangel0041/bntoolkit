@@ -2,8 +2,8 @@ import { getUnitById } from "@/lib/units";
 import { getAbilityById } from "@/lib/abilities";
 import { unitMatchesTargets } from "@/lib/tagHierarchy";
 import { getStatusEffect, getEffectDisplayNameTranslated, getEffectColor } from "@/lib/statusEffects";
-import type { AbilityInfo, DamagePreview, DamageResult, PartyUnit, StatusEffectPreview } from "@/types/battleSimulator";
-import { DAMAGE_TYPE_MAP } from "@/types/battleSimulator";
+import type { AbilityInfo, DamagePreview, DamageResult, PartyUnit, StatusEffectPreview, TargetArea } from "@/types/battleSimulator";
+import { DAMAGE_TYPE_MAP, getAffectedGridPositions } from "@/types/battleSimulator";
 import type { EncounterUnit } from "@/types/encounters";
 import type { DamageMods, UnitStats } from "@/types/units";
 
@@ -314,6 +314,7 @@ export function calculateDamagePreviewsForEnemy(
         targetHp: hp,
         targetDefense: defense,
         statusEffects,
+        damagePercent: 100,
       };
     });
 }
@@ -378,8 +379,172 @@ export function calculateDamagePreviewsForFriendly(
       targetHp: hp,
       targetDefense: defense,
       statusEffects,
+      damagePercent: 100,
     };
   });
+}
+
+// Calculate damage previews with AOE pattern applied at reticle position
+export function calculateAoeDamagePreviewsForEnemy(
+  attackerAbility: AbilityInfo,
+  enemyUnits: EncounterUnit[],
+  reticleGridId: number,
+  enemyRankOverrides: Record<number, number> = {}
+): DamagePreview[] {
+  const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
+  const affectedPositions = getAffectedGridPositions(reticleGridId, attackerAbility.targetArea, true);
+  
+  // Create a map of gridId -> damagePercent
+  const damagePercentMap = new Map<number, number>();
+  for (const pos of affectedPositions) {
+    damagePercentMap.set(pos.gridId, pos.damagePercent);
+  }
+  
+  return enemyUnits
+    .filter(u => u.grid_id !== undefined && damagePercentMap.has(u.grid_id))
+    .map(enemyUnit => {
+      const enemy = getUnitById(enemyUnit.unit_id);
+      const enemyRank = enemyRankOverrides[enemyUnit.grid_id!] || (enemy?.statsConfig?.stats?.length || 1);
+      const enemyStats = getUnitStatsAtRank(enemyUnit.unit_id, enemyRank);
+      const canTarget = canTargetUnit(enemyUnit.unit_id, attackerAbility.targets);
+      const defense = enemyStats?.defense || 0;
+      const dodgeChance = calculateDodgeChance(defense, attackerAbility.offense);
+      const critChance = calculateCritChance(attackerAbility.critPercent, attackerAbility.critBonuses, enemyUnit.unit_id);
+
+      const armorHp = enemyStats?.armor_hp || 0;
+      const hp = enemyStats?.hp || 0;
+      const immunities = enemy?.statsConfig?.status_effect_immunities || [];
+      
+      // Apply damage percent modifier to damage
+      const damagePercent = damagePercentMap.get(enemyUnit.grid_id!) || 100;
+      const adjustedMinDamage = Math.floor(attackerAbility.minDamage * (damagePercent / 100));
+      const adjustedMaxDamage = Math.floor(attackerAbility.maxDamage * (damagePercent / 100));
+      
+      const minResult = calculateDamageWithArmor(
+        adjustedMinDamage,
+        armorHp,
+        enemyStats?.armor_damage_mods,
+        enemyStats?.damage_mods,
+        attackerAbility.damageType,
+        attackerAbility.armorPiercing
+      );
+      
+      const maxResult = calculateDamageWithArmor(
+        adjustedMaxDamage,
+        armorHp,
+        enemyStats?.armor_damage_mods,
+        enemyStats?.damage_mods,
+        attackerAbility.damageType,
+        attackerAbility.armorPiercing
+      );
+      
+      // Calculate status effect previews with adjusted damage
+      const avgDamage = Math.floor((adjustedMinDamage + adjustedMaxDamage) / 2);
+      const statusEffects = calculateStatusEffectPreviews(
+        attackerAbility.statusEffects,
+        avgDamage,
+        immunities
+      );
+
+      return {
+        targetGridId: enemyUnit.grid_id!,
+        targetUnitId: enemyUnit.unit_id,
+        minDamage: minResult,
+        maxDamage: maxResult,
+        totalShots,
+        minTotalDamage: multiplyDamageResult(minResult, totalShots),
+        maxTotalDamage: multiplyDamageResult(maxResult, totalShots),
+        dodgeChance,
+        critChance,
+        canTarget,
+        targetHasArmor: armorHp > 0,
+        targetArmorHp: armorHp,
+        targetHp: hp,
+        targetDefense: defense,
+        statusEffects,
+        damagePercent,
+      };
+    });
+}
+
+export function calculateAoeDamagePreviewsForFriendly(
+  attackerAbility: AbilityInfo,
+  friendlyUnits: PartyUnit[],
+  reticleGridId: number
+): DamagePreview[] {
+  const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
+  const affectedPositions = getAffectedGridPositions(reticleGridId, attackerAbility.targetArea, false);
+  
+  // Create a map of gridId -> damagePercent
+  const damagePercentMap = new Map<number, number>();
+  for (const pos of affectedPositions) {
+    damagePercentMap.set(pos.gridId, pos.damagePercent);
+  }
+  
+  return friendlyUnits
+    .filter(u => damagePercentMap.has(u.gridId))
+    .map(friendlyUnit => {
+      const unit = getUnitById(friendlyUnit.unitId);
+      const stats = getUnitStatsAtRank(friendlyUnit.unitId, friendlyUnit.rank);
+      const canTarget = canTargetUnit(friendlyUnit.unitId, attackerAbility.targets);
+      const defense = stats?.defense || 0;
+      const dodgeChance = calculateDodgeChance(defense, attackerAbility.offense);
+      const critChance = calculateCritChance(attackerAbility.critPercent, attackerAbility.critBonuses, friendlyUnit.unitId);
+
+      const armorHp = stats?.armor_hp || 0;
+      const hp = stats?.hp || 0;
+      const immunities = unit?.statsConfig?.status_effect_immunities || [];
+      
+      // Apply damage percent modifier
+      const damagePercent = damagePercentMap.get(friendlyUnit.gridId) || 100;
+      const adjustedMinDamage = Math.floor(attackerAbility.minDamage * (damagePercent / 100));
+      const adjustedMaxDamage = Math.floor(attackerAbility.maxDamage * (damagePercent / 100));
+      
+      const minResult = calculateDamageWithArmor(
+        adjustedMinDamage,
+        armorHp,
+        stats?.armor_damage_mods,
+        stats?.damage_mods,
+        attackerAbility.damageType,
+        attackerAbility.armorPiercing
+      );
+      
+      const maxResult = calculateDamageWithArmor(
+        adjustedMaxDamage,
+        armorHp,
+        stats?.armor_damage_mods,
+        stats?.damage_mods,
+        attackerAbility.damageType,
+        attackerAbility.armorPiercing
+      );
+      
+      // Calculate status effect previews
+      const avgDamage = Math.floor((adjustedMinDamage + adjustedMaxDamage) / 2);
+      const statusEffects = calculateStatusEffectPreviews(
+        attackerAbility.statusEffects,
+        avgDamage,
+        immunities
+      );
+
+      return {
+        targetGridId: friendlyUnit.gridId,
+        targetUnitId: friendlyUnit.unitId,
+        minDamage: minResult,
+        maxDamage: maxResult,
+        totalShots,
+        minTotalDamage: multiplyDamageResult(minResult, totalShots),
+        maxTotalDamage: multiplyDamageResult(maxResult, totalShots),
+        dodgeChance,
+        critChance,
+        canTarget,
+        targetHasArmor: armorHp > 0,
+        targetArmorHp: armorHp,
+        targetHp: hp,
+        targetDefense: defense,
+        statusEffects,
+        damagePercent,
+      };
+    });
 }
 
 // Get the first available grid position based on preferred row

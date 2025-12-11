@@ -104,6 +104,8 @@ export interface DamagePreview {
   targetHp: number;
   targetDefense: number;
   statusEffects: StatusEffectPreview[];
+  // AOE damage modifier (100 = full damage, 25 = 25% splash)
+  damagePercent: number;
 }
 
 // Row mapping: preferred_row 1 = front (row 1), 2 = middle (row 2), 3 = back (row 3)

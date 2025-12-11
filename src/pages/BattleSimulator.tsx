@@ -8,12 +8,13 @@ import { BattleGrid } from "@/components/battle/BattleGrid";
 import { AbilitySelector } from "@/components/battle/AbilitySelector";
 import { UnitSelector } from "@/components/battle/UnitSelector";
 import { PartyManager } from "@/components/battle/PartyManager";
+import { TargetingPatternDiagram } from "@/components/battle/TargetingPatternDiagram";
 import { useParties } from "@/hooks/useParties";
 import { useTempFormation } from "@/hooks/useTempFormation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { getEncounterById, getEncounterWaves } from "@/lib/encounters";
 import { getUnitById } from "@/lib/units";
-import { getUnitAbilities, calculateDamagePreviewsForEnemy, calculateDamagePreviewsForFriendly } from "@/lib/battleCalculations";
+import { getUnitAbilities, calculateAoeDamagePreviewsForEnemy, calculateAoeDamagePreviewsForFriendly } from "@/lib/battleCalculations";
 import { UnitImage } from "@/components/units/UnitImage";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -42,6 +43,10 @@ const BattleSimulator = () => {
   const [selectedUnit, setSelectedUnit] = useState<SelectedUnit | null>(null);
   const [selectedAbilityId, setSelectedAbilityId] = useState<number | null>(null);
   const [enemyRankOverrides, setEnemyRankOverrides] = useState<Record<number, number>>({});
+  // Locked reticle positions - these persist until ability changes
+  const [enemyReticleGridId, setEnemyReticleGridId] = useState<number>(7); // Default: row 2 center
+  const [friendlyReticleGridId, setFriendlyReticleGridId] = useState<number>(7);
+  // Hovered positions - for visual preview only
   const [hoveredEnemyGridId, setHoveredEnemyGridId] = useState<number | null>(null);
   const [hoveredFriendlyGridId, setHoveredFriendlyGridId] = useState<number | null>(null);
 
@@ -68,18 +73,33 @@ const BattleSimulator = () => {
     return selectedUnitAbilities.find(a => a.abilityId === selectedAbilityId) || null;
   }, [selectedAbilityId, selectedUnitAbilities]);
 
-  // Calculate damage previews using temp formation
+  // Calculate damage previews using AOE at reticle position (or hovered position)
   const damagePreviews = useMemo<DamagePreview[]>(() => {
     if (!selectedUnit || !selectedAbility) return [];
 
     if (selectedUnit.isEnemy) {
-      // Enemy attacking friendly units
-      return calculateDamagePreviewsForFriendly(selectedAbility, tempFormation.units);
+      // Enemy attacking friendly units - use hovered or locked reticle position
+      const reticlePos = hoveredFriendlyGridId ?? friendlyReticleGridId;
+      return calculateAoeDamagePreviewsForFriendly(selectedAbility, tempFormation.units, reticlePos);
     } else {
-      // Friendly attacking enemy units
-      return calculateDamagePreviewsForEnemy(selectedAbility, currentWaveUnits, enemyRankOverrides);
+      // Friendly attacking enemy units - use hovered or locked reticle position
+      const reticlePos = hoveredEnemyGridId ?? enemyReticleGridId;
+      return calculateAoeDamagePreviewsForEnemy(selectedAbility, currentWaveUnits, reticlePos, enemyRankOverrides);
     }
-  }, [selectedUnit, selectedAbility, tempFormation.units, currentWaveUnits, enemyRankOverrides]);
+  }, [selectedUnit, selectedAbility, tempFormation.units, currentWaveUnits, enemyRankOverrides, hoveredEnemyGridId, hoveredFriendlyGridId, enemyReticleGridId, friendlyReticleGridId]);
+
+  // Handle clicking on the grid to lock the reticle position
+  const handleEnemyGridClick = (gridId: number) => {
+    if (selectedAbility && !selectedUnit?.isEnemy) {
+      setEnemyReticleGridId(gridId);
+    }
+  };
+
+  const handleFriendlyGridClick = (gridId: number) => {
+    if (selectedAbility && selectedUnit?.isEnemy) {
+      setFriendlyReticleGridId(gridId);
+    }
+  };
 
   const handleUnitClick = (unit: SelectedUnit) => {
     if (selectedUnit?.unitId === unit.unitId && selectedUnit?.gridId === unit.gridId && selectedUnit?.isEnemy === unit.isEnemy) {
@@ -183,6 +203,8 @@ const BattleSimulator = () => {
             targetArea={!selectedUnit?.isEnemy && selectedAbility ? selectedAbility.targetArea : undefined}
             hoveredGridId={hoveredEnemyGridId}
             onHoverGrid={setHoveredEnemyGridId}
+            reticleGridId={!selectedUnit?.isEnemy ? enemyReticleGridId : undefined}
+            onReticleClick={handleEnemyGridClick}
           />
 
           {/* Divider with selected unit info */}
@@ -210,8 +232,16 @@ const BattleSimulator = () => {
                   abilities={selectedUnitAbilities}
                   selectedAbilityId={selectedAbilityId}
                   onSelectAbility={setSelectedAbilityId}
-                  className="flex-1 max-w-2xl"
+                  className="flex-1 max-w-xl"
                 />
+                
+                {/* Pattern diagram for AOE abilities */}
+                {selectedAbility?.targetArea && (
+                  <TargetingPatternDiagram 
+                    targetArea={selectedAbility.targetArea}
+                    className="ml-4"
+                  />
+                )}
               </div>
             ) : (
               <p className="text-center text-muted-foreground">
@@ -233,6 +263,8 @@ const BattleSimulator = () => {
             targetArea={selectedUnit?.isEnemy && selectedAbility ? selectedAbility.targetArea : undefined}
             hoveredGridId={hoveredFriendlyGridId}
             onHoverGrid={setHoveredFriendlyGridId}
+            reticleGridId={selectedUnit?.isEnemy ? friendlyReticleGridId : undefined}
+            onReticleClick={handleFriendlyGridClick}
           />
         </div>
 

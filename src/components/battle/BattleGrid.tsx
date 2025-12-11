@@ -22,6 +22,9 @@ interface BattleGridProps {
   targetArea?: TargetArea;
   hoveredGridId?: number | null;
   onHoverGrid?: (gridId: number | null) => void;
+  // Locked reticle position
+  reticleGridId?: number;
+  onReticleClick?: (gridId: number) => void;
 }
 
 const DAMAGE_TYPE_NAMES: Record<number, string> = {
@@ -46,15 +49,20 @@ export function BattleGrid({
   targetArea,
   hoveredGridId,
   onHoverGrid,
+  reticleGridId,
+  onReticleClick,
 }: BattleGridProps) {
   const { t } = useLanguage();
   const layout = isEnemy ? ENEMY_GRID_LAYOUT : FRIENDLY_GRID_LAYOUT;
   const [draggedGridId, setDraggedGridId] = useState<number | null>(null);
   const [dragOverGridId, setDragOverGridId] = useState<number | null>(null);
 
+  // Use hovered position if available, otherwise use locked reticle position
+  const activeReticleGridId = hoveredGridId ?? reticleGridId ?? null;
+
   // Calculate which grid positions are affected by the reticle
-  const affectedPositions = hoveredGridId !== null && hoveredGridId !== undefined && targetArea
-    ? getAffectedGridPositions(hoveredGridId, targetArea, isEnemy)
+  const affectedPositions = activeReticleGridId !== null && targetArea
+    ? getAffectedGridPositions(activeReticleGridId, targetArea, isEnemy)
     : [];
 
   const getUnitAtPosition = (gridId: number) => {
@@ -137,7 +145,8 @@ export function BattleGrid({
     // Check if this grid is affected by AOE reticle
     const affectedPos = affectedPositions.find(p => p.gridId === gridId);
     const isAffectedByReticle = affectedPos !== undefined;
-    const isReticleCenter = hoveredGridId === gridId;
+    const isReticleCenter = activeReticleGridId === gridId;
+    const isLockedReticle = reticleGridId === gridId && hoveredGridId === null;
     
     const slotSize = "w-16 h-16 sm:w-18 sm:h-18";
     
@@ -153,6 +162,14 @@ export function BattleGrid({
         onHoverGrid(null);
       }
     };
+
+    // Handle clicking to lock reticle position
+    const handleReticleAreaClick = (e: React.MouseEvent) => {
+      if (onReticleClick && targetArea) {
+        e.stopPropagation(); // Prevent unit click
+        onReticleClick(gridId);
+      }
+    };
     
     if (!encounterUnit) {
       return (
@@ -160,17 +177,21 @@ export function BattleGrid({
           key={gridId}
           className={cn(
             slotSize,
-            "border border-dashed border-muted-foreground/20 rounded-md transition-all",
+            "border border-dashed border-muted-foreground/20 rounded-md transition-all flex items-center justify-center",
             isDragOver && "border-primary bg-primary/20 border-solid",
             // Reticle highlighting for empty slots
             isReticleCenter && "border-yellow-500 border-solid border-2 bg-yellow-500/20",
-            isAffectedByReticle && !isReticleCenter && "border-orange-500 border-solid bg-orange-500/10"
+            isAffectedByReticle && !isReticleCenter && "border-orange-500 border-solid bg-orange-500/10",
+            // Locked reticle indicator
+            isLockedReticle && !isReticleCenter && "ring-2 ring-yellow-500/50",
+            targetArea && "cursor-crosshair"
           )}
           onDragOver={(e) => handleDragOver(e, gridId)}
           onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, gridId)}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
+          onClick={handleReticleAreaClick}
         >
           {/* Show damage percent for AOE */}
           {isAffectedByReticle && affectedPos && affectedPos.damagePercent !== 100 && (
