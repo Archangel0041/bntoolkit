@@ -358,6 +358,45 @@ export const UnitTagLabels: Record<number, string> = {
   [UnitTag.UsesCover]: "Uses Cover",
 };
 
+// Proto namespace enums (different from main game enums)
+export const ProtoWeaponType = {
+  None: 0,
+  Primary: 1,
+  Secondary: 2,
+  Special: 3,
+  Melee: 4,
+} as const;
+
+export const ProtoWeaponTypeLabels: Record<number, string> = {
+  [ProtoWeaponType.None]: "None",
+  [ProtoWeaponType.Primary]: "Primary",
+  [ProtoWeaponType.Secondary]: "Secondary",
+  [ProtoWeaponType.Special]: "Special",
+  [ProtoWeaponType.Melee]: "Melee",
+};
+
+export const ProtoDamageType = {
+  StandardDamage: 0,
+  CriticalDamage: 1,
+  SecondaryDamage: 2,
+  DodgeDamage: 3,
+  MissDamage: 4,
+  ImmuneDamage: 5,
+  TargetedDamage: 6,
+  DotstatusDamage: 7,
+} as const;
+
+export const ProtoDamageTypeLabels: Record<number, string> = {
+  [ProtoDamageType.StandardDamage]: "Standard",
+  [ProtoDamageType.CriticalDamage]: "Critical",
+  [ProtoDamageType.SecondaryDamage]: "Secondary",
+  [ProtoDamageType.DodgeDamage]: "Dodge",
+  [ProtoDamageType.MissDamage]: "Miss",
+  [ProtoDamageType.ImmuneDamage]: "Immune",
+  [ProtoDamageType.TargetedDamage]: "Targeted",
+  [ProtoDamageType.DotstatusDamage]: "DoT Status",
+};
+
 // Type exports for TypeScript
 export type UnitSideType = typeof UnitSide[keyof typeof UnitSide];
 export type DamageTypeType = typeof DamageType[keyof typeof DamageType];
@@ -371,3 +410,5 @@ export type UnitArmorDefenseStyleType = typeof UnitArmorDefenseStyle[keyof typeo
 export type UnitStatusEffectType = typeof UnitStatusEffect[keyof typeof UnitStatusEffect];
 export type UnitClassType = typeof UnitClass[keyof typeof UnitClass];
 export type UnitTagType = typeof UnitTag[keyof typeof UnitTag];
+export type ProtoWeaponTypeType = typeof ProtoWeaponType[keyof typeof ProtoWeaponType];
+export type ProtoDamageTypeType = typeof ProtoDamageType[keyof typeof ProtoDamageType];
