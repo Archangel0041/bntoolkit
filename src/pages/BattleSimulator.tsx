@@ -31,6 +31,7 @@ const BattleSimulator = () => {
     selectedPartyId,
     setSelectedPartyId,
     createParty,
+    updateParty,
     removeParty,
     renameParty,
   } = useParties();
@@ -105,13 +106,12 @@ const BattleSimulator = () => {
     const name = prompt("Enter party name:");
     if (name) {
       const newParty = createParty(name);
-      // Copy temp formation units to the new party
-      tempFormation.units.forEach(unit => {
-        // This is a bit awkward since createParty creates empty party
-        // We need to update the party storage directly
+      // Update the party with temp formation units
+      updateParty({
+        ...newParty,
+        units: [...tempFormation.units],
       });
-      // For now, just load the formation into the newly created party
-      toast.success(`Created party: ${name}`);
+      toast.success(`Saved party: ${name}`);
     }
   };
 
@@ -245,6 +245,17 @@ const BattleSimulator = () => {
                 </Button>
               )}
             </div>
+
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleSaveAsParty}
+              disabled={tempFormation.units.length === 0}
+              className="gap-1"
+            >
+              <Save className="h-3 w-3" />
+              Save as Party
+            </Button>
 
             <Button 
               variant="outline" 
