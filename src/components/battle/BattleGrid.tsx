@@ -122,7 +122,7 @@ export function BattleGrid({
     const isDragging = draggedGridId === gridId;
     const isDragOver = dragOverGridId === gridId;
     
-    const slotSize = "w-16 h-16 sm:w-20 sm:h-20";
+    const slotSize = "w-16 h-16 sm:w-18 sm:h-18";
     
     if (!encounterUnit) {
       return (
@@ -238,10 +238,10 @@ export function BattleGrid({
           }
           
           return (
-            <div className="absolute inset-0 bg-black/70 flex flex-col justify-end p-1">
+            <div className="absolute bottom-0 left-0 right-0 p-0.5">
               {/* HP Bar with damage visualization */}
               <div className="space-y-0.5">
-                <div className="h-2.5 w-full bg-gray-700 rounded-sm overflow-hidden flex">
+                <div className="h-1.5 w-full bg-gray-700/80 rounded-sm overflow-hidden flex">
                   {/* Green: Remaining HP (minimum case) */}
                   <div 
                     className="h-full bg-emerald-500 transition-all" 
@@ -265,7 +265,7 @@ export function BattleGrid({
                 
                 {/* Armor Bar with damage visualization */}
                 {damagePreview.targetHasArmor && (
-                  <div className="h-2.5 w-full bg-gray-700 rounded-sm overflow-hidden flex">
+                  <div className="h-1.5 w-full bg-gray-700/80 rounded-sm overflow-hidden flex">
                     {/* Blue: Remaining Armor (minimum case) */}
                     <div 
                       className="h-full bg-sky-500 transition-all" 
@@ -287,14 +287,14 @@ export function BattleGrid({
                     )}
                   </div>
                 )}
+                
+                {/* Dodge chance indicator */}
+                {damagePreview.dodgeChance > 0 && (
+                  <div className="text-center text-[8px] font-bold text-yellow-400 bg-black/50 rounded-sm">
+                    {damagePreview.dodgeChance}%
+                  </div>
+                )}
               </div>
-              
-              {/* Dodge chance indicator */}
-              {damagePreview.dodgeChance > 0 && (
-                <div className="text-center text-[9px] font-bold text-yellow-400 mt-0.5">
-                  {damagePreview.dodgeChance}% dodge
-                </div>
-              )}
             </div>
           );
         })()}
