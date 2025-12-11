@@ -46,9 +46,6 @@ const BattleSimulator = () => {
   // Locked reticle positions - these persist until ability changes
   const [enemyReticleGridId, setEnemyReticleGridId] = useState<number>(7); // Default: row 2 center
   const [friendlyReticleGridId, setFriendlyReticleGridId] = useState<number>(7);
-  // Hovered positions - for visual preview only
-  const [hoveredEnemyGridId, setHoveredEnemyGridId] = useState<number | null>(null);
-  const [hoveredFriendlyGridId, setHoveredFriendlyGridId] = useState<number | null>(null);
 
   const encounter = encounterId ? getEncounterById(parseInt(encounterId)) : null;
   const waves = encounter ? getEncounterWaves(encounter) : [];
@@ -73,20 +70,18 @@ const BattleSimulator = () => {
     return selectedUnitAbilities.find(a => a.abilityId === selectedAbilityId) || null;
   }, [selectedAbilityId, selectedUnitAbilities]);
 
-  // Calculate damage previews using AOE at reticle position (or hovered position)
+  // Calculate damage previews using AOE at reticle position
   const damagePreviews = useMemo<DamagePreview[]>(() => {
     if (!selectedUnit || !selectedAbility) return [];
 
     if (selectedUnit.isEnemy) {
-      // Enemy attacking friendly units - use hovered or locked reticle position
-      const reticlePos = hoveredFriendlyGridId ?? friendlyReticleGridId;
-      return calculateAoeDamagePreviewsForFriendly(selectedAbility, tempFormation.units, reticlePos);
+      // Enemy attacking friendly units
+      return calculateAoeDamagePreviewsForFriendly(selectedAbility, tempFormation.units, friendlyReticleGridId);
     } else {
-      // Friendly attacking enemy units - use hovered or locked reticle position
-      const reticlePos = hoveredEnemyGridId ?? enemyReticleGridId;
-      return calculateAoeDamagePreviewsForEnemy(selectedAbility, currentWaveUnits, reticlePos, enemyRankOverrides);
+      // Friendly attacking enemy units
+      return calculateAoeDamagePreviewsForEnemy(selectedAbility, currentWaveUnits, enemyReticleGridId, enemyRankOverrides);
     }
-  }, [selectedUnit, selectedAbility, tempFormation.units, currentWaveUnits, enemyRankOverrides, hoveredEnemyGridId, hoveredFriendlyGridId, enemyReticleGridId, friendlyReticleGridId]);
+  }, [selectedUnit, selectedAbility, tempFormation.units, currentWaveUnits, enemyRankOverrides, enemyReticleGridId, friendlyReticleGridId]);
 
   // Handle clicking on the grid to lock the reticle position
   const handleEnemyGridClick = (gridId: number) => {
@@ -192,7 +187,7 @@ const BattleSimulator = () => {
 
         {/* Battle grids */}
         <div className="grid gap-4">
-          {/* Enemy grid at top */}
+          {/* Enemy grid at top - show reticle when FRIENDLY unit is attacking */}
           <BattleGrid
             isEnemy={true}
             units={currentWaveUnits}
@@ -200,11 +195,10 @@ const BattleSimulator = () => {
             onUnitClick={handleUnitClick}
             damagePreviews={!selectedUnit?.isEnemy ? damagePreviews : []}
             rankOverrides={enemyRankOverrides}
-            targetArea={!selectedUnit?.isEnemy && selectedAbility ? selectedAbility.targetArea : undefined}
-            hoveredGridId={hoveredEnemyGridId}
-            onHoverGrid={setHoveredEnemyGridId}
-            reticleGridId={!selectedUnit?.isEnemy ? enemyReticleGridId : undefined}
+            targetArea={selectedAbility?.targetArea}
+            reticleGridId={enemyReticleGridId}
             onReticleClick={handleEnemyGridClick}
+            showReticle={!!selectedAbility && !selectedUnit?.isEnemy}
           />
 
           {/* Divider with selected unit info */}
@@ -255,7 +249,7 @@ const BattleSimulator = () => {
             )}
           </div>
 
-          {/* Friendly grid at bottom */}
+          {/* Friendly grid at bottom - show reticle when ENEMY unit is attacking */}
           <BattleGrid
             isEnemy={false}
             units={tempFormation.units}
@@ -265,11 +259,10 @@ const BattleSimulator = () => {
             onMoveUnit={tempFormation.moveUnit}
             onRemoveUnit={tempFormation.removeUnit}
             onAddUnit={tempFormation.addUnit}
-            targetArea={selectedUnit?.isEnemy && selectedAbility ? selectedAbility.targetArea : undefined}
-            hoveredGridId={hoveredFriendlyGridId}
-            onHoverGrid={setHoveredFriendlyGridId}
-            reticleGridId={selectedUnit?.isEnemy ? friendlyReticleGridId : undefined}
+            targetArea={selectedAbility?.targetArea}
+            reticleGridId={friendlyReticleGridId}
             onReticleClick={handleFriendlyGridClick}
+            showReticle={!!selectedAbility && selectedUnit?.isEnemy}
           />
         </div>
 
