@@ -5,8 +5,8 @@ import { UnitImage } from "@/components/units/UnitImage";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import type { EncounterUnit } from "@/types/encounters";
-import type { PartyUnit, DamagePreview, SelectedUnit } from "@/types/battleSimulator";
-import { ENEMY_GRID_LAYOUT, FRIENDLY_GRID_LAYOUT } from "@/types/battleSimulator";
+import type { PartyUnit, DamagePreview, SelectedUnit, TargetArea } from "@/types/battleSimulator";
+import { ENEMY_GRID_LAYOUT, FRIENDLY_GRID_LAYOUT, getAffectedGridPositions } from "@/types/battleSimulator";
 
 interface BattleGridProps {
   isEnemy: boolean;
@@ -18,6 +18,10 @@ interface BattleGridProps {
   onMoveUnit?: (fromGridId: number, toGridId: number) => void;
   onRemoveUnit?: (gridId: number) => void;
   onAddUnit?: (unitId: number, gridId: number) => void;
+  // Targeting reticle props
+  targetArea?: TargetArea;
+  hoveredGridId?: number | null;
+  onHoverGrid?: (gridId: number | null) => void;
 }
 
 const DAMAGE_TYPE_NAMES: Record<number, string> = {
@@ -39,11 +43,19 @@ export function BattleGrid({
   onMoveUnit,
   onRemoveUnit,
   onAddUnit,
+  targetArea,
+  hoveredGridId,
+  onHoverGrid,
 }: BattleGridProps) {
   const { t } = useLanguage();
   const layout = isEnemy ? ENEMY_GRID_LAYOUT : FRIENDLY_GRID_LAYOUT;
   const [draggedGridId, setDraggedGridId] = useState<number | null>(null);
   const [dragOverGridId, setDragOverGridId] = useState<number | null>(null);
+
+  // Calculate which grid positions are affected by the reticle
+  const affectedPositions = hoveredGridId !== null && hoveredGridId !== undefined && targetArea
+    ? getAffectedGridPositions(hoveredGridId, targetArea, isEnemy)
+    : [];
 
   const getUnitAtPosition = (gridId: number) => {
     if (isEnemy) {
@@ -122,7 +134,25 @@ export function BattleGrid({
     const isDragging = draggedGridId === gridId;
     const isDragOver = dragOverGridId === gridId;
     
+    // Check if this grid is affected by AOE reticle
+    const affectedPos = affectedPositions.find(p => p.gridId === gridId);
+    const isAffectedByReticle = affectedPos !== undefined;
+    const isReticleCenter = hoveredGridId === gridId;
+    
     const slotSize = "w-16 h-16 sm:w-18 sm:h-18";
+    
+    // Handle mouse events for targeting reticle
+    const handleMouseEnter = () => {
+      if (onHoverGrid && targetArea) {
+        onHoverGrid(gridId);
+      }
+    };
+    
+    const handleMouseLeave = () => {
+      if (onHoverGrid && targetArea) {
+        onHoverGrid(null);
+      }
+    };
     
     if (!encounterUnit) {
       return (
@@ -131,12 +161,24 @@ export function BattleGrid({
           className={cn(
             slotSize,
             "border border-dashed border-muted-foreground/20 rounded-md transition-all",
-            isDragOver && "border-primary bg-primary/20 border-solid"
+            isDragOver && "border-primary bg-primary/20 border-solid",
+            // Reticle highlighting for empty slots
+            isReticleCenter && "border-yellow-500 border-solid border-2 bg-yellow-500/20",
+            isAffectedByReticle && !isReticleCenter && "border-orange-500 border-solid bg-orange-500/10"
           )}
           onDragOver={(e) => handleDragOver(e, gridId)}
           onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, gridId)}
-        />
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          {/* Show damage percent for AOE */}
+          {isAffectedByReticle && affectedPos && affectedPos.damagePercent !== 100 && (
+            <span className="text-[10px] font-bold text-orange-400">
+              {affectedPos.damagePercent}%
+            </span>
+          )}
+        </div>
       );
     }
 
@@ -180,6 +222,8 @@ export function BattleGrid({
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(e, gridId)}
         onDragEnd={handleDragEnd}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         className={cn(
           slotSize,
           "border rounded-md flex flex-col items-center justify-center overflow-hidden transition-all cursor-pointer relative",
@@ -188,7 +232,10 @@ export function BattleGrid({
             : "border-primary bg-primary/10 hover:bg-primary/20",
           isSelected && "ring-2 ring-offset-2 ring-yellow-500",
           isDragging && "opacity-50",
-          isDragOver && "ring-2 ring-primary"
+          isDragOver && "ring-2 ring-primary",
+          // Reticle highlighting for occupied slots
+          isReticleCenter && "ring-2 ring-yellow-500 ring-offset-1",
+          isAffectedByReticle && !isReticleCenter && "ring-2 ring-orange-500/70"
         )}
       >
         {unitData && (
@@ -197,6 +244,13 @@ export function BattleGrid({
             alt={unitName}
             className="w-full h-full"
           />
+        )}
+
+        {/* AOE damage percent indicator - top right */}
+        {isAffectedByReticle && affectedPos && affectedPos.damagePercent !== 100 && (
+          <div className="absolute top-0.5 right-0.5 text-[8px] font-bold text-orange-400 bg-black/60 px-1 rounded-sm">
+            {affectedPos.damagePercent}%
+          </div>
         )}
 
         {/* HP/Armor bars at bottom when no damage preview */}

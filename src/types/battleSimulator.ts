@@ -26,6 +26,22 @@ export interface SelectedUnit {
   isEnemy: boolean;
 }
 
+// Target area data for AOE abilities
+export interface TargetAreaPosition {
+  x: number;
+  y: number;
+  damagePercent?: number;
+  weight?: number;
+  order?: number;
+}
+
+export interface TargetArea {
+  targetType: number; // 1 = single target, 2 = AOE pattern
+  data: TargetAreaPosition[];
+  random?: boolean;
+  aoeOrderDelay?: number;
+}
+
 export interface AbilityInfo {
   abilityId: number;
   weaponName: string;
@@ -48,6 +64,7 @@ export interface AbilityInfo {
   suppressionMultiplier: number;
   suppressionBonus: number;
   statusEffects: Record<string, number>; // effect_id -> chance %
+  targetArea?: TargetArea; // AOE targeting data
 }
 
 export interface StatusEffectPreview {
@@ -107,6 +124,68 @@ export const ENEMY_GRID_LAYOUT = {
   ROW_2: [9, 8, 7, 6, 5],
   ROW_3: [13, 12, 11],
 } as const;
+
+// Grid coordinate mapping: gridId -> {x, y} where y=0 is front row (ROW_1)
+// x ranges from 0-4 for rows 1-2, and 0-2 for row 3 (centered)
+export const GRID_ID_TO_COORDS: Record<number, { x: number; y: number }> = {
+  // Row 1 (y=0): positions 0-4
+  0: { x: 0, y: 0 }, 1: { x: 1, y: 0 }, 2: { x: 2, y: 0 }, 3: { x: 3, y: 0 }, 4: { x: 4, y: 0 },
+  // Row 2 (y=1): positions 5-9
+  5: { x: 0, y: 1 }, 6: { x: 1, y: 1 }, 7: { x: 2, y: 1 }, 8: { x: 3, y: 1 }, 9: { x: 4, y: 1 },
+  // Row 3 (y=2): positions 11-13 (centered, so x = 1, 2, 3)
+  11: { x: 1, y: 2 }, 12: { x: 2, y: 2 }, 13: { x: 3, y: 2 },
+};
+
+// Reverse mapping: {x,y} string -> gridId
+export const COORDS_TO_GRID_ID: Record<string, number> = {
+  "0,0": 0, "1,0": 1, "2,0": 2, "3,0": 3, "4,0": 4,
+  "0,1": 5, "1,1": 6, "2,1": 7, "3,1": 8, "4,1": 9,
+  "1,2": 11, "2,2": 12, "3,2": 13,
+};
+
+// Get grid positions affected by an AOE ability centered on a target position
+export function getAffectedGridPositions(
+  targetGridId: number,
+  targetArea: TargetArea | undefined,
+  isEnemy: boolean
+): { gridId: number; damagePercent: number }[] {
+  // If no target area or single target type, just return the target
+  if (!targetArea || targetArea.targetType === 1 || targetArea.data.length === 0) {
+    return [{ gridId: targetGridId, damagePercent: 100 }];
+  }
+
+  const targetCoords = GRID_ID_TO_COORDS[targetGridId];
+  if (!targetCoords) return [{ gridId: targetGridId, damagePercent: 100 }];
+
+  const affected: { gridId: number; damagePercent: number }[] = [];
+
+  for (const pos of targetArea.data) {
+    // Y direction: negative Y in data means towards enemy (forward), positive means toward friendly (backward)
+    // For enemy grid, we need to flip the y direction since we're attacking from below
+    const yOffset = isEnemy ? -pos.y : pos.y;
+    
+    const newX = targetCoords.x + pos.x;
+    const newY = targetCoords.y + yOffset;
+    
+    // Check if this is a valid grid position
+    const coordKey = `${newX},${newY}`;
+    const gridId = COORDS_TO_GRID_ID[coordKey];
+    
+    if (gridId !== undefined) {
+      affected.push({
+        gridId,
+        damagePercent: pos.damagePercent || 100,
+      });
+    }
+  }
+
+  // If no positions matched, at least include the target
+  if (affected.length === 0) {
+    affected.push({ gridId: targetGridId, damagePercent: 100 });
+  }
+
+  return affected;
+}
 
 // Damage type IDs to property names mapping
 export const DAMAGE_TYPE_MAP: Record<number, keyof DamageMods> = {

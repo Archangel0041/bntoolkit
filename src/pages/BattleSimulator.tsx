@@ -42,6 +42,8 @@ const BattleSimulator = () => {
   const [selectedUnit, setSelectedUnit] = useState<SelectedUnit | null>(null);
   const [selectedAbilityId, setSelectedAbilityId] = useState<number | null>(null);
   const [enemyRankOverrides, setEnemyRankOverrides] = useState<Record<number, number>>({});
+  const [hoveredEnemyGridId, setHoveredEnemyGridId] = useState<number | null>(null);
+  const [hoveredFriendlyGridId, setHoveredFriendlyGridId] = useState<number | null>(null);
 
   const encounter = encounterId ? getEncounterById(parseInt(encounterId)) : null;
   const waves = encounter ? getEncounterWaves(encounter) : [];
@@ -60,21 +62,24 @@ const BattleSimulator = () => {
     setSelectedAbilityId(null);
   }, [selectedUnit?.unitId, selectedUnit?.gridId]);
 
+  // Get the selected ability with targeting data
+  const selectedAbility = useMemo(() => {
+    if (!selectedAbilityId) return null;
+    return selectedUnitAbilities.find(a => a.abilityId === selectedAbilityId) || null;
+  }, [selectedAbilityId, selectedUnitAbilities]);
+
   // Calculate damage previews using temp formation
   const damagePreviews = useMemo<DamagePreview[]>(() => {
-    if (!selectedUnit || !selectedAbilityId) return [];
-
-    const ability = selectedUnitAbilities.find(a => a.abilityId === selectedAbilityId);
-    if (!ability) return [];
+    if (!selectedUnit || !selectedAbility) return [];
 
     if (selectedUnit.isEnemy) {
       // Enemy attacking friendly units
-      return calculateDamagePreviewsForFriendly(ability, tempFormation.units);
+      return calculateDamagePreviewsForFriendly(selectedAbility, tempFormation.units);
     } else {
       // Friendly attacking enemy units
-      return calculateDamagePreviewsForEnemy(ability, currentWaveUnits, enemyRankOverrides);
+      return calculateDamagePreviewsForEnemy(selectedAbility, currentWaveUnits, enemyRankOverrides);
     }
-  }, [selectedUnit, selectedAbilityId, selectedUnitAbilities, tempFormation.units, currentWaveUnits, enemyRankOverrides]);
+  }, [selectedUnit, selectedAbility, tempFormation.units, currentWaveUnits, enemyRankOverrides]);
 
   const handleUnitClick = (unit: SelectedUnit) => {
     if (selectedUnit?.unitId === unit.unitId && selectedUnit?.gridId === unit.gridId && selectedUnit?.isEnemy === unit.isEnemy) {
@@ -175,6 +180,9 @@ const BattleSimulator = () => {
             onUnitClick={handleUnitClick}
             damagePreviews={!selectedUnit?.isEnemy ? damagePreviews : []}
             rankOverrides={enemyRankOverrides}
+            targetArea={!selectedUnit?.isEnemy && selectedAbility ? selectedAbility.targetArea : undefined}
+            hoveredGridId={hoveredEnemyGridId}
+            onHoverGrid={setHoveredEnemyGridId}
           />
 
           {/* Divider with selected unit info */}
@@ -222,6 +230,9 @@ const BattleSimulator = () => {
             onMoveUnit={tempFormation.moveUnit}
             onRemoveUnit={tempFormation.removeUnit}
             onAddUnit={tempFormation.addUnit}
+            targetArea={selectedUnit?.isEnemy && selectedAbility ? selectedAbility.targetArea : undefined}
+            hoveredGridId={hoveredFriendlyGridId}
+            onHoverGrid={setHoveredFriendlyGridId}
           />
         </div>
 
