@@ -394,8 +394,8 @@ export function BattleGrid({
           </div>
         )}
 
-        {/* HP/Armor bars at bottom when no damage preview */}
-        {!damagePreview && (unitHp > 0 || unitArmor > 0) && (
+        {/* HP/Armor bars at bottom when no damage preview, or when target is out of range/blocked */}
+        {(!damagePreview || !damagePreview.canTarget || !damagePreview.inRange || damagePreview.isBlocked) && (unitHp > 0 || unitArmor > 0) && (
           <div className="absolute bottom-0 left-0 right-0 bg-black/60 p-0.5 space-y-0.5">
             {/* Armor Bar (above HP) */}
             {unitArmor > 0 && (
@@ -411,7 +411,7 @@ export function BattleGrid({
         )}
         
         {/* Damage preview bars */}
-        {damagePreview && damagePreview.canTarget && (() => {
+        {damagePreview && damagePreview.canTarget && damagePreview.inRange && !damagePreview.isBlocked && (() => {
           const { minHpRemaining, maxHpRemaining, minArmorRemaining, maxArmorRemaining } = getRemainingRange(damagePreview);
           
           // Calculate percentages for HP bar
@@ -496,17 +496,21 @@ export function BattleGrid({
           );
         })()}
         
-        {/* Cannot target overlay */}
-        {damagePreview && !damagePreview.canTarget && (
-          <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
-            <span className="text-muted-foreground text-xs">✕</span>
+        {/* Cannot target overlay - now includes out-of-range and blocked */}
+        {damagePreview && (!damagePreview.canTarget || !damagePreview.inRange || damagePreview.isBlocked) && (
+          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center">
+            <span className="text-muted-foreground text-xs">
+              {!damagePreview.canTarget && "✕"}
+              {damagePreview.canTarget && !damagePreview.inRange && "Out of Range"}
+              {damagePreview.canTarget && damagePreview.inRange && damagePreview.isBlocked && "Blocked"}
+            </span>
           </div>
         )}
       </div>
     );
 
     // Wrap with tooltip for detailed info
-    if (damagePreview && damagePreview.canTarget) {
+    if (damagePreview && damagePreview.canTarget && damagePreview.inRange && !damagePreview.isBlocked) {
       const { minHpRemaining, maxHpRemaining, minArmorRemaining, maxArmorRemaining } = getRemainingRange(damagePreview);
       
       return (

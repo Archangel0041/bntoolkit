@@ -123,6 +123,12 @@ export interface DamagePreview {
   statusEffects: StatusEffectPreview[];
   // AOE damage modifier (100 = full damage, 25 = 25% splash)
   damagePercent: number;
+  // Range and blocking info
+  inRange: boolean;
+  range: number;
+  isBlocked: boolean;
+  blockedByUnitId?: number;
+  blockReason?: string;
 }
 
 // Row mapping: preferred_row 1 = front (row 1), 2 = middle (row 2), 3 = back (row 3)
