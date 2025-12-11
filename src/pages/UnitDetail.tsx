@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getUnitById } from "@/lib/units";
-import { getAbilityById } from "@/lib/abilities";
+import { getAbilityById, getLineOfFireLabel } from "@/lib/abilities";
 import { getStatusEffectDisplayName, getStatusEffectColor, getStatusEffectIconUrl, getEffectDisplayNameTranslated, getEffectColor, getEffectIconUrl, getEffectDuration } from "@/lib/statusEffects";
 import { getClassDisplayName } from "@/lib/battleConfig";
 import { getAbilityImageUrl } from "@/lib/abilityImages";
@@ -325,15 +325,25 @@ export default function UnitDetail() {
                           </div>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1 text-sm">
-                          <StatRow label="Min Damage" value={minDamage} highlight />
-                          <StatRow label="Max Damage" value={maxDamage} highlight />
+                          <StatRow 
+                            label="Min Damage" 
+                            value={ability.stats.shots_per_attack > 1 ? `${minDamage} (x${ability.stats.shots_per_attack})` : minDamage} 
+                            highlight 
+                          />
+                          <StatRow 
+                            label="Max Damage" 
+                            value={ability.stats.shots_per_attack > 1 ? `${maxDamage} (x${ability.stats.shots_per_attack})` : maxDamage} 
+                            highlight 
+                          />
                           <StatRow label="Offense" value={offense} highlight />
                           <StatRow label="Attack" value={ability.stats.attack} />
                           <StatRow label="Crit %" value={`${ability.stats.critical_hit_percent}%`} />
                           <StatRow label="Cooldown" value={ability.stats.ability_cooldown} />
                           <StatRow label="Ammo Required" value={ability.stats.ammo_required} />
                           <StatRow label="Range" value={`${ability.stats.min_range}-${ability.stats.max_range}`} />
-                          <StatRow label="Shots" value={ability.stats.shots_per_attack} />
+                          {getLineOfFireLabel(ability.stats.line_of_fire) && (
+                            <StatRow label="Line of Fire" value={getLineOfFireLabel(ability.stats.line_of_fire)!} />
+                          )}
                           {ability.stats.armor_piercing_percent > 0 && (
                             <StatRow label="Armor Pierce" value={`${Math.round(ability.stats.armor_piercing_percent * 100)}%`} />
                           )}

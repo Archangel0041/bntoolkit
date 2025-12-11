@@ -9,11 +9,22 @@ export interface AbilityStats {
   critical_hit_percent: number;
   damage: number;
   damage_type: number;
+  line_of_fire?: number;
   max_range: number;
   min_range: number;
   shots_per_attack: number;
   targets?: number[];
   status_effects?: Record<string, number>;
+}
+
+export function getLineOfFireLabel(lof: number | undefined): string | null {
+  if (lof === undefined) return null;
+  switch (lof) {
+    case 1: return "Direct";
+    case 2: return "Precise";
+    case 3: return "Indirect";
+    default: return null;
+  }
 }
 
 export interface Ability {
