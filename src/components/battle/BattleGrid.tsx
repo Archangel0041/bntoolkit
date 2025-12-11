@@ -114,6 +114,11 @@ export function BattleGrid({
       ? (rankOverrides[unitGridId] || maxRank)
       : (encounterUnit as PartyUnit).rank;
 
+    // Get unit stats for HP/Armor display
+    const unitStats = unitData?.statsConfig?.stats?.[currentRank - 1];
+    const unitHp = unitStats?.hp || 0;
+    const unitArmor = unitStats?.armor_hp || 0;
+
     const isSelected = selectedUnit?.gridId === unitGridId && selectedUnit?.isEnemy === isEnemy;
 
     const handleClick = () => {
@@ -158,16 +163,36 @@ export function BattleGrid({
             className="w-full h-full"
           />
         )}
+
+        {/* HP/Armor bar at bottom when no damage preview */}
+        {!damagePreview && (unitHp > 0 || unitArmor > 0) && (
+          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-0.5 py-0.5 flex justify-center gap-1 text-[8px] font-bold">
+            <span className="text-emerald-400 dark:text-emerald-300">{unitHp}</span>
+            {unitArmor > 0 && (
+              <span className="text-sky-400 dark:text-sky-300">{unitArmor}</span>
+            )}
+          </div>
+        )}
         
-        {/* Compact damage overlay - shows final HP and key stats */}
+        {/* Compact damage overlay - shows HP/Armor, damage, dodge, crit */}
         {damagePreview && damagePreview.canTarget && (
-          <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center text-white text-[9px] font-bold p-0.5 leading-tight">
-            {/* Final HP estimate */}
-            <span className="text-destructive text-[11px]">
-              → {getFinalHp(damagePreview)} HP
+          <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center text-white text-[8px] font-bold p-0.5 leading-tight gap-0.5">
+            {/* Current HP/Armor */}
+            <div className="flex gap-1">
+              <span className="text-emerald-400 dark:text-emerald-300">{damagePreview.targetHp}</span>
+              {damagePreview.targetHasArmor && (
+                <span className="text-sky-400 dark:text-sky-300">{damagePreview.targetArmorHp}</span>
+              )}
+            </div>
+            {/* Damage range */}
+            <span className="text-destructive text-[10px]">
+              {damagePreview.minDamage.hpDamage}-{damagePreview.maxDamage.hpDamage}
+              {damagePreview.targetHasArmor && (
+                <span className="text-sky-400"> +{damagePreview.minDamage.armorDamage}-{damagePreview.maxDamage.armorDamage}</span>
+              )}
             </span>
             {/* Dodge and Crit */}
-            <div className="flex gap-1 text-[8px]">
+            <div className="flex gap-1">
               {damagePreview.dodgeChance > 0 && (
                 <span className="text-yellow-400">{damagePreview.dodgeChance}%D</span>
               )}
@@ -200,9 +225,9 @@ export function BattleGrid({
               
               {/* Current HP/Armor */}
               <div className="flex gap-3 text-muted-foreground">
-                <span>HP: <span className="text-foreground">{damagePreview.targetHp}</span></span>
+                <span>HP: <span className="text-emerald-500 dark:text-emerald-400 font-medium">{damagePreview.targetHp}</span></span>
                 {damagePreview.targetHasArmor && (
-                  <span>Armor: <span className="text-blue-400">{damagePreview.targetArmorHp}</span></span>
+                  <span>Armor: <span className="text-sky-500 dark:text-sky-400 font-medium">{damagePreview.targetArmorHp}</span></span>
                 )}
                 <span>Def: <span className="text-foreground">{damagePreview.targetDefense}</span></span>
               </div>
@@ -218,7 +243,7 @@ export function BattleGrid({
                 {damagePreview.targetHasArmor && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Armor Damage:</span>
-                    <span className="text-blue-400 font-medium">
+                    <span className="text-sky-500 dark:text-sky-400 font-medium">
                       {damagePreview.minDamage.armorDamage} - {damagePreview.maxDamage.armorDamage}
                     </span>
                   </div>
@@ -237,7 +262,7 @@ export function BattleGrid({
                   <span className="text-muted-foreground">Dodge: </span>
                   <span className={cn(
                     "font-medium",
-                    damagePreview.dodgeChance > 0 ? "text-yellow-400" : "text-foreground"
+                    damagePreview.dodgeChance > 0 ? "text-yellow-500 dark:text-yellow-400" : "text-foreground"
                   )}>
                     {damagePreview.dodgeChance}%
                   </span>
@@ -246,7 +271,7 @@ export function BattleGrid({
                   <span className="text-muted-foreground">Crit: </span>
                   <span className={cn(
                     "font-medium",
-                    damagePreview.critChance > 0 ? "text-orange-400" : "text-foreground"
+                    damagePreview.critChance > 0 ? "text-orange-500 dark:text-orange-400" : "text-foreground"
                   )}>
                     {damagePreview.critChance}%
                   </span>
@@ -256,11 +281,11 @@ export function BattleGrid({
               {/* Final HP estimate */}
               <div className="border-t pt-1.5">
                 <span className="text-muted-foreground">After attack: </span>
-                <span className="text-destructive font-semibold">
+                <span className="text-emerald-500 dark:text-emerald-400 font-semibold">
                   ~{getFinalHp(damagePreview)} HP
                 </span>
                 {damagePreview.targetHasArmor && damagePreview.maxDamage.armorRemaining < damagePreview.targetArmorHp && (
-                  <span className="text-blue-400 ml-2">
+                  <span className="text-sky-500 dark:text-sky-400 ml-2">
                     ~{Math.floor((damagePreview.minDamage.armorRemaining + damagePreview.maxDamage.armorRemaining) / 2)} Armor
                   </span>
                 )}

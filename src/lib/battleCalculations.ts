@@ -18,12 +18,15 @@ export function calculateDodgeChance(defenderDefense: number, attackerOffense: n
 }
 
 // Get damage modifier for a specific damage type
+// Values can be stored as percentages (100 = 1x, 150 = 1.5x) or decimals (1.0 = 1x, 1.5 = 1.5x)
 export function getDamageModifier(damageMods: DamageMods | undefined, damageType: number): number {
   if (!damageMods) return 1;
   const modKey = DAMAGE_TYPE_MAP[damageType];
   if (!modKey) return 1;
   const mod = damageMods[modKey];
-  return mod !== undefined ? mod / 100 : 1; // Convert from percentage (e.g., 150 -> 1.5)
+  if (mod === undefined) return 1;
+  // If value > 10, assume it's a percentage (e.g., 100, 150), otherwise it's a decimal (e.g., 1.0, 1.5)
+  return mod > 10 ? mod / 100 : mod;
 }
 
 // Calculate damage with armor mechanics
