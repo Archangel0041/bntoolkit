@@ -47,7 +47,10 @@ export function getBlockingUnits(
 // Check if a target is blocked by units in front of it based on line of fire
 // Returns: { isBlocked: boolean, blockedBy?: BlockingUnit }
 // 
-// IMPORTANT: For cross-grid attacks, we need to account for x-coordinate mirroring.
+// IMPORTANT: Blocking propagates - if a unit blocks at row Y, all units at row Y+1, Y+2, etc.
+// are also blocked because the attack cannot pass through the blocker.
+// 
+// For cross-grid attacks, we need to account for x-coordinate mirroring.
 // When a friendly unit at x=0 attacks an enemy, the attack goes "straight ahead".
 // But enemy grid coords are mirrored, so enemy x=4 is visually aligned with friendly x=0.
 export function checkLineOfFire(
@@ -69,47 +72,43 @@ export function checkLineOfFire(
     return { isBlocked: false };
   }
 
-  // Get units between attacker and target that could block
-  // For attacks from friendly -> enemy, "between" means units at lower y (closer to front)
-  // The blocking unit must be in the same column as the target
-  
-  const unitsInPath = targetUnits.filter(u => {
+  // Get units in the same column as the target that could block
+  // For attacks from friendly -> enemy, "in front" means units at lower y (closer to attacker)
+  const unitsInColumn = targetUnits.filter(u => {
     const unitCoords = GRID_ID_TO_COORDS[u.gridId];
     if (!unitCoords) return false;
     
-    // Don't block yourself
+    // Don't consider the target itself
     if (u.gridId === targetGridId) return false;
     
     // Unit must be in the same column as the target (on the target's grid)
     if (unitCoords.x !== targetCoords.x) return false;
     
-    // Unit must be between attacker and target (closer to front/attacker)
-    // For enemy grid targets: lower y = closer to attacker (front row)
+    // Unit must be in front of the target (lower y = closer to attacker)
     return unitCoords.y < targetCoords.y;
   });
 
   // Sort by y (front to back - lowest y first)
-  unitsInPath.sort((a, b) => {
+  unitsInColumn.sort((a, b) => {
     const aCoords = GRID_ID_TO_COORDS[a.gridId];
     const bCoords = GRID_ID_TO_COORDS[b.gridId];
     return (aCoords?.y ?? 0) - (bCoords?.y ?? 0);
   });
 
   // Check each unit in path based on line of fire rules
-  for (const blockingUnit of unitsInPath) {
+  // If ANY unit blocks, the target is blocked (blocking propagates to all rows behind)
+  for (const blockingUnit of unitsInColumn) {
     const blocking = blockingUnit.blocking;
     
     switch (lineOfFire) {
       case LineOfFire.Contact:
-        // Contact: blocked by ANY unit in front
-        if (blocking >= UnitBlocking.None) {
-          return { 
-            isBlocked: true, 
-            blockedBy: blockingUnit,
-            reason: "Contact fire blocked"
-          };
-        }
-        break;
+        // Contact: blocked by ANY unit in front (even None blocking counts as presence)
+        // Actually, Contact should be blocked by the presence of any unit
+        return { 
+          isBlocked: true, 
+          blockedBy: blockingUnit,
+          reason: "Contact fire - unit in path"
+        };
         
       case LineOfFire.Direct:
         // Direct: Can fire PAST None blocking units
@@ -118,19 +117,19 @@ export function checkLineOfFire(
           return { 
             isBlocked: true, 
             blockedBy: blockingUnit,
-            reason: "Direct fire blocked"
+            reason: "Direct fire blocked by Partial+ blocking"
           };
         }
         break;
         
       case LineOfFire.Precise:
-        // Precise: Can fire past Partial blocking
+        // Precise: Can fire past None and Partial blocking
         // Blocked by Full, God
         if (blocking >= UnitBlocking.Full) {
           return { 
             isBlocked: true, 
             blockedBy: blockingUnit,
-            reason: "Precise fire blocked"
+            reason: "Precise fire blocked by Full+ blocking"
           };
         }
         break;
