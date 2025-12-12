@@ -14,8 +14,9 @@ import { useTempFormation } from "@/hooks/useTempFormation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { getEncounterById, getEncounterWaves } from "@/lib/encounters";
 import { getUnitById } from "@/lib/units";
-import { getUnitAbilities, calculateAoeDamagePreviewsForEnemy, calculateAoeDamagePreviewsForFriendly, calculateFixedDamagePreviewsForEnemy, calculateFixedDamagePreviewsForFriendly } from "@/lib/battleCalculations";
+import { getUnitAbilities, calculateAoeDamagePreviewsForEnemy, calculateAoeDamagePreviewsForFriendly, calculateFixedDamagePreviewsForEnemy, calculateFixedDamagePreviewsForFriendly, calculateDamagePreviewsForEnemy, calculateDamagePreviewsForFriendly } from "@/lib/battleCalculations";
 import { getFixedAttackPositions } from "@/types/battleSimulator";
+import { getBlockingUnits, findFrontmostUnblockedPosition } from "@/lib/battleTargeting";
 import { UnitImage } from "@/components/units/UnitImage";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -71,6 +72,32 @@ const BattleSimulator = () => {
     return selectedUnitAbilities.find(a => a.abilityId === selectedAbilityId) || null;
   }, [selectedAbilityId, selectedUnitAbilities]);
 
+  // Update default reticle position when ability changes (to frontmost unblocked target)
+  useEffect(() => {
+    if (!selectedAbility || !selectedUnit || selectedAbility.isSingleTarget || selectedAbility.isFixed) return;
+    
+    const blockingUnits = selectedUnit.isEnemy 
+      ? getBlockingUnits(tempFormation.units, false)
+      : getBlockingUnits(currentWaveUnits, true);
+    
+    const frontmostPosition = findFrontmostUnblockedPosition(
+      selectedUnit.gridId,
+      selectedAbility.minRange,
+      selectedAbility.maxRange,
+      selectedAbility.lineOfFire,
+      selectedUnit.isEnemy,
+      blockingUnits
+    );
+    
+    if (frontmostPosition !== null) {
+      if (selectedUnit.isEnemy) {
+        setFriendlyReticleGridId(frontmostPosition);
+      } else {
+        setEnemyReticleGridId(frontmostPosition);
+      }
+    }
+  }, [selectedAbility, selectedUnit, currentWaveUnits, tempFormation.units]);
+
   // Calculate fixed attack positions based on attacker's grid position
   const fixedAttackPositions = useMemo(() => {
     if (!selectedUnit || !selectedAbility?.isFixed || !selectedAbility.targetArea) {
@@ -90,20 +117,29 @@ const BattleSimulator = () => {
     return { enemyGrid, friendlyGrid };
   }, [selectedUnit, selectedAbility]);
 
-  // Calculate damage previews using AOE at reticle position (or fixed positions)
+  // Calculate damage previews
+  // - Single target: show all valid targets with damage (blocking applies)
+  // - Fixed pattern: show damage for all units in pattern
+  // - AOE: show damage for units in reticle area
   const damagePreviews = useMemo<DamagePreview[]>(() => {
     if (!selectedUnit || !selectedAbility) return [];
 
-    // For fixed attacks, use the fixedAttackPositions as the affected area
-    // For movable AOE, use the reticle position
     if (selectedUnit.isEnemy) {
       // Enemy attacking friendly units
+      if (selectedAbility.isSingleTarget) {
+        // Single target: calculate for ALL friendly units (blocking will filter display)
+        return calculateDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units);
+      }
       if (selectedAbility.isFixed && fixedAttackPositions.friendlyGrid.length > 0) {
         return calculateFixedDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units, fixedAttackPositions.friendlyGrid);
       }
       return calculateAoeDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units, friendlyReticleGridId);
     } else {
       // Friendly attacking enemy units
+      if (selectedAbility.isSingleTarget) {
+        // Single target: calculate for ALL enemy units (blocking will filter display)
+        return calculateDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, enemyRankOverrides);
+      }
       if (selectedAbility.isFixed && fixedAttackPositions.enemyGrid.length > 0) {
         return calculateFixedDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, fixedAttackPositions.enemyGrid, enemyRankOverrides);
       }
@@ -216,7 +252,7 @@ const BattleSimulator = () => {
 
         {/* Battle grids */}
         <div className="grid gap-4">
-          {/* Enemy grid at top - show reticle when FRIENDLY unit is attacking with movable AOE */}
+          {/* Enemy grid at top - show reticle when FRIENDLY unit is attacking with movable AOE (not single-target or fixed) */}
           <BattleGrid
             isEnemy={true}
             units={currentWaveUnits}
@@ -227,7 +263,7 @@ const BattleSimulator = () => {
             targetArea={selectedAbility?.targetArea}
             reticleGridId={enemyReticleGridId}
             onReticleMove={handleEnemyReticleMove}
-            showReticle={!!selectedAbility && !selectedAbility.isFixed && !selectedUnit?.isEnemy}
+            showReticle={!!selectedAbility && !selectedAbility.isFixed && !selectedAbility.isSingleTarget && !selectedUnit?.isEnemy}
             fixedAttackPositions={!selectedUnit?.isEnemy ? fixedAttackPositions.enemyGrid : fixedAttackPositions.friendlyGrid}
           />
 
@@ -279,7 +315,7 @@ const BattleSimulator = () => {
             )}
           </div>
 
-          {/* Friendly grid at bottom - show reticle when ENEMY unit is attacking with movable AOE */}
+          {/* Friendly grid at bottom - show reticle when ENEMY unit is attacking with movable AOE (not single-target or fixed) */}
           <BattleGrid
             isEnemy={false}
             units={tempFormation.units}
@@ -292,7 +328,7 @@ const BattleSimulator = () => {
             targetArea={selectedAbility?.targetArea}
             reticleGridId={friendlyReticleGridId}
             onReticleMove={handleFriendlyReticleMove}
-            showReticle={!!selectedAbility && !selectedAbility.isFixed && selectedUnit?.isEnemy}
+            showReticle={!!selectedAbility && !selectedAbility.isFixed && !selectedAbility.isSingleTarget && selectedUnit?.isEnemy}
             fixedAttackPositions={selectedUnit?.isEnemy ? fixedAttackPositions.friendlyGrid : []}
           />
         </div>

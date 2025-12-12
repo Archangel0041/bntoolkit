@@ -189,6 +189,7 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
       const rawTargetArea = (ability.stats as any).target_area;
       let targetArea = undefined;
       let isFixed = false;
+      let isSingleTarget = true; // Default to single target
       
       if (rawTargetArea) {
         targetArea = {
@@ -209,6 +210,14 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
         // If target_type is 1 AND there are positions with non-zero offsets, it's fixed
         isFixed = rawTargetArea.target_type === 1 && 
           targetArea.data.some((d: any) => d.x !== 0 || d.y !== 0);
+        
+        // Single target = no target_area OR only center position with 100% damage
+        // AOE (target_type 2) = has splash pattern, needs reticle
+        // Fixed (target_type 1 with offsets) = no reticle but shows pattern
+        isSingleTarget = !rawTargetArea || (
+          rawTargetArea.target_type === 1 && 
+          !targetArea.data.some((d: any) => d.x !== 0 || d.y !== 0)
+        );
       }
 
       const attackDirection = ability.stats.attack_direction || 1;
@@ -239,6 +248,7 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
         statusEffects: ability.stats.status_effects || {},
         targetArea,
         isFixed,
+        isSingleTarget,
       });
     });
   });
@@ -433,6 +443,8 @@ export function calculateDamagePreviewsForFriendly(
       immunities
     );
 
+    const blockerInfo = getBlockerInfo(blockCheck.blockedBy);
+
     return {
       targetGridId: friendlyUnit.gridId,
       targetUnitId: friendlyUnit.unitId,
@@ -454,6 +466,7 @@ export function calculateDamagePreviewsForFriendly(
       range,
       isBlocked: blockCheck.isBlocked,
       blockedByUnitId: blockCheck.blockedBy?.unitId,
+      ...blockerInfo,
       blockReason: blockCheck.reason,
     };
   });
@@ -536,6 +549,8 @@ export function calculateAoeDamagePreviewsForEnemy(
         immunities
       );
 
+      const blockerInfo = getBlockerInfo(blockCheck.blockedBy);
+
       return {
         targetGridId: enemyUnit.grid_id!,
         targetUnitId: enemyUnit.unit_id,
@@ -557,6 +572,7 @@ export function calculateAoeDamagePreviewsForEnemy(
         range,
         isBlocked: blockCheck.isBlocked,
         blockedByUnitId: blockCheck.blockedBy?.unitId,
+        ...blockerInfo,
         blockReason: blockCheck.reason,
       };
     });
@@ -636,6 +652,8 @@ export function calculateAoeDamagePreviewsForFriendly(
         immunities
       );
 
+      const blockerInfo = getBlockerInfo(blockCheck.blockedBy);
+
       return {
         targetGridId: friendlyUnit.gridId,
         targetUnitId: friendlyUnit.unitId,
@@ -657,6 +675,7 @@ export function calculateAoeDamagePreviewsForFriendly(
         range,
         isBlocked: blockCheck.isBlocked,
         blockedByUnitId: blockCheck.blockedBy?.unitId,
+        ...blockerInfo,
         blockReason: blockCheck.reason,
       };
     });

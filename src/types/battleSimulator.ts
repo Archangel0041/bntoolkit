@@ -82,6 +82,7 @@ export interface AbilityInfo {
   statusEffects: Record<string, number>; // effect_id -> chance %
   targetArea?: TargetArea; // AOE targeting data
   isFixed: boolean; // True if attack pattern is fixed (can't be aimed)
+  isSingleTarget: boolean; // True if ability is single-target (no AOE pattern)
 }
 
 export interface StatusEffectPreview {
