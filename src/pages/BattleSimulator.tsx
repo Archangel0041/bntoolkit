@@ -14,7 +14,7 @@ import { useTempFormation } from "@/hooks/useTempFormation";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { getEncounterById, getEncounterWaves } from "@/lib/encounters";
 import { getUnitById } from "@/lib/units";
-import { getUnitAbilities, calculateAoeDamagePreviewsForEnemy, calculateAoeDamagePreviewsForFriendly } from "@/lib/battleCalculations";
+import { getUnitAbilities, calculateAoeDamagePreviewsForEnemy, calculateAoeDamagePreviewsForFriendly, calculateFixedDamagePreviewsForEnemy, calculateFixedDamagePreviewsForFriendly } from "@/lib/battleCalculations";
 import { getFixedAttackPositions } from "@/types/battleSimulator";
 import { UnitImage } from "@/components/units/UnitImage";
 import { cn } from "@/lib/utils";
@@ -94,14 +94,22 @@ const BattleSimulator = () => {
   const damagePreviews = useMemo<DamagePreview[]>(() => {
     if (!selectedUnit || !selectedAbility) return [];
 
+    // For fixed attacks, use the fixedAttackPositions as the affected area
+    // For movable AOE, use the reticle position
     if (selectedUnit.isEnemy) {
       // Enemy attacking friendly units
+      if (selectedAbility.isFixed && fixedAttackPositions.friendlyGrid.length > 0) {
+        return calculateFixedDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units, fixedAttackPositions.friendlyGrid);
+      }
       return calculateAoeDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units, friendlyReticleGridId);
     } else {
       // Friendly attacking enemy units
+      if (selectedAbility.isFixed && fixedAttackPositions.enemyGrid.length > 0) {
+        return calculateFixedDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, fixedAttackPositions.enemyGrid, enemyRankOverrides);
+      }
       return calculateAoeDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, enemyReticleGridId, enemyRankOverrides);
     }
-  }, [selectedUnit, selectedAbility, tempFormation.units, currentWaveUnits, enemyRankOverrides, enemyReticleGridId, friendlyReticleGridId]);
+  }, [selectedUnit, selectedAbility, tempFormation.units, currentWaveUnits, enemyRankOverrides, enemyReticleGridId, friendlyReticleGridId, fixedAttackPositions]);
 
   // Handle moving the reticle on enemy grid (only for movable reticles)
   const handleEnemyReticleMove = (gridId: number) => {

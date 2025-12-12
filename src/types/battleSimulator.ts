@@ -128,6 +128,8 @@ export interface DamagePreview {
   range: number;
   isBlocked: boolean;
   blockedByUnitId?: number;
+  blockedByUnitName?: string;
+  blockedByBlockingLevel?: number;
   blockReason?: string;
 }
 
