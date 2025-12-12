@@ -69,14 +69,9 @@ export function checkLineOfFire(
     return { isBlocked: false };
   }
 
-  // For cross-grid attacks, the attacker's x needs to be mirrored to compare with target grid
-  // Attacker at x=0 attacks in line with target x=4 (mirrored: 4-0=4)
-  // Attacker at x=2 attacks in line with target x=2 (mirrored: 4-2=2)
-  const mirroredAttackerX = 4 - attackerCoords.x;
-  
   // Get units between attacker and target that could block
   // For attacks from friendly -> enemy, "between" means units at lower y (closer to front)
-  // The blocking unit must be in the same visual column as the attack path
+  // The blocking unit must be in the same column as the target
   
   const unitsInPath = targetUnits.filter(u => {
     const unitCoords = GRID_ID_TO_COORDS[u.gridId];
@@ -86,12 +81,7 @@ export function checkLineOfFire(
     if (u.gridId === targetGridId) return false;
     
     // Unit must be in the same column as the target (on the target's grid)
-    // This is correct because we're checking blocking units on the same grid as the target
     if (unitCoords.x !== targetCoords.x) return false;
-    
-    // Also check if the attack path actually goes through this column
-    // The mirrored attacker x should match the target column for the attack to pass through
-    if (mirroredAttackerX !== targetCoords.x) return false;
     
     // Unit must be between attacker and target (closer to front/attacker)
     // For enemy grid targets: lower y = closer to attacker (front row)
@@ -150,6 +140,44 @@ export function checkLineOfFire(
   }
 
   return { isBlocked: false };
+}
+
+// Find the frontmost unblocked target position for initial reticle placement
+export function findFrontmostUnblockedPosition(
+  attackerGridId: number,
+  minRange: number,
+  maxRange: number,
+  lineOfFire: number,
+  attackerIsEnemy: boolean,
+  targetUnits: BlockingUnit[]
+): number | null {
+  const attackerCoords = GRID_ID_TO_COORDS[attackerGridId];
+  if (!attackerCoords) return null;
+  
+  // Check center column first (x=2), then expand outward
+  const columnOrder = [2, 1, 3, 0, 4];
+  
+  // Check front row first (y=0), then middle (y=1), then back (y=2)
+  for (let y = 0; y <= 2; y++) {
+    for (const x of columnOrder) {
+      const coordKey = `${x},${y}`;
+      const gridId = COORDS_TO_GRID_ID[coordKey];
+      if (gridId === undefined) continue;
+      
+      // Check if in range
+      const range = calculateRange(attackerGridId, gridId, attackerIsEnemy);
+      if (range < minRange || range > maxRange) continue;
+      
+      // Check if blocked
+      const blockCheck = checkLineOfFire(attackerGridId, gridId, lineOfFire, attackerIsEnemy, targetUnits);
+      if (!blockCheck.isBlocked) {
+        return gridId;
+      }
+    }
+  }
+  
+  // Fallback to center of front row even if blocked
+  return COORDS_TO_GRID_ID["2,0"] ?? 2;
 }
 
 // Calculate row distance from attacker to target for range checking
