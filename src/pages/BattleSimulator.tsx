@@ -59,19 +59,18 @@ const BattleSimulator = () => {
     renameParty,
   } = useParties();
 
-  const tempFormation = useTempFormation();
-
   const [currentWave, setCurrentWave] = useState(0);
   const [selectedUnit, setSelectedUnit] = useState<SelectedUnit | null>(null);
   const [selectedAbilityId, setSelectedAbilityId] = useState<number | null>(null);
   const [enemyRankOverrides, setEnemyRankOverrides] = useState<Record<number, number>>({});
-  // Locked reticle positions - these persist until ability changes
-  const [enemyReticleGridId, setEnemyReticleGridId] = useState<number>(7); // Default: row 2 center
+  const [enemyReticleGridId, setEnemyReticleGridId] = useState<number>(7);
   const [friendlyReticleGridId, setFriendlyReticleGridId] = useState<number>(7);
 
   const encounter = encounterId ? getEncounterById(parseInt(encounterId)) : null;
   const waves = encounter ? getEncounterWaves(encounter) : [];
   const currentWaveUnits = waves[currentWave] || [];
+
+  const tempFormation = useTempFormation({ encounter });
 
   const backPath = (location.state as any)?.from || "/";
 
@@ -489,6 +488,7 @@ const BattleSimulator = () => {
             onAddUnit={(unit) => tempFormation.addUnit(unit.unitId, unit.gridId)}
             onRemoveUnit={tempFormation.removeUnit}
             onUpdateRank={tempFormation.setUnitRank}
+            encounter={encounter}
           />
         </div>
       </main>

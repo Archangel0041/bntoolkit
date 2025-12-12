@@ -4,6 +4,7 @@ import { UnitImage } from "@/components/units/UnitImage";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -18,18 +19,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, AlertCircle } from "lucide-react";
 import { allUnits } from "@/lib/units";
 import { UnitSide } from "@/data/gameEnums";
 import type { PartyUnit } from "@/types/battleSimulator";
+import type { Encounter } from "@/types/encounters";
 import { getNextAvailablePosition } from "@/lib/battleCalculations";
+import { getEncounterUnitLimit, getRestrictionMessages } from "@/lib/unitRestrictions";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface UnitSelectorProps {
   partyUnits: PartyUnit[];
-  onAddUnit: (unit: PartyUnit) => void;
+  onAddUnit: (unit: PartyUnit) => { success: boolean; error?: string } | void;
   onRemoveUnit: (gridId: number) => void;
   onUpdateRank: (gridId: number, rank: number) => void;
+  encounter?: Encounter | null;
 }
 
 export function UnitSelector({
@@ -37,6 +42,7 @@ export function UnitSelector({
   onAddUnit,
   onRemoveUnit,
   onUpdateRank,
+  encounter,
 }: UnitSelectorProps) {
   const { t } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
@@ -54,6 +60,10 @@ export function UnitSelector({
     return name.includes(query) || id.includes(query);
   });
 
+  // Get unit limit and restriction messages
+  const unitLimit = encounter ? getEncounterUnitLimit(encounter) : 13;
+  const restrictionMessages = getRestrictionMessages(encounter, partyUnits, t);
+
   const handleAddUnit = (unitId: number) => {
     const unit = getUnitById(unitId);
     if (!unit) return;
@@ -63,16 +73,23 @@ export function UnitSelector({
     const position = getNextAvailablePosition(preferredRow, occupiedPositions);
 
     if (position === null) {
-      return; // Grid full
+      toast.error("Grid is full");
+      return;
     }
 
     const maxRank = unit.statsConfig?.stats?.length || 1;
 
-    onAddUnit({
+    const result = onAddUnit({
       unitId,
       gridId: position,
       rank: maxRank,
     });
+
+    // Handle error if the hook returns a result object
+    if (result && !result.success && result.error) {
+      toast.error(result.error);
+      return;
+    }
 
     setIsOpen(false);
     setSearchQuery("");
@@ -116,8 +133,17 @@ export function UnitSelector({
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <h3 className="text-sm font-medium">Party Units</h3>
+        <Badge variant="outline" className="text-xs">
+          {partyUnits.length}/{unitLimit}
+        </Badge>
+        {restrictionMessages.length > 0 && (
+          <div className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
+            <AlertCircle className="h-3 w-3" />
+            <span>{restrictionMessages[0]}</span>
+          </div>
+        )}
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm" className="gap-1">

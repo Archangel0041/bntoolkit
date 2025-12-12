@@ -537,9 +537,10 @@ export function calculateAoeDamagePreviewsForEnemy(
       const hp = enemyStats?.hp || 0;
       const immunities = enemy?.statsConfig?.status_effect_immunities || [];
       
-      // Check range
+      // For AOE attacks, splash damage ignores range - only the reticle position matters
+      // The unit is hit because they're in the splash area, not because they're in range
       const range = calculateRange(attackerGridId, enemyUnit.grid_id!, false);
-      const inRange = range >= attackerAbility.minRange && range <= attackerAbility.maxRange;
+      const inRange = true; // AOE splash always hits if in affected area
       
       // Check line of fire blocking
       const blockCheck = checkLineOfFire(
@@ -643,9 +644,9 @@ export function calculateAoeDamagePreviewsForFriendly(
       const hp = stats?.hp || 0;
       const immunities = unit?.statsConfig?.status_effect_immunities || [];
       
-      // Check range
+      // For AOE attacks, splash damage ignores range - only the reticle position matters
       const range = calculateRange(attackerGridId, friendlyUnit.gridId, true);
-      const inRange = range >= attackerAbility.minRange && range <= attackerAbility.maxRange;
+      const inRange = true; // AOE splash always hits if in affected area
       
       // Check line of fire blocking
       const blockCheck = checkLineOfFire(
@@ -751,9 +752,9 @@ export function calculateFixedDamagePreviewsForEnemy(
       const hp = enemyStats?.hp || 0;
       const immunities = enemy?.statsConfig?.status_effect_immunities || [];
       
-      // Check range
+      // Fixed pattern attacks: splash damage ignores range
       const range = calculateRange(attackerGridId, enemyUnit.grid_id!, false);
-      const inRange = range >= attackerAbility.minRange && range <= attackerAbility.maxRange;
+      const inRange = true; // Fixed pattern splash always hits
       
       // Check line of fire blocking
       const blockCheck = checkLineOfFire(
@@ -854,9 +855,9 @@ export function calculateFixedDamagePreviewsForFriendly(
       const hp = stats?.hp || 0;
       const immunities = unit?.statsConfig?.status_effect_immunities || [];
       
-      // Check range
+      // Fixed pattern attacks: splash damage ignores range
       const range = calculateRange(attackerGridId, friendlyUnit.gridId, true);
-      const inRange = range >= attackerAbility.minRange && range <= attackerAbility.maxRange;
+      const inRange = true; // Fixed pattern splash always hits
       
       // Check line of fire blocking
       const blockCheck = checkLineOfFire(
