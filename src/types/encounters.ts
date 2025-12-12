@@ -27,6 +27,8 @@ export interface Encounter {
   units?: EncounterUnit[];
   waves?: EncounterWave[];
   enemy_ai_type?: number;
+  // Environmental status effect that applies to all units
+  status_effect?: number;
   [key: string]: unknown; // Allow additional properties
 }
 

@@ -213,6 +213,14 @@ function EncounterListSection({
     });
   }, [tierInfo]);
 
+  // Default to level 46-50 if available, otherwise first available
+  useMemo(() => {
+    if (levelRanges.length > 0 && !selectedLevel) {
+      const defaultLevel = levelRanges.find(r => r === "46-50") || levelRanges[levelRanges.length - 1];
+      setSelectedLevel(defaultLevel);
+    }
+  }, [levelRanges, selectedLevel]);
+
   // Get encounters grouped by tier for selected level, collapsing identical tiers
   const collapsedTierGroups = useMemo(() => {
     if (!tierInfo || !selectedLevel) return [];
@@ -254,15 +262,9 @@ function EncounterListSection({
       }
     }
     
-    return groups;
+    // Reverse order to show higher tiers first (Tier 6-10 before Tier 1-5)
+    return groups.reverse();
   }, [tierInfo, selectedLevel]);
-
-  // Auto-select first level range on load
-  useMemo(() => {
-    if (levelRanges.length > 0 && !selectedLevel) {
-      setSelectedLevel(levelRanges[0]);
-    }
-  }, [levelRanges, selectedLevel]);
 
   if (!tierInfo || tierInfo.length === 0) {
     return <p className="text-muted-foreground">No encounters available</p>;

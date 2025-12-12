@@ -17,10 +17,17 @@ import { getUnitById } from "@/lib/units";
 import { getUnitAbilities, calculateAoeDamagePreviewsForEnemy, calculateAoeDamagePreviewsForFriendly, calculateFixedDamagePreviewsForEnemy, calculateFixedDamagePreviewsForFriendly, calculateDamagePreviewsForEnemy, calculateDamagePreviewsForFriendly } from "@/lib/battleCalculations";
 import { getFixedAttackPositions } from "@/types/battleSimulator";
 import { getBlockingUnits, findFrontmostUnblockedPosition } from "@/lib/battleTargeting";
+import { getStatusEffect, getStatusEffectDisplayName, getStatusEffectColor, getStatusEffectIconUrl } from "@/lib/statusEffects";
 import { UnitImage } from "@/components/units/UnitImage";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { Flame } from "lucide-react";
 import type { SelectedUnit, AbilityInfo, DamagePreview } from "@/types/battleSimulator";
+import { DAMAGE_TYPE_MAP } from "@/types/battleSimulator";
+
+const getDamageTypeName = (type: number): string => {
+  return DAMAGE_TYPE_MAP[type] || `Type ${type}`;
+};
 
 const BattleSimulator = () => {
   const { encounterId } = useParams();
@@ -249,6 +256,35 @@ const BattleSimulator = () => {
             </Button>
           </div>
         )}
+
+        {/* Environmental Status Effect Warning */}
+        {encounter?.status_effect && (() => {
+          const envEffect = getStatusEffect(encounter.status_effect);
+          const effectName = getStatusEffectDisplayName(envEffect?.family || 0);
+          const effectColor = getStatusEffectColor(envEffect?.family || 0);
+          const damageMods = envEffect?.stun_damage_mods || {};
+          
+          return (
+            <div 
+              className="flex items-center gap-3 p-3 rounded-lg border"
+              style={{ borderColor: effectColor, backgroundColor: `${effectColor}20` }}
+            >
+              <Flame className="h-5 w-5" style={{ color: effectColor }} />
+              <div className="flex-1">
+                <span className="font-medium" style={{ color: effectColor }}>
+                  Environmental Effect: {effectName}
+                </span>
+                <div className="text-sm text-muted-foreground">
+                  {Object.entries(damageMods).map(([type, mult]) => (
+                    <span key={type} className="mr-3">
+                      {getDamageTypeName(parseInt(type))}: {Math.round((mult as number) * 100)}%
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Battle grids */}
         <div className="grid gap-4">
