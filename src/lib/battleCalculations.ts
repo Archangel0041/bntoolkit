@@ -2,11 +2,24 @@ import { getUnitById } from "@/lib/units";
 import { getAbilityById } from "@/lib/abilities";
 import { unitMatchesTargets } from "@/lib/tagHierarchy";
 import { getStatusEffect, getEffectDisplayNameTranslated, getEffectColor } from "@/lib/statusEffects";
-import { getBlockingUnits, checkLineOfFire, isTargetInRange, calculateRange } from "@/lib/battleTargeting";
+import { getBlockingUnits, checkLineOfFire, isTargetInRange, calculateRange, BlockingUnit } from "@/lib/battleTargeting";
+import { UnitBlockingLabels } from "@/data/gameEnums";
 import type { AbilityInfo, DamagePreview, DamageResult, PartyUnit, StatusEffectPreview, TargetArea } from "@/types/battleSimulator";
 import { DAMAGE_TYPE_MAP, getAffectedGridPositions, getFixedAttackPositions } from "@/types/battleSimulator";
 import type { EncounterUnit } from "@/types/encounters";
 import type { DamageMods, UnitStats } from "@/types/units";
+
+// Helper to get blocker info for damage preview
+function getBlockerInfo(blockedBy?: BlockingUnit): { blockedByUnitName?: string; blockedByBlockingLevel?: number } {
+  if (!blockedBy) return {};
+  const blockerUnit = getUnitById(blockedBy.unitId);
+  // Use the unit's name key or fallback to ID
+  const blockerName = blockerUnit?.identity?.name || `Unit ${blockedBy.unitId}`;
+  return {
+    blockedByUnitName: blockerName,
+    blockedByBlockingLevel: blockedBy.blocking,
+  };
+}
 
 // Calculate damage at rank: Damage = Base Damage * (1 + 2 * 0.01 * Power)
 export function calculateDamageAtRank(baseDamage: number, power: number): number {
@@ -105,10 +118,12 @@ function multiplyDamageResult(result: DamageResult, shots: number): DamageResult
 }
 
 // Calculate status effect previews for a target
+// damagePercentMod: Optional modifier for splash damage (100 = full, 50 = half chance)
 function calculateStatusEffectPreviews(
   statusEffects: Record<string, number>,
   abilityDamage: number,
-  targetImmunities: number[]
+  targetImmunities: number[],
+  damagePercentMod: number = 100
 ): StatusEffectPreview[] {
   const previews: StatusEffectPreview[] = [];
   
@@ -131,10 +146,13 @@ function calculateStatusEffectPreviews(
     
     const isStun = effect.stun_block_action === true || effect.stun_block_movement === true;
     
+    // Apply damage percent modifier to status effect chance (for splash damage)
+    const adjustedChance = Math.floor(chance * (damagePercentMod / 100));
+    
     previews.push({
       effectId,
       name,
-      chance,
+      chance: adjustedChance,
       duration: effect.duration,
       damageType: effect.dot_damage_type || null,
       dotDamage,
@@ -327,6 +345,8 @@ export function calculateDamagePreviewsForEnemy(
         immunities
       );
 
+      const blockerInfo = getBlockerInfo(blockCheck.blockedBy);
+
       return {
         targetGridId: enemyUnit.grid_id!,
         targetUnitId: enemyUnit.unit_id,
@@ -348,6 +368,7 @@ export function calculateDamagePreviewsForEnemy(
         range,
         isBlocked: blockCheck.isBlocked,
         blockedByUnitId: blockCheck.blockedBy?.unitId,
+        ...blockerInfo,
         blockReason: blockCheck.reason,
       };
     });
@@ -613,6 +634,209 @@ export function calculateAoeDamagePreviewsForFriendly(
         attackerAbility.statusEffects,
         avgDamage,
         immunities
+      );
+
+      return {
+        targetGridId: friendlyUnit.gridId,
+        targetUnitId: friendlyUnit.unitId,
+        minDamage: minResult,
+        maxDamage: maxResult,
+        totalShots,
+        minTotalDamage: multiplyDamageResult(minResult, totalShots),
+        maxTotalDamage: multiplyDamageResult(maxResult, totalShots),
+        dodgeChance,
+        critChance,
+        canTarget,
+        targetHasArmor: armorHp > 0,
+        targetArmorHp: armorHp,
+        targetHp: hp,
+        targetDefense: defense,
+        statusEffects,
+        damagePercent,
+        inRange,
+        range,
+        isBlocked: blockCheck.isBlocked,
+        blockedByUnitId: blockCheck.blockedBy?.unitId,
+        blockReason: blockCheck.reason,
+      };
+    });
+}
+
+// Calculate damage previews for fixed attack patterns
+export function calculateFixedDamagePreviewsForEnemy(
+  attackerAbility: AbilityInfo,
+  attackerGridId: number,
+  enemyUnits: EncounterUnit[],
+  fixedPositions: { gridId: number; damagePercent: number }[],
+  enemyRankOverrides: Record<number, number> = {}
+): DamagePreview[] {
+  const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
+  const blockingUnits = getBlockingUnits(enemyUnits, true);
+  
+  // Create a map of gridId -> damagePercent from fixed positions
+  const damagePercentMap = new Map<number, number>();
+  for (const pos of fixedPositions) {
+    damagePercentMap.set(pos.gridId, pos.damagePercent);
+  }
+  
+  return enemyUnits
+    .filter(u => u.grid_id !== undefined && damagePercentMap.has(u.grid_id))
+    .map(enemyUnit => {
+      const enemy = getUnitById(enemyUnit.unit_id);
+      const enemyRank = enemyRankOverrides[enemyUnit.grid_id!] || (enemy?.statsConfig?.stats?.length || 1);
+      const enemyStats = getUnitStatsAtRank(enemyUnit.unit_id, enemyRank);
+      const canTarget = canTargetUnit(enemyUnit.unit_id, attackerAbility.targets);
+      const defense = enemyStats?.defense || 0;
+      const dodgeChance = calculateDodgeChance(defense, attackerAbility.offense);
+      const critChance = calculateCritChance(attackerAbility.critPercent, attackerAbility.critBonuses, enemyUnit.unit_id);
+
+      const armorHp = enemyStats?.armor_hp || 0;
+      const hp = enemyStats?.hp || 0;
+      const immunities = enemy?.statsConfig?.status_effect_immunities || [];
+      
+      // Check range
+      const range = calculateRange(attackerGridId, enemyUnit.grid_id!, false);
+      const inRange = range >= attackerAbility.minRange && range <= attackerAbility.maxRange;
+      
+      // Check line of fire blocking
+      const blockCheck = checkLineOfFire(
+        attackerGridId,
+        enemyUnit.grid_id!,
+        attackerAbility.lineOfFire,
+        false,
+        blockingUnits
+      );
+      
+      // Apply damage percent modifier from fixed position
+      const damagePercent = damagePercentMap.get(enemyUnit.grid_id!) || 100;
+      const adjustedMinDamage = Math.floor(attackerAbility.minDamage * (damagePercent / 100));
+      const adjustedMaxDamage = Math.floor(attackerAbility.maxDamage * (damagePercent / 100));
+      
+      const minResult = calculateDamageWithArmor(
+        adjustedMinDamage,
+        armorHp,
+        enemyStats?.armor_damage_mods,
+        enemyStats?.damage_mods,
+        attackerAbility.damageType,
+        attackerAbility.armorPiercing
+      );
+      
+      const maxResult = calculateDamageWithArmor(
+        adjustedMaxDamage,
+        armorHp,
+        enemyStats?.armor_damage_mods,
+        enemyStats?.damage_mods,
+        attackerAbility.damageType,
+        attackerAbility.armorPiercing
+      );
+      
+      // Calculate status effect previews with adjusted chance based on damagePercent
+      const avgDamage = Math.floor((adjustedMinDamage + adjustedMaxDamage) / 2);
+      const statusEffects = calculateStatusEffectPreviews(
+        attackerAbility.statusEffects,
+        avgDamage,
+        immunities,
+        damagePercent // Pass damage percent to scale status effect chances
+      );
+
+      return {
+        targetGridId: enemyUnit.grid_id!,
+        targetUnitId: enemyUnit.unit_id,
+        minDamage: minResult,
+        maxDamage: maxResult,
+        totalShots,
+        minTotalDamage: multiplyDamageResult(minResult, totalShots),
+        maxTotalDamage: multiplyDamageResult(maxResult, totalShots),
+        dodgeChance,
+        critChance,
+        canTarget,
+        targetHasArmor: armorHp > 0,
+        targetArmorHp: armorHp,
+        targetHp: hp,
+        targetDefense: defense,
+        statusEffects,
+        damagePercent,
+        inRange,
+        range,
+        isBlocked: blockCheck.isBlocked,
+        blockedByUnitId: blockCheck.blockedBy?.unitId,
+        blockReason: blockCheck.reason,
+      };
+    });
+}
+
+export function calculateFixedDamagePreviewsForFriendly(
+  attackerAbility: AbilityInfo,
+  attackerGridId: number,
+  friendlyUnits: PartyUnit[],
+  fixedPositions: { gridId: number; damagePercent: number }[]
+): DamagePreview[] {
+  const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
+  const blockingUnits = getBlockingUnits(friendlyUnits, false);
+  
+  // Create a map of gridId -> damagePercent from fixed positions
+  const damagePercentMap = new Map<number, number>();
+  for (const pos of fixedPositions) {
+    damagePercentMap.set(pos.gridId, pos.damagePercent);
+  }
+  
+  return friendlyUnits
+    .filter(u => damagePercentMap.has(u.gridId))
+    .map(friendlyUnit => {
+      const unit = getUnitById(friendlyUnit.unitId);
+      const stats = getUnitStatsAtRank(friendlyUnit.unitId, friendlyUnit.rank);
+      const canTarget = canTargetUnit(friendlyUnit.unitId, attackerAbility.targets);
+      const defense = stats?.defense || 0;
+      const dodgeChance = calculateDodgeChance(defense, attackerAbility.offense);
+      const critChance = calculateCritChance(attackerAbility.critPercent, attackerAbility.critBonuses, friendlyUnit.unitId);
+
+      const armorHp = stats?.armor_hp || 0;
+      const hp = stats?.hp || 0;
+      const immunities = unit?.statsConfig?.status_effect_immunities || [];
+      
+      // Check range
+      const range = calculateRange(attackerGridId, friendlyUnit.gridId, true);
+      const inRange = range >= attackerAbility.minRange && range <= attackerAbility.maxRange;
+      
+      // Check line of fire blocking
+      const blockCheck = checkLineOfFire(
+        attackerGridId,
+        friendlyUnit.gridId,
+        attackerAbility.lineOfFire,
+        true,
+        blockingUnits
+      );
+      
+      // Apply damage percent modifier
+      const damagePercent = damagePercentMap.get(friendlyUnit.gridId) || 100;
+      const adjustedMinDamage = Math.floor(attackerAbility.minDamage * (damagePercent / 100));
+      const adjustedMaxDamage = Math.floor(attackerAbility.maxDamage * (damagePercent / 100));
+      
+      const minResult = calculateDamageWithArmor(
+        adjustedMinDamage,
+        armorHp,
+        stats?.armor_damage_mods,
+        stats?.damage_mods,
+        attackerAbility.damageType,
+        attackerAbility.armorPiercing
+      );
+      
+      const maxResult = calculateDamageWithArmor(
+        adjustedMaxDamage,
+        armorHp,
+        stats?.armor_damage_mods,
+        stats?.damage_mods,
+        attackerAbility.damageType,
+        attackerAbility.armorPiercing
+      );
+      
+      // Calculate status effect previews with adjusted chance
+      const avgDamage = Math.floor((adjustedMinDamage + adjustedMaxDamage) / 2);
+      const statusEffects = calculateStatusEffectPreviews(
+        attackerAbility.statusEffects,
+        avgDamage,
+        immunities,
+        damagePercent
       );
 
       return {

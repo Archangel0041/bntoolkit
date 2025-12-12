@@ -498,13 +498,39 @@ export function BattleGrid({
         
         {/* Cannot target overlay - now includes out-of-range and blocked */}
         {damagePreview && (!damagePreview.canTarget || !damagePreview.inRange || damagePreview.isBlocked) && (
-          <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center">
-            <span className="text-muted-foreground text-xs">
-              {!damagePreview.canTarget && "✕"}
-              {damagePreview.canTarget && !damagePreview.inRange && "Out of Range"}
-              {damagePreview.canTarget && damagePreview.inRange && damagePreview.isBlocked && "Blocked"}
-            </span>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center cursor-help">
+                <span className="text-muted-foreground text-xs">
+                  {!damagePreview.canTarget && "✕"}
+                  {damagePreview.canTarget && !damagePreview.inRange && "Out of Range"}
+                  {damagePreview.canTarget && damagePreview.inRange && damagePreview.isBlocked && "Blocked"}
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs p-2">
+              <div className="text-xs space-y-1">
+                <p className="font-semibold">{unitName}</p>
+                {!damagePreview.canTarget && <p className="text-muted-foreground">Cannot target this unit type</p>}
+                {damagePreview.canTarget && !damagePreview.inRange && (
+                  <p className="text-muted-foreground">Target is out of range (Range: {damagePreview.range})</p>
+                )}
+                {damagePreview.canTarget && damagePreview.inRange && damagePreview.isBlocked && (
+                  <div className="space-y-0.5">
+                    <p className="text-muted-foreground">Blocked by:</p>
+                    <p className="text-amber-500">
+                      {t(damagePreview.blockedByUnitName || "Unknown")} 
+                      <span className="text-muted-foreground ml-1">
+                        ({damagePreview.blockedByBlockingLevel !== undefined 
+                          ? ["None", "Partial", "Full", "God"][damagePreview.blockedByBlockingLevel] 
+                          : "?"} blocking)
+                      </span>
+                    </p>
+                  </div>
+                )}
+              </div>
+            </TooltipContent>
+          </Tooltip>
         )}
       </div>
     );
