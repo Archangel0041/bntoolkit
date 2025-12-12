@@ -16,7 +16,7 @@ import { getEncounterById, getEncounterWaves } from "@/lib/encounters";
 import { getUnitById } from "@/lib/units";
 import { getUnitAbilities, calculateAoeDamagePreviewsForEnemy, calculateAoeDamagePreviewsForFriendly, calculateFixedDamagePreviewsForEnemy, calculateFixedDamagePreviewsForFriendly, calculateDamagePreviewsForEnemy, calculateDamagePreviewsForFriendly } from "@/lib/battleCalculations";
 import { getFixedAttackPositions } from "@/types/battleSimulator";
-import { getBlockingUnits, findFrontmostUnblockedPosition } from "@/lib/battleTargeting";
+import { getBlockingUnits, findFrontmostUnblockedPosition, getTargetingInfo } from "@/lib/battleTargeting";
 import { getStatusEffect, getStatusEffectDisplayName, getStatusEffectColor, getStatusEffectIconUrl } from "@/lib/statusEffects";
 import { UnitImage } from "@/components/units/UnitImage";
 import { cn } from "@/lib/utils";
@@ -144,6 +144,33 @@ const BattleSimulator = () => {
     const envEffect = getStatusEffect(encounter.environmental_status_effect);
     return envEffect?.stun_damage_mods;
   }, [encounter?.environmental_status_effect]);
+
+  // Calculate valid reticle positions based on range and line of fire
+  const validReticlePositions = useMemo(() => {
+    if (!selectedUnit || !selectedAbility || selectedAbility.isSingleTarget || selectedAbility.isFixed) {
+      return undefined;
+    }
+    
+    const targetUnits = selectedUnit.isEnemy 
+      ? getBlockingUnits(tempFormation.units, false)
+      : getBlockingUnits(currentWaveUnits, true);
+    
+    const targetingInfo = getTargetingInfo(
+      selectedUnit.gridId,
+      selectedAbility.minRange,
+      selectedAbility.maxRange,
+      selectedAbility.lineOfFire,
+      selectedUnit.isEnemy,
+      targetUnits
+    );
+    
+    // Return set of valid grid IDs (in range and not blocked)
+    return new Set(
+      targetingInfo
+        .filter(t => t.inRange && !t.isBlocked)
+        .map(t => t.gridId)
+    );
+  }, [selectedUnit, selectedAbility, tempFormation.units, currentWaveUnits]);
 
   // Calculate damage previews
   // - Single target: show all valid targets with damage (blocking applies)
@@ -318,10 +345,12 @@ const BattleSimulator = () => {
             damagePreviews={!selectedUnit?.isEnemy ? damagePreviews : []}
             rankOverrides={enemyRankOverrides}
             targetArea={selectedAbility?.targetArea}
+            damageArea={selectedAbility?.damageArea}
             reticleGridId={enemyReticleGridId}
             onReticleMove={handleEnemyReticleMove}
             showReticle={!!selectedAbility && !selectedAbility.isFixed && !selectedAbility.isSingleTarget && !selectedUnit?.isEnemy}
             fixedAttackPositions={!selectedUnit?.isEnemy ? fixedAttackPositions.enemyGrid : fixedAttackPositions.friendlyGrid}
+            validReticlePositions={!selectedUnit?.isEnemy ? validReticlePositions : undefined}
           />
 
           {/* Divider with selected unit info */}
@@ -383,10 +412,12 @@ const BattleSimulator = () => {
             onRemoveUnit={tempFormation.removeUnit}
             onAddUnit={tempFormation.addUnit}
             targetArea={selectedAbility?.targetArea}
+            damageArea={selectedAbility?.damageArea}
             reticleGridId={friendlyReticleGridId}
             onReticleMove={handleFriendlyReticleMove}
             showReticle={!!selectedAbility && !selectedAbility.isFixed && !selectedAbility.isSingleTarget && selectedUnit?.isEnemy}
             fixedAttackPositions={selectedUnit?.isEnemy ? fixedAttackPositions.friendlyGrid : []}
+            validReticlePositions={selectedUnit?.isEnemy ? validReticlePositions : undefined}
           />
         </div>
 

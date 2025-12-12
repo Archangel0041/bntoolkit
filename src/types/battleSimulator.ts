@@ -35,6 +35,12 @@ export interface TargetAreaPosition {
   order?: number;
 }
 
+export interface DamageAreaPosition {
+  x: number;
+  y: number;
+  damagePercent: number;
+}
+
 export interface TargetArea {
   targetType: number; // 1 = single target/fixed, 2 = AOE pattern (movable)
   data: TargetAreaPosition[];
@@ -81,6 +87,7 @@ export interface AbilityInfo {
   suppressionBonus: number;
   statusEffects: Record<string, number>; // effect_id -> chance %
   targetArea?: TargetArea; // AOE targeting data
+  damageArea?: DamageAreaPosition[]; // Splash damage pattern around each impact point
   isFixed: boolean; // True if attack pattern is fixed (can't be aimed)
   isSingleTarget: boolean; // True if ability is single-target (no AOE pattern)
 }
@@ -173,11 +180,13 @@ export const COORDS_TO_GRID_ID: Record<string, number> = {
 
 // Get grid positions affected by an AOE ability centered on a target position
 // Coordinate system from data: x: -1=left, 0=same, 1=right; y: -1=down(toward front), 0=same, 1=up(toward back)
+// Now supports overlapping splash damage from damageArea
 export function getAffectedGridPositions(
   targetGridId: number,
   targetArea: TargetArea | undefined,
-  isTargetOnEnemyGrid: boolean
-): { gridId: number; damagePercent: number }[] {
+  isTargetOnEnemyGrid: boolean,
+  damageArea?: DamageAreaPosition[]
+): { gridId: number; damagePercent: number; hitCount?: number }[] {
   // If no target area or single target type with no data, just return the target
   if (!targetArea || targetArea.data.length === 0) {
     return [{ gridId: targetGridId, damagePercent: 100 }];
@@ -186,36 +195,71 @@ export function getAffectedGridPositions(
   const targetCoords = GRID_ID_TO_COORDS[targetGridId];
   if (!targetCoords) return [{ gridId: targetGridId, damagePercent: 100 }];
 
-  const affected: { gridId: number; damagePercent: number }[] = [];
-
+  // First, get all impact points from targetArea
+  const impactPoints: { x: number; y: number; damagePercent: number }[] = [];
+  
   for (const pos of targetArea.data) {
-    // Data coordinates: x: -1=left, 0=same, 1=right
-    // Data coordinates: y: -1=down(toward row 0/front), 0=same, 1=up(toward row 2/back)
-    // Grid y: 0=front (row 1), 1=middle (row 2), 2=back (row 3)
-    
-    // When targeting enemy grid from friendly side:
-    // - y=1 in data means "up" which is toward enemy back row (higher y in grid coords)
-    // - y=-1 in data means "down" which is toward enemy front row (lower y in grid coords)
-    // The grid y increases toward the back, so we add pos.y directly
-    
     const newX = targetCoords.x + pos.x;
-    const newY = targetCoords.y + pos.y; // y=1 moves toward back (higher y), y=-1 moves toward front (lower y)
-    
-    // Check if this is a valid grid position
-    const coordKey = `${newX},${newY}`;
-    const gridId = COORDS_TO_GRID_ID[coordKey];
-    
-    if (gridId !== undefined) {
-      affected.push({
-        gridId,
-        damagePercent: pos.damagePercent || 100,
-      });
+    const newY = targetCoords.y + pos.y;
+    impactPoints.push({ x: newX, y: newY, damagePercent: pos.damagePercent || 100 });
+  }
+
+  // If there's no damageArea (no splash), just return the impact points as before
+  if (!damageArea || damageArea.length === 0) {
+    const affected: { gridId: number; damagePercent: number }[] = [];
+    for (const impact of impactPoints) {
+      const coordKey = `${impact.x},${impact.y}`;
+      const gridId = COORDS_TO_GRID_ID[coordKey];
+      if (gridId !== undefined) {
+        affected.push({ gridId, damagePercent: impact.damagePercent });
+      }
+    }
+    if (affected.length === 0) {
+      affected.push({ gridId: targetGridId, damagePercent: 100 });
+    }
+    return affected;
+  }
+
+  // With damageArea, calculate overlapping splash damage
+  // Key: gridId, Value: { totalDamagePercent, hitCount }
+  const damageMap = new Map<number, { totalDamagePercent: number; hitCount: number }>();
+
+  for (const impact of impactPoints) {
+    // For each impact point, apply the damageArea pattern
+    for (const splash of damageArea) {
+      const splashX = impact.x + splash.x;
+      const splashY = impact.y + splash.y;
+      const coordKey = `${splashX},${splashY}`;
+      const gridId = COORDS_TO_GRID_ID[coordKey];
+      
+      if (gridId !== undefined) {
+        // Scale splash damage by the impact point's damage percent
+        const effectiveDamage = Math.floor((splash.damagePercent * impact.damagePercent) / 100);
+        
+        const existing = damageMap.get(gridId);
+        if (existing) {
+          // Accumulate damage from multiple hits
+          existing.totalDamagePercent += effectiveDamage;
+          existing.hitCount += 1;
+        } else {
+          damageMap.set(gridId, { totalDamagePercent: effectiveDamage, hitCount: 1 });
+        }
+      }
     }
   }
 
-  // If no positions matched, at least include the target
+  // Convert map to array
+  const affected: { gridId: number; damagePercent: number; hitCount: number }[] = [];
+  for (const [gridId, data] of damageMap) {
+    affected.push({
+      gridId,
+      damagePercent: data.totalDamagePercent,
+      hitCount: data.hitCount,
+    });
+  }
+
   if (affected.length === 0) {
-    affected.push({ gridId: targetGridId, damagePercent: 100 });
+    affected.push({ gridId: targetGridId, damagePercent: 100, hitCount: 1 });
   }
 
   return affected;
