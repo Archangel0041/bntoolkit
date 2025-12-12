@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import UnitDetail from "./pages/UnitDetail";
 import Compare from "./pages/Compare";
 import BattleSimulator from "./pages/BattleSimulator";
+import UploadImages from "./pages/UploadImages";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
                 <Route path="/unit/:id" element={<UnitDetail />} />
                 <Route path="/compare/:id1/:id2" element={<Compare />} />
                 <Route path="/battle/:encounterId" element={<BattleSimulator />} />
+                <Route path="/upload" element={<UploadImages />} />
                 
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

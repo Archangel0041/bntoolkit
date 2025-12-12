@@ -20,9 +20,10 @@ import {
   listEncounterIcons,
   listMissionIcons
 } from "@/lib/resourceImages";
-import { Upload, CheckCircle, XCircle, FolderOpen, Users, Swords, Shield, Zap, Coins, Gift, Image, Map, Target } from "lucide-react";
+import { Upload, CheckCircle, XCircle, FolderOpen, Users, Swords, Shield, Zap, Coins, Gift, Image, Map, Target, FileJson } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
+import { Separator } from "@/components/ui/separator";
 
 type UploadType = "units" | "abilities" | "damage" | "status" | "resources" | "eventRewards" | "menuBackgrounds" | "encounters" | "missions";
 
@@ -280,6 +281,19 @@ export default function UploadImages() {
           </TabsContent>
         </Tabs>
 
+        <Separator className="my-8" />
+
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-2xl font-bold">JSON Config Files</h2>
+            <p className="text-muted-foreground">
+              Upload JSON configuration files to update game data. Files will be downloaded for manual placement in src/data/.
+            </p>
+          </div>
+          
+          <JsonConfigSection />
+        </div>
+
         <Card>
           <CardHeader>
             <CardTitle>Naming Conventions</CardTitle>
@@ -315,6 +329,136 @@ export default function UploadImages() {
         </Card>
       </main>
     </div>
+  );
+}
+
+const JSON_CONFIG_FILES = [
+  { name: "battle_units.json", description: "Unit definitions and stats" },
+  { name: "battle_abilities.json", description: "Ability definitions" },
+  { name: "battle_encounters.json", description: "Encounter definitions" },
+  { name: "boss_strike_config.json", description: "Boss strike configuration" },
+  { name: "battle_config.json", description: "Battle configuration" },
+  { name: "status_effects.json", description: "Status effect definitions" },
+  { name: "status_effect_families.json", description: "Status effect families" },
+  { name: "GameText_en.json", description: "English localization" },
+  { name: "GameText_Shared_Data.json", description: "Shared text keys" },
+];
+
+function JsonConfigSection() {
+  const [jsonFiles, setJsonFiles] = useState<Record<string, { content: string; parsed: boolean }>>({});
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleJsonSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newFiles: Record<string, { content: string; parsed: boolean }> = {};
+    
+    for (const file of Array.from(files)) {
+      try {
+        const content = await file.text();
+        JSON.parse(content); // Validate JSON
+        newFiles[file.name] = { content, parsed: true };
+      } catch {
+        newFiles[file.name] = { content: "", parsed: false };
+        toast({
+          title: "Invalid JSON",
+          description: `${file.name} is not valid JSON`,
+          variant: "destructive",
+        });
+      }
+    }
+
+    setJsonFiles(prev => ({ ...prev, ...newFiles }));
+    
+    const validCount = Object.values(newFiles).filter(f => f.parsed).length;
+    if (validCount > 0) {
+      toast({
+        title: "Files Loaded",
+        description: `${validCount} JSON file(s) loaded successfully. Copy content to src/data/ folder.`,
+      });
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const downloadFile = (filename: string, content: string) => {
+    const blob = new Blob([content], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FileJson className="h-5 w-5" />
+          JSON Config Upload
+        </CardTitle>
+        <CardDescription>
+          Upload JSON files to validate and preview. Download validated files to place in <code className="bg-muted px-1 rounded">src/data/</code>.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json"
+          multiple
+          onChange={handleJsonSelect}
+          className="hidden"
+        />
+        
+        <Button onClick={() => fileInputRef.current?.click()} className="gap-2">
+          <Upload className="h-4 w-4" />
+          Select JSON Files
+        </Button>
+
+        {Object.keys(jsonFiles).length > 0 && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">Loaded Files:</p>
+            <div className="grid gap-2">
+              {Object.entries(jsonFiles).map(([filename, { parsed, content }]) => (
+                <div key={filename} className="flex items-center justify-between p-2 rounded-lg bg-muted/50">
+                  <div className="flex items-center gap-2">
+                    {parsed ? (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-destructive" />
+                    )}
+                    <span className="text-sm font-mono">{filename}</span>
+                  </div>
+                  {parsed && (
+                    <Button size="sm" variant="outline" onClick={() => downloadFile(filename, content)}>
+                      Download
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="pt-4 border-t">
+          <p className="text-sm font-medium mb-2">Expected Config Files:</p>
+          <div className="grid md:grid-cols-3 gap-2 text-sm text-muted-foreground">
+            {JSON_CONFIG_FILES.map(({ name, description }) => (
+              <div key={name} className="flex flex-col">
+                <code className="text-xs bg-muted px-1 rounded">{name}</code>
+                <span className="text-xs">{description}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
