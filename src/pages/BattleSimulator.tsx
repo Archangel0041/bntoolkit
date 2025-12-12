@@ -25,8 +25,17 @@ import { Flame } from "lucide-react";
 import type { SelectedUnit, AbilityInfo, DamagePreview } from "@/types/battleSimulator";
 import { DAMAGE_TYPE_MAP } from "@/types/battleSimulator";
 
+const DAMAGE_TYPE_NAMES: Record<number, string> = {
+  1: "Piercing",
+  2: "Explosive", 
+  3: "Fire",
+  4: "Cold",
+  5: "Crushing",
+  6: "Poison",
+};
+
 const getDamageTypeName = (type: number): string => {
-  return DAMAGE_TYPE_MAP[type] || `Type ${type}`;
+  return DAMAGE_TYPE_NAMES[type] || `Type ${type}`;
 };
 
 const BattleSimulator = () => {
@@ -258,8 +267,8 @@ const BattleSimulator = () => {
         )}
 
         {/* Environmental Status Effect Warning */}
-        {encounter?.status_effect && (() => {
-          const envEffect = getStatusEffect(encounter.status_effect);
+        {encounter?.environmental_status_effect && (() => {
+          const envEffect = getStatusEffect(encounter.environmental_status_effect);
           const effectName = getStatusEffectDisplayName(envEffect?.family || 0);
           const effectColor = getStatusEffectColor(envEffect?.family || 0);
           const damageMods = envEffect?.stun_damage_mods || {};

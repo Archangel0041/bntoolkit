@@ -172,9 +172,11 @@ export function BattleGrid({
   };
 
   const handleDragOver = (e: React.DragEvent, gridId: number) => {
-    // Handle reticle drag over
-    if (showReticle && e.dataTransfer.types.includes("application/x-reticle")) {
-      handleReticleDragOver(e, gridId);
+    // Handle reticle drag over - always allow if showReticle is true
+    if (showReticle) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      setDragOverGridId(gridId);
       return;
     }
     if (isEnemy) return;
@@ -187,15 +189,17 @@ export function BattleGrid({
   };
 
   const handleDrop = (e: React.DragEvent, targetGridId: number) => {
-    // Handle reticle drop first
-    if (showReticle && handleReticleDrop(e, targetGridId)) {
+    e.preventDefault();
+    
+    // Handle reticle drop when showReticle is active
+    if (showReticle && onReticleMove) {
+      onReticleMove(targetGridId);
+      setIsDraggingReticle(false);
+      setDragOverGridId(null);
       return;
     }
     
     if (isEnemy) return;
-    e.preventDefault();
-    if (isEnemy) return;
-    e.preventDefault();
     
     // Check if it's a unit being dragged from the party selector
     const selectorData = e.dataTransfer.getData("application/x-selector-unit");
