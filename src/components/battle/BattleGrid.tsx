@@ -261,10 +261,18 @@ export function BattleGrid({
     };
     
     if (!encounterUnit) {
+      const handleEmptySlotClick = () => {
+        // Allow clicking empty slots to move reticle
+        if (showReticle && onReticleMove) {
+          onReticleMove(gridId);
+        }
+      };
+      
       return (
         <div
           key={gridId}
           draggable={isReticleCenter}
+          onClick={handleEmptySlotClick}
           onDragStart={(e) => isReticleCenter && handleReticleDragStart(e, gridId)}
           onDragOver={(e) => handleDragOver(e, gridId)}
           onDragLeave={handleDragLeave}
@@ -273,6 +281,7 @@ export function BattleGrid({
           className={cn(
             slotSize,
             "border border-dashed border-muted-foreground/20 rounded-md transition-all flex flex-col items-center justify-center relative",
+            showReticle && "cursor-pointer hover:bg-yellow-500/10",
             isDragOver && showReticle && "border-yellow-400 bg-yellow-500/20 border-solid",
             isDragOver && !showReticle && "border-primary bg-primary/20 border-solid",
             // Movable reticle highlighting
@@ -324,6 +333,11 @@ export function BattleGrid({
     const isSelected = selectedUnit?.gridId === unitGridId && selectedUnit?.isEnemy === isEnemy;
 
     const handleClick = () => {
+      // If showing reticle, clicking on a slot moves the reticle there
+      if (showReticle && onReticleMove) {
+        onReticleMove(unitGridId);
+        return;
+      }
       // If this is the reticle center, don't handle unit click
       if (isReticleCenter) return;
       onUnitClick({

@@ -24,7 +24,13 @@ interface StatusEffect {
   dot_ap_percent?: number;
   stun_block_action?: boolean;
   stun_block_movement?: boolean;
+  stun_damage_break?: boolean;
+  // Environmental effect damage modifiers (like firemod)
+  stun_damage_mods?: Record<string, number>;
+  stun_armor_damage_mods?: Record<string, number>;
 }
+
+export type { StatusEffect, StatusEffectFamily };
 
 const families = statusEffectFamiliesData as Record<string, StatusEffectFamily>;
 const effects = statusEffectsData as Record<string, StatusEffect>;
