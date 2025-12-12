@@ -27,11 +27,15 @@ import { DAMAGE_TYPE_MAP } from "@/types/battleSimulator";
 
 const DAMAGE_TYPE_NAMES: Record<number, string> = {
   1: "Piercing",
-  2: "Explosive", 
-  3: "Fire",
-  4: "Cold",
-  5: "Crushing",
-  6: "Poison",
+  2: "Cold",
+  3: "Crushing",
+  4: "Explosive",
+  5: "Fire",
+  6: "Torpedo",
+  7: "Depth Charge",
+  8: "Melee",
+  9: "Projectile",
+  10: "Shell",
 };
 
 const getDamageTypeName = (type: number): string => {
