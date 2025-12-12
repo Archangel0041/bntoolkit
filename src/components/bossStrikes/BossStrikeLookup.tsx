@@ -71,12 +71,12 @@ export function BossStrikeLookup() {
     setIsGridOpen(false);
   };
 
-  const getBackgroundImage = (id: string): string | undefined => {
-    return getBossStrikeBackgroundById(id) || undefined;
+  const getBackgroundImage = (id: string, archived: boolean): string | undefined => {
+    return getBossStrikeBackgroundById(id, archived) || undefined;
   };
 
-  const getDisplayName = (encounterName: string | undefined, id: string): string => {
-    const mappedName = getBossStrikeNameById(id);
+  const getDisplayName = (encounterName: string | undefined, id: string, archived: boolean): string => {
+    const mappedName = getBossStrikeNameById(id, archived);
     if (mappedName) return mappedName;
     
     if (encounterName) {
@@ -91,8 +91,8 @@ export function BossStrikeLookup() {
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {bossStrikes.map(({ id, data, encounterName, archived }) => {
         const isSelected = selectedBossStrikeId === id && selectedIsArchived === archived;
-        const displayName = getDisplayName(encounterName, id);
-        const backgroundUrl = getBackgroundImage(id);
+        const displayName = getDisplayName(encounterName, id, archived);
+        const backgroundUrl = getBackgroundImage(id, archived);
         
         return (
           <Card 

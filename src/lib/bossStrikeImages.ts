@@ -1,5 +1,15 @@
-// ID-based mappings for boss strike backgrounds
-const idToBackground: Record<string, string> = {
+// ID-based mappings for CURRENT boss strike backgrounds
+const currentIdToBackground: Record<string, string> = {
+  "1": "/boss-strike-images/boss_animal_raider_1136x640.png",
+};
+
+// ID-based mappings for CURRENT boss strike names
+const currentIdToName: Record<string, string> = {
+  "1": "Yuzul the Raptor Trainer",
+};
+
+// ID-based mappings for ARCHIVED boss strike backgrounds
+const archivedIdToBackground: Record<string, string> = {
   "1": "/boss-strike-images/boss_strike_mad_scientist_1136x640.png",
   "2": "/boss-strike-images/boss_strike_mad_scientist_1136x640.png",
   "3": "/boss-strike-images/navy_boss_strike1136x640.png",
@@ -31,8 +41,8 @@ const idToBackground: Record<string, string> = {
   "22": "/boss-strike-images/raider_bosses_boss_strike1136x640.png",
 };
 
-// ID-based mappings for boss strike names
-const idToName: Record<string, string> = {
+// ID-based mappings for ARCHIVED boss strike names
+const archivedIdToName: Record<string, string> = {
   "1": "Dr. Vogel",
   "2": "Dr. Vogel",
   "3": "Sovereign Forces",
@@ -64,12 +74,16 @@ const idToName: Record<string, string> = {
   "22": "Raiders",
 };
 
-export function getBossStrikeBackgroundById(id: string | number): string | null {
-  return idToBackground[String(id)] || null;
+export function getBossStrikeBackgroundById(id: string | number, archived = false): string | null {
+  const map = archived ? archivedIdToBackground : currentIdToBackground;
+  // Fall back to archived if not found in current
+  return map[String(id)] || archivedIdToBackground[String(id)] || null;
 }
 
-export function getBossStrikeNameById(id: string | number): string | null {
-  return idToName[String(id)] || null;
+export function getBossStrikeNameById(id: string | number, archived = false): string | null {
+  const map = archived ? archivedIdToName : currentIdToName;
+  // Fall back to archived if not found in current
+  return map[String(id)] || archivedIdToName[String(id)] || null;
 }
 
 // Legacy functions kept for compatibility
