@@ -92,7 +92,8 @@ const BattleSimulator = () => {
     return selectedUnitAbilities.find(a => a.abilityId === selectedAbilityId) || null;
   }, [selectedAbilityId, selectedUnitAbilities]);
 
-  // Update default reticle position when ability changes (to frontmost unblocked target)
+  // Update default reticle position ONLY when ability or selected unit changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!selectedAbility || !selectedUnit || selectedAbility.isSingleTarget || selectedAbility.isFixed) return;
     
@@ -116,7 +117,7 @@ const BattleSimulator = () => {
         setEnemyReticleGridId(frontmostPosition);
       }
     }
-  }, [selectedAbility, selectedUnit, currentWaveUnits, tempFormation.units]);
+  }, [selectedAbility?.abilityId, selectedUnit?.gridId, selectedUnit?.isEnemy]);
 
   // Calculate fixed attack positions based on attacker's grid position
   const fixedAttackPositions = useMemo(() => {
