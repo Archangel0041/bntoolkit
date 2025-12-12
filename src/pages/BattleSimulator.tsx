@@ -138,6 +138,13 @@ const BattleSimulator = () => {
     return { enemyGrid, friendlyGrid };
   }, [selectedUnit, selectedAbility]);
 
+  // Get environmental damage modifiers from encounter status effect
+  const environmentalDamageMods = useMemo(() => {
+    if (!encounter?.environmental_status_effect) return undefined;
+    const envEffect = getStatusEffect(encounter.environmental_status_effect);
+    return envEffect?.stun_damage_mods;
+  }, [encounter?.environmental_status_effect]);
+
   // Calculate damage previews
   // - Single target: show all valid targets with damage (blocking applies)
   // - Fixed pattern: show damage for all units in pattern
@@ -149,24 +156,24 @@ const BattleSimulator = () => {
       // Enemy attacking friendly units
       if (selectedAbility.isSingleTarget) {
         // Single target: calculate for ALL friendly units (blocking will filter display)
-        return calculateDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units);
+        return calculateDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units, environmentalDamageMods);
       }
       if (selectedAbility.isFixed && fixedAttackPositions.friendlyGrid.length > 0) {
-        return calculateFixedDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units, fixedAttackPositions.friendlyGrid);
+        return calculateFixedDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units, fixedAttackPositions.friendlyGrid, environmentalDamageMods);
       }
-      return calculateAoeDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units, friendlyReticleGridId);
+      return calculateAoeDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units, friendlyReticleGridId, environmentalDamageMods);
     } else {
       // Friendly attacking enemy units
       if (selectedAbility.isSingleTarget) {
         // Single target: calculate for ALL enemy units (blocking will filter display)
-        return calculateDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, enemyRankOverrides);
+        return calculateDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, enemyRankOverrides, environmentalDamageMods);
       }
       if (selectedAbility.isFixed && fixedAttackPositions.enemyGrid.length > 0) {
-        return calculateFixedDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, fixedAttackPositions.enemyGrid, enemyRankOverrides);
+        return calculateFixedDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, fixedAttackPositions.enemyGrid, enemyRankOverrides, environmentalDamageMods);
       }
-      return calculateAoeDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, enemyReticleGridId, enemyRankOverrides);
+      return calculateAoeDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, enemyReticleGridId, enemyRankOverrides, environmentalDamageMods);
     }
-  }, [selectedUnit, selectedAbility, tempFormation.units, currentWaveUnits, enemyRankOverrides, enemyReticleGridId, friendlyReticleGridId, fixedAttackPositions]);
+  }, [selectedUnit, selectedAbility, tempFormation.units, currentWaveUnits, enemyRankOverrides, enemyReticleGridId, friendlyReticleGridId, fixedAttackPositions, environmentalDamageMods]);
 
   // Handle moving the reticle on enemy grid (only for movable AOE reticles)
   const handleEnemyReticleMove = (gridId: number) => {
