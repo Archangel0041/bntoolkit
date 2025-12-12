@@ -365,11 +365,16 @@ export function isInRange(
   return distance >= minRange && distance <= maxRange;
 }
 
-// Damage type IDs to property names mapping
+// Damage type IDs to property names mapping (matches DamageType enum)
 export const DAMAGE_TYPE_MAP: Record<number, keyof DamageMods> = {
   1: "piercing",
-  2: "explosive",
-  3: "fire",
-  4: "cold",
-  5: "crushing",
+  2: "cold",
+  3: "crushing",
+  4: "explosive",
+  5: "fire",
+  6: "torpedo",
+  7: "depth_charge",
+  8: "melee",
+  9: "projectile",
+  10: "shell",
 } as const;

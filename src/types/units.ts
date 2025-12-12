@@ -1,9 +1,14 @@
 export interface DamageMods {
+  piercing?: number;
   cold?: number;
   crushing?: number;
   explosive?: number;
   fire?: number;
-  piercing?: number;
+  torpedo?: number;
+  depth_charge?: number;
+  melee?: number;
+  projectile?: number;
+  shell?: number;
 }
 
 export interface WeaponStats {
