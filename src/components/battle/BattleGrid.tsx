@@ -6,7 +6,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 import { Crosshair } from "lucide-react";
 import type { EncounterUnit } from "@/types/encounters";
-import type { PartyUnit, DamagePreview, SelectedUnit, TargetArea } from "@/types/battleSimulator";
+import type { PartyUnit, DamagePreview, SelectedUnit, TargetArea, DamageAreaPosition } from "@/types/battleSimulator";
 import { ENEMY_GRID_LAYOUT, FRIENDLY_GRID_LAYOUT, GRID_ID_TO_COORDS, COORDS_TO_GRID_ID, getAffectedGridPositions } from "@/types/battleSimulator";
 
 interface BattleGridProps {
@@ -21,11 +21,14 @@ interface BattleGridProps {
   onAddUnit?: (unitId: number, gridId: number) => void;
   // Targeting reticle props - only shows when this grid is the TARGET side
   targetArea?: TargetArea;
+  damageArea?: DamageAreaPosition[]; // Splash damage pattern for overlapping calculation
   reticleGridId?: number;
   onReticleMove?: (gridId: number) => void;
   showReticle?: boolean; // Whether to show the movable reticle on this grid
   // Fixed attack pattern positions (pre-calculated based on attacker position)
   fixedAttackPositions?: { gridId: number; damagePercent: number }[];
+  // Valid reticle positions based on range/line of fire
+  validReticlePositions?: Set<number>;
 }
 
 const DAMAGE_TYPE_NAMES: Record<number, string> = {
@@ -48,10 +51,12 @@ export function BattleGrid({
   onRemoveUnit,
   onAddUnit,
   targetArea,
+  damageArea,
   reticleGridId,
   onReticleMove,
   showReticle = false,
   fixedAttackPositions = [],
+  validReticlePositions,
 }: BattleGridProps) {
   const { t } = useLanguage();
   const layout = isEnemy ? ENEMY_GRID_LAYOUT : FRIENDLY_GRID_LAYOUT;
@@ -64,7 +69,7 @@ export function BattleGrid({
   const affectedPositions = fixedAttackPositions.length > 0
     ? fixedAttackPositions
     : (showReticle && reticleGridId !== undefined && targetArea
-        ? getAffectedGridPositions(reticleGridId, targetArea, isEnemy)
+        ? getAffectedGridPositions(reticleGridId, targetArea, isEnemy, damageArea)
         : []);
   
   // Whether we're showing any targeting pattern (movable or fixed)
@@ -254,12 +259,19 @@ export function BattleGrid({
     const isReticleCenter = showReticle && reticleGridId === gridId;
     // For fixed patterns, highlight all affected tiles (no special "center")
     const isFixedPatternTile = fixedAttackPositions.length > 0 && affectedPos !== undefined;
+    // Valid reticle position highlighting (when dragging/placing reticle)
+    const isValidReticleTarget = showReticle && validReticlePositions?.has(gridId) && !isReticleCenter;
+    const isInvalidReticleTarget = showReticle && validReticlePositions && !validReticlePositions.has(gridId) && !isReticleCenter;
     
     const slotSize = "w-16 h-16 sm:w-18 sm:h-18";
     
-    // Get the label for this slot based on damage percent
+    // Get the label for this slot based on damage percent and hit count
     const getDamageLabel = () => {
       if (!affectedPos) return null;
+      const hitCount = (affectedPos as any).hitCount;
+      if (hitCount && hitCount > 1) {
+        return `${affectedPos.damagePercent}% (${hitCount}x)`;
+      }
       if (affectedPos.damagePercent === 100) return "Target";
       return `${affectedPos.damagePercent}%`;
     };
@@ -288,6 +300,9 @@ export function BattleGrid({
             showReticle && "cursor-pointer hover:bg-yellow-500/10",
             isDragOver && showReticle && "border-yellow-400 bg-yellow-500/20 border-solid",
             isDragOver && !showReticle && "border-primary bg-primary/20 border-solid",
+            // Valid/invalid reticle position highlighting
+            isValidReticleTarget && !isAffectedByPattern && "border-green-500/50 border-solid bg-green-500/10",
+            isInvalidReticleTarget && "opacity-30",
             // Movable reticle highlighting
             isReticleCenter && "border-yellow-500 border-solid border-2 bg-yellow-500/20 cursor-grab",
             showReticle && isAffectedByPattern && !isReticleCenter && "border-orange-500 border-solid bg-orange-500/10",

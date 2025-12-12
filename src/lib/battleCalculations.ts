@@ -234,6 +234,16 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
         );
       }
 
+      // Parse damage_area - splash damage pattern around each impact point
+      const rawDamageArea = (ability.stats as any).damage_area;
+      const damageArea = rawDamageArea 
+        ? rawDamageArea.map((d: any) => ({
+            x: d.pos?.x || 0,
+            y: d.pos?.y || 0,
+            damagePercent: d.damage_percent || 100,
+          }))
+        : undefined;
+
       const attackDirection = ability.stats.attack_direction || 1;
       const lineOfFire = ability.stats.line_of_fire ?? 1; // Default to Direct
 
@@ -261,6 +271,7 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
         suppressionBonus: (ability.stats as any).damage_distraction_bonus || 0,
         statusEffects: ability.stats.status_effects || {},
         targetArea,
+        damageArea,
         isFixed,
         isSingleTarget,
       });
@@ -502,7 +513,7 @@ export function calculateAoeDamagePreviewsForEnemy(
   environmentalDamageMods?: Record<string, number>
 ): DamagePreview[] {
   const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
-  const affectedPositions = getAffectedGridPositions(reticleGridId, attackerAbility.targetArea, true);
+  const affectedPositions = getAffectedGridPositions(reticleGridId, attackerAbility.targetArea, true, attackerAbility.damageArea);
   const blockingUnits = getBlockingUnits(enemyUnits, true);
   
   // Create a map of gridId -> damagePercent
@@ -609,7 +620,7 @@ export function calculateAoeDamagePreviewsForFriendly(
   environmentalDamageMods?: Record<string, number>
 ): DamagePreview[] {
   const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
-  const affectedPositions = getAffectedGridPositions(reticleGridId, attackerAbility.targetArea, false);
+  const affectedPositions = getAffectedGridPositions(reticleGridId, attackerAbility.targetArea, false, attackerAbility.damageArea);
   const blockingUnits = getBlockingUnits(friendlyUnits, false);
   
   // Create a map of gridId -> damagePercent
