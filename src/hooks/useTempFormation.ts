@@ -1,14 +1,41 @@
 import { useState, useCallback } from "react";
 import type { PartyUnit } from "@/types/battleSimulator";
+import type { Encounter } from "@/types/encounters";
 import { getUnitById } from "@/lib/units";
 import { getNextAvailablePosition } from "@/lib/battleCalculations";
+import { checkDeployLimits, checkEncounterUnitLimit } from "@/lib/unitRestrictions";
 
-export function useTempFormation() {
+interface UseTempFormationOptions {
+  encounter?: Encounter | null;
+}
+
+export function useTempFormation(options: UseTempFormationOptions = {}) {
   const [units, setUnits] = useState<PartyUnit[]>([]);
 
-  const addUnit = useCallback((unitId: number, preferredGridId?: number) => {
+  const addUnit = useCallback((unitId: number, preferredGridId?: number): { success: boolean; error?: string } => {
     const unit = getUnitById(unitId);
-    if (!unit) return;
+    if (!unit) return { success: false, error: "Unit not found" };
+
+    // Check encounter unit limit
+    if (options.encounter) {
+      const limitCheck = checkEncounterUnitLimit(options.encounter, units);
+      if (!limitCheck.allowed) {
+        return { 
+          success: false, 
+          error: `Unit limit reached: ${limitCheck.current}/${limitCheck.limit}` 
+        };
+      }
+    }
+
+    // Check tag deploy limits
+    const deployCheck = checkDeployLimits(unitId, units);
+    if (!deployCheck.allowed) {
+      const violation = deployCheck.violations[0];
+      return { 
+        success: false, 
+        error: `Deploy limit reached for ${violation.stringId}: ${violation.current}/${violation.limit}` 
+      };
+    }
 
     const occupiedPositions = units.map(u => u.gridId);
     
@@ -23,7 +50,7 @@ export function useTempFormation() {
       gridId = getNextAvailablePosition(preferredRow, occupiedPositions);
     }
 
-    if (gridId === null) return; // Grid full
+    if (gridId === null) return { success: false, error: "Grid full" };
 
     const maxRank = unit.statsConfig?.stats?.length || 1;
 
@@ -32,7 +59,9 @@ export function useTempFormation() {
       gridId,
       rank: maxRank,
     }]);
-  }, [units]);
+    
+    return { success: true };
+  }, [units, options.encounter]);
 
   const removeUnit = useCallback((gridId: number) => {
     setUnits(prev => prev.filter(u => u.gridId !== gridId));

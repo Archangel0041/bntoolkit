@@ -10,7 +10,7 @@ export interface EncounterWave {
 
 export interface Encounter {
   attacker_defense_slots?: number;
-  attacker_slots?: number;
+  attacker_slots?: number; // Unit limit for player
   bg_image?: string;
   exclude_tag?: number;
   hide_heal_button?: boolean;
