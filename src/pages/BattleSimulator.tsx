@@ -154,16 +154,16 @@ const BattleSimulator = () => {
     }
   }, [selectedUnit, selectedAbility, tempFormation.units, currentWaveUnits, enemyRankOverrides, enemyReticleGridId, friendlyReticleGridId, fixedAttackPositions]);
 
-  // Handle moving the reticle on enemy grid (only for movable reticles)
+  // Handle moving the reticle on enemy grid (only for movable AOE reticles)
   const handleEnemyReticleMove = (gridId: number) => {
-    if (selectedAbility && !selectedAbility.isFixed && !selectedUnit?.isEnemy) {
+    if (selectedAbility && !selectedAbility.isFixed && !selectedAbility.isSingleTarget && !selectedUnit?.isEnemy) {
       setEnemyReticleGridId(gridId);
     }
   };
 
-  // Handle moving the reticle on friendly grid (only for movable reticles)
+  // Handle moving the reticle on friendly grid (only for movable AOE reticles)
   const handleFriendlyReticleMove = (gridId: number) => {
-    if (selectedAbility && !selectedAbility.isFixed && selectedUnit?.isEnemy) {
+    if (selectedAbility && !selectedAbility.isFixed && !selectedAbility.isSingleTarget && selectedUnit?.isEnemy) {
       setFriendlyReticleGridId(gridId);
     }
   };
