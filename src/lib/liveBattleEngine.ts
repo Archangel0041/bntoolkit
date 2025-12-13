@@ -603,9 +603,9 @@ export function executeAttack(
       const adjustedChance = Math.floor(chance * (pos.damagePercent / 100));
       
       if (rollStatusEffect(adjustedChance)) {
-        // Calculate DoT damage: actualDamageDealt * envMod * resistMod
-        // The actual damage dealt already has environmental mods applied from the attack
-        // Then we multiply by environmental mod AND resistance mod AGAIN to get the base DoT damage
+        // Calculate base DoT damage: actualDamageDealt * envMod
+        // Resistance is NOT applied here - it's applied when DoT actually ticks
+        // based on target's current armor state at tick time
         let dotDamage = totalHpDamage + totalArmorDamage;
         
         // Apply environmental damage mods AGAIN for the DoT's damage type
@@ -614,15 +614,6 @@ export function executeAttack(
           const envMod = environmentalDamageMods[effect.dot_damage_type.toString()];
           if (envMod !== undefined) {
             dotDamage = Math.floor(dotDamage * envMod);
-          }
-        }
-        
-        // Apply target's resistance to the DoT damage type
-        const targetDamageMods = targetStats?.damage_mods;
-        if (targetDamageMods && effect.dot_damage_type !== undefined) {
-          const resistMod = targetDamageMods[effect.dot_damage_type.toString()];
-          if (resistMod !== undefined) {
-            dotDamage = Math.floor(dotDamage * resistMod);
           }
         }
         
