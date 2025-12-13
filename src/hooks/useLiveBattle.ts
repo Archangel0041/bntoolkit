@@ -36,7 +36,6 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   const [selectedUnitGridId, setSelectedUnitGridId] = useState<number | null>(null);
   const [selectedAbilityId, setSelectedAbilityId] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentEnemyIndex, setCurrentEnemyIndex] = useState<number>(0);
 
   // Get environmental damage mods
   const environmentalDamageMods = useMemo(() => {
@@ -54,7 +53,6 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     setSelectedUnitGridId(null);
     setSelectedAbilityId(null);
     setIsProcessing(false);
-    setCurrentEnemyIndex(0);
   }, [friendlyParty, waves, startingWave]);
 
   // Get currently selected unit
@@ -430,6 +428,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         isBattleOver: endCheck.isOver,
         isPlayerVictory: endCheck.playerWon,
         isPlayerTurn: !endCheck.isOver ? false : prev.isPlayerTurn,
+        currentEnemyIndex: 0, // Reset enemy index when transitioning to enemy turn
       };
     });
 
@@ -440,18 +439,23 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
 
 
   // Execute one enemy's turn - 1 enemy, 1 ability, 1 action per call
+  // Uses battleState.currentEnemyIndex to track which enemy is acting
   const executeEnemyTurn = useCallback(() => {
     if (!battleState || battleState.isPlayerTurn || battleState.isBattleOver || isProcessing) return;
 
     setIsProcessing(true);
 
     setBattleState(prev => {
-      if (!prev) return prev;
+      if (!prev) {
+        setIsProcessing(false);
+        return prev;
+      }
 
       const allActions: BattleAction[] = [];
+      const enemyIdx = prev.currentEnemyIndex;
 
       // Process status effects only at the start of enemy phase (first enemy of the turn)
-      if (currentEnemyIndex === 0) {
+      if (enemyIdx === 0) {
         const statusActions = processStatusEffects([...prev.friendlyUnits, ...prev.enemyUnits]);
         allActions.push(...statusActions);
 
@@ -463,10 +467,10 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
             isPlayerTurn: false,
             actions: allActions,
           };
-          setCurrentEnemyIndex(0);
-          setIsProcessing(false);
+          setTimeout(() => setIsProcessing(false), 0);
           return {
             ...prev,
+            currentEnemyIndex: 0,
             battleLog: [...prev.battleLog, turn],
             isBattleOver: true,
             isPlayerVictory: endCheckAfterStatus.playerWon,
@@ -477,7 +481,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       // Get alive enemies
       const aliveEnemies = prev.enemyUnits.filter(e => !e.isDead);
       
-      if (aliveEnemies.length === 0 || currentEnemyIndex >= aliveEnemies.length) {
+      if (aliveEnemies.length === 0 || enemyIdx >= aliveEnemies.length) {
         // All enemies have acted or none alive - reduce cooldowns and switch to player turn
         reduceCooldowns(prev.enemyUnits);
         
@@ -488,13 +492,13 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         };
         
         const endCheck = checkBattleEnd(prev);
-        setCurrentEnemyIndex(0);
-        setIsProcessing(false);
+        setTimeout(() => setIsProcessing(false), 0);
         
         return {
           ...prev,
           currentTurn: prev.currentTurn + 1,
           isPlayerTurn: true,
+          currentEnemyIndex: 0,
           battleLog: [...prev.battleLog, turn],
           isBattleOver: endCheck.isOver,
           isPlayerVictory: endCheck.playerWon,
@@ -502,9 +506,11 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       }
 
       // Get the current enemy to act
-      const enemy = aliveEnemies[currentEnemyIndex];
+      const enemy = aliveEnemies[enemyIdx];
       const enemyUnit = getUnitById(enemy.unitId);
       const enemyName = enemyUnit ? t(enemyUnit.identity.name) : `Enemy ${enemy.unitId}`;
+      
+      console.log(`[executeEnemyTurn] Enemy ${enemyIdx}/${aliveEnemies.length}: ${enemyName} (grid ${enemy.gridId})`);
       
       // Check if stunned
       if (enemy.activeStatusEffects.some(e => e.isStun)) {
@@ -515,18 +521,17 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           message: `${enemyName} is stunned and cannot act`,
         });
         
-        // Move to next enemy
-        setCurrentEnemyIndex(currentEnemyIndex + 1);
-        setIsProcessing(false);
-        
         const turn: BattleTurn = {
           turnNumber: prev.currentTurn,
           isPlayerTurn: false,
           actions: allActions,
         };
         
+        setTimeout(() => setIsProcessing(false), 0);
+        
         return {
           ...prev,
+          currentEnemyIndex: enemyIdx + 1,
           battleLog: [...prev.battleLog, turn],
         };
       }
@@ -536,6 +541,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       
       if (!action) {
         // No valid action, this enemy passes
+        console.log(`[executeEnemyTurn] ${enemyName} has no valid action`);
         allActions.push({
           type: "skip",
           attackerGridId: enemy.gridId,
@@ -543,18 +549,17 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           message: `${enemyName} has no valid targets`,
         });
         
-        // Move to next enemy
-        setCurrentEnemyIndex(currentEnemyIndex + 1);
-        setIsProcessing(false);
-        
         const turn: BattleTurn = {
           turnNumber: prev.currentTurn,
           isPlayerTurn: false,
           actions: allActions,
         };
         
+        setTimeout(() => setIsProcessing(false), 0);
+        
         return {
           ...prev,
+          currentEnemyIndex: enemyIdx + 1,
           battleLog: [...prev.battleLog, turn],
         };
       }
@@ -563,7 +568,9 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       const abilityData = getAbilityById(action.ability.abilityId);
       const localizedAbilityName = abilityData ? t(abilityData.name) : `Ability ${action.ability.abilityId}`;
       
-      // Execute the attack
+      console.log(`[executeEnemyTurn] ${enemyName} using ${localizedAbilityName} on grid ${action.targetGridId}`);
+      
+      // Execute the attack - this modifies units in place
       let attackActions: BattleAction[];
       if (isRandomAttack(action.ability)) {
         attackActions = executeRandomAttack(
@@ -594,24 +601,23 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       // Check if battle ended
       const endCheck = checkBattleEnd(prev);
       
-      // Move to next enemy
-      setCurrentEnemyIndex(currentEnemyIndex + 1);
-      setIsProcessing(false);
-      
       const turn: BattleTurn = {
         turnNumber: prev.currentTurn,
         isPlayerTurn: false,
         actions: allActions,
       };
       
+      setTimeout(() => setIsProcessing(false), 0);
+      
       return {
         ...prev,
+        currentEnemyIndex: enemyIdx + 1,
         battleLog: [...prev.battleLog, turn],
         isBattleOver: endCheck.isOver,
         isPlayerVictory: endCheck.playerWon,
       };
     });
-  }, [battleState, isProcessing, environmentalDamageMods, currentEnemyIndex, t]);
+  }, [battleState, isProcessing, environmentalDamageMods, t]);
 
   // Check if all enemies are dead and auto-advance wave
   const checkWaveAdvance = useCallback(() => {
@@ -627,8 +633,6 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   // Advance to next wave (enemies go first on subsequent waves)
   const advanceWave = useCallback(() => {
     if (!battleState || battleState.currentWave >= battleState.totalWaves - 1) return;
-
-    setCurrentEnemyIndex(0); // Reset enemy index for new wave
 
     setBattleState(prev => {
       if (!prev) return prev;
@@ -648,6 +652,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         ...prev,
         enemyUnits,
         currentWave: nextWave,
+        currentEnemyIndex: 0, // Reset enemy index for new wave
         isPlayerTurn: false, // Enemy goes first on wave 2+
         battleLog: [...prev.battleLog, {
           turnNumber: prev.currentTurn,
@@ -677,6 +682,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         ...prev,
         battleLog: [...prev.battleLog, turn],
         isPlayerTurn: false,
+        currentEnemyIndex: 0, // Reset enemy index when transitioning to enemy turn
       };
     });
   }, [battleState, isProcessing]);
