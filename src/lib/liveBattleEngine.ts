@@ -604,27 +604,21 @@ export function executeAttack(
       
       if (rollStatusEffect(adjustedChance)) {
         // Calculate DoT damage based on ACTUAL damage dealt (not average)
-        // Then apply the DoT's damage type modifiers (e.g., Firemod for Fire DoT)
+        // The actual damage dealt already has environmental mods applied from the attack
+        // Then we multiply by environmental mod AGAIN to get the base DoT damage
         let dotDamage = 0;
         if (effect.dot_ability_damage_mult || effect.dot_bonus_damage) {
           // Use actual damage dealt (HP + armor damage) as the base
+          // This already includes environmental mods from the attack calculation
           const actualDamageDealt = totalHpDamage + totalArmorDamage;
           let baseDotDamage = Math.floor(actualDamageDealt * (effect.dot_ability_damage_mult || 0) + (effect.dot_bonus_damage || 0));
           
-          // Apply environmental damage mods for the DoT's damage type (e.g., Firemod increases Fire DoT)
+          // Apply environmental damage mods AGAIN for the DoT's damage type
+          // e.g., 30 damage -> 66 with Firemod (2.2x) -> 145 base DoT (66 * 2.2)
           if (environmentalDamageMods && effect.dot_damage_type !== undefined) {
             const envMod = environmentalDamageMods[effect.dot_damage_type.toString()];
             if (envMod !== undefined) {
               baseDotDamage = Math.floor(baseDotDamage * envMod);
-            }
-          }
-          
-          // Apply target's resistance to the DoT damage type
-          const targetDamageMods = targetStats?.damage_mods;
-          if (targetDamageMods && effect.dot_damage_type !== undefined) {
-            const resistMod = targetDamageMods[effect.dot_damage_type.toString()];
-            if (resistMod !== undefined) {
-              baseDotDamage = Math.floor(baseDotDamage * resistMod);
             }
           }
           
