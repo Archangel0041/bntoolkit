@@ -1,9 +1,9 @@
 import { useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sword, Shield, Skull, Zap, Wind, Target, Flame, Droplets } from "lucide-react";
+import { Sword, Shield, Skull, Zap, Wind, Target, Flame, Droplets, TrendingUp } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import type { BattleAction, BattleTurn } from "@/types/liveBattle";
+import type { BattleAction, BattleTurn, TurnSummary } from "@/types/liveBattle";
 
 interface BattleLogProps {
   turns: BattleTurn[];
@@ -45,6 +45,39 @@ function formatUnitWithGrid(name: string | undefined, gridId: number | undefined
   return localizedName;
 }
 
+function TurnSummaryDisplay({ summary, isPlayerTurn }: { summary: TurnSummary; isPlayerTurn: boolean }) {
+  const hasStats = summary.totalDamage > 0 || summary.dodges > 0 || summary.crits > 0 || summary.statusEffectsApplied > 0 || summary.kills > 0;
+  
+  if (!hasStats) return null;
+  
+  return (
+    <div className={cn(
+      "flex flex-wrap gap-2 mt-1 pt-1 border-t border-border/50 text-[10px]",
+      isPlayerTurn ? "text-green-600" : "text-red-600"
+    )}>
+      <TrendingUp className="h-3 w-3" />
+      {summary.totalHpDamage > 0 && (
+        <span className="text-red-500">{summary.totalHpDamage} HP dmg</span>
+      )}
+      {summary.totalArmorDamage > 0 && (
+        <span className="text-blue-500">{summary.totalArmorDamage} armor dmg</span>
+      )}
+      {summary.crits > 0 && (
+        <span className="text-yellow-500">{summary.crits} crit{summary.crits > 1 ? 's' : ''}</span>
+      )}
+      {summary.dodges > 0 && (
+        <span className="text-blue-400">{summary.dodges} dodge{summary.dodges > 1 ? 's' : ''}</span>
+      )}
+      {summary.statusEffectsApplied > 0 && (
+        <span className="text-purple-500">{summary.statusEffectsApplied} effect{summary.statusEffectsApplied > 1 ? 's' : ''}</span>
+      )}
+      {summary.kills > 0 && (
+        <span className="text-red-600">{summary.kills} kill{summary.kills > 1 ? 's' : ''}</span>
+      )}
+    </div>
+  );
+}
+
 export function BattleLog({ turns, currentTurn, className }: BattleLogProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { t } = useLanguage();
@@ -55,6 +88,35 @@ export function BattleLog({ turns, currentTurn, className }: BattleLogProps) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [turns.length]);
+
+  // Format action message with localization
+  const formatActionMessage = (action: BattleAction): string => {
+    const { type, message, hpDamage, armorDamage, statusEffectName, hitCount } = action;
+    
+    // For status_tick, format with HP and armor damage
+    if (type === 'status_tick') {
+      const damageParts: string[] = [];
+      if (hpDamage && hpDamage > 0) damageParts.push(`${hpDamage} HP`);
+      if (armorDamage && armorDamage > 0) damageParts.push(`${armorDamage} armor`);
+      const damageText = damageParts.length > 0 ? damageParts.join(' and ') : '0';
+      // Extract turns left from message if present
+      const turnsMatch = message.match(/\((\d+)t left\)/);
+      const turnsLeft = turnsMatch ? turnsMatch[1] : '?';
+      return `took ${damageText} ${statusEffectName || 'DOT'} damage (${turnsLeft}t left)`;
+    }
+    
+    // For death by status effect
+    if (type === 'death' && statusEffectName) {
+      return `defeated by ${statusEffectName}!`;
+    }
+    
+    // For attack actions, show hit count if multi-hit
+    if (type === 'attack' && hitCount && hitCount > 1) {
+      return message;
+    }
+    
+    return message;
+  };
 
   return (
     <div className={cn("border rounded-lg", className)}>
@@ -110,7 +172,19 @@ export function BattleLog({ turns, currentTurn, className }: BattleLogProps) {
                               {attackerDisplay} → {abilityDisplay}:{" "}
                             </span>
                           )}
-                          {attackerDisplay && !abilityDisplay && (
+                          {/* Status tick: show unit name → effect name */}
+                          {action.type === 'status_tick' && targetDisplay && action.statusEffectName && (
+                            <span className="font-medium text-foreground">
+                              {targetDisplay} → {action.statusEffectName}:{" "}
+                            </span>
+                          )}
+                          {/* Death by status effect */}
+                          {action.type === 'death' && !attackerDisplay && targetDisplay && (
+                            <span className="font-medium text-foreground">
+                              {targetDisplay}:{" "}
+                            </span>
+                          )}
+                          {attackerDisplay && !abilityDisplay && action.type !== 'status_tick' && (
                             <span className="font-medium text-foreground">
                               {attackerDisplay}:{" "}
                             </span>
@@ -123,12 +197,14 @@ export function BattleLog({ turns, currentTurn, className }: BattleLogProps) {
                           {action.hitCount && action.hitCount > 1 && (
                             <span className="text-purple-400 font-medium">[{action.hitCount}x] </span>
                           )}
-                          {action.message}
+                          {formatActionMessage(action)}
                         </span>
                       </div>
                     );
                   })}
                 </div>
+                {/* Turn summary */}
+                {turn.summary && <TurnSummaryDisplay summary={turn.summary} isPlayerTurn={turn.isPlayerTurn} />}
               </div>
             ))
           )}

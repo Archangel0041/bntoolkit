@@ -55,10 +55,22 @@ export interface BattleAction {
   hitCount?: number;
 }
 
+// Turn summary stats
+export interface TurnSummary {
+  totalDamage: number;
+  totalHpDamage: number;
+  totalArmorDamage: number;
+  dodges: number;
+  crits: number;
+  statusEffectsApplied: number;
+  kills: number;
+}
+
 export interface BattleTurn {
   turnNumber: number;
   isPlayerTurn: boolean;
   actions: BattleAction[];
+  summary?: TurnSummary;
 }
 
 export interface LiveBattleState {
