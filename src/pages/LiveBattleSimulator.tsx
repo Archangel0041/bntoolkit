@@ -64,6 +64,11 @@ const LiveBattleSimulator = () => {
     advanceWave,
     skipTurn,
     checkWaveAdvance,
+    damagePreviews,
+    enemyReticleGridId,
+    setEnemyReticleGridId,
+    fixedAttackPositions,
+    validReticlePositions,
   } = useLiveBattle({
     encounter,
     waves,

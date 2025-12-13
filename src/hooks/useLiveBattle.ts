@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   initializeBattle,
   getAvailableAbilities,
@@ -10,9 +10,12 @@ import {
   aiSelectAction,
   createLiveBattleUnit,
 } from "@/lib/liveBattleEngine";
-import { getUnitAbilities } from "@/lib/battleCalculations";
-import { getStatusEffect } from "@/lib/statusEffects";
-import type { PartyUnit, AbilityInfo } from "@/types/battleSimulator";
+import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTargetUnit } from "@/lib/battleCalculations";
+import { getBlockingUnits, checkLineOfFire, calculateRange, findFrontmostUnblockedPosition, getTargetingInfo } from "@/lib/battleTargeting";
+import { getStatusEffect, getStatusEffectDisplayName, getStatusEffectColor } from "@/lib/statusEffects";
+import { getUnitById } from "@/lib/units";
+import { getFixedAttackPositions, getAffectedGridPositions } from "@/types/battleSimulator";
+import type { PartyUnit, AbilityInfo, DamagePreview, DamageResult, StatusEffectPreview } from "@/types/battleSimulator";
 import type { EncounterUnit, Encounter } from "@/types/encounters";
 import type { LiveBattleState, LiveBattleUnit, BattleAction, BattleTurn } from "@/types/liveBattle";
 
@@ -69,6 +72,239 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     if (!selectedAbilityId) return null;
     return availableAbilities.find(a => a.abilityId === selectedAbilityId) || null;
   }, [selectedAbilityId, availableAbilities]);
+
+  // State for reticle position (for AOE abilities)
+  const [enemyReticleGridId, setEnemyReticleGridId] = useState<number>(7);
+
+  // Update default reticle position when ability changes
+  useEffect(() => {
+    if (!selectedAbility || !selectedUnit || !battleState || selectedAbility.isSingleTarget || selectedAbility.isFixed) return;
+    
+    const targetUnits = selectedUnit.isEnemy 
+      ? battleState.friendlyUnits 
+      : battleState.enemyUnits;
+    
+    const blockingUnits = getBlockingUnits(
+      targetUnits.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
+      !selectedUnit.isEnemy
+    );
+    
+    const frontmostPosition = findFrontmostUnblockedPosition(
+      selectedUnit.gridId,
+      selectedAbility.minRange,
+      selectedAbility.maxRange,
+      selectedAbility.lineOfFire,
+      selectedUnit.isEnemy,
+      blockingUnits
+    );
+    
+    if (frontmostPosition !== null) {
+      setEnemyReticleGridId(frontmostPosition);
+    }
+  }, [selectedAbility?.abilityId, selectedUnit?.gridId, selectedUnit?.isEnemy, battleState]);
+
+  // Calculate fixed attack positions
+  const fixedAttackPositions = useMemo(() => {
+    if (!selectedUnit || !selectedAbility?.isFixed || !selectedAbility.targetArea) {
+      return { enemyGrid: [] as { gridId: number; damagePercent: number }[], friendlyGrid: [] as { gridId: number; damagePercent: number }[] };
+    }
+
+    const positions = getFixedAttackPositions(
+      selectedUnit.gridId,
+      selectedAbility.targetArea,
+      !selectedUnit.isEnemy
+    );
+
+    const enemyGrid = positions.filter(p => p.isOnEnemyGrid);
+    const friendlyGrid = positions.filter(p => !p.isOnEnemyGrid);
+
+    return { enemyGrid, friendlyGrid };
+  }, [selectedUnit, selectedAbility]);
+
+  // Calculate valid reticle positions
+  const validReticlePositions = useMemo(() => {
+    if (!selectedUnit || !selectedAbility || !battleState || selectedAbility.isSingleTarget || selectedAbility.isFixed) {
+      return undefined;
+    }
+    
+    const targetUnits = selectedUnit.isEnemy 
+      ? battleState.friendlyUnits 
+      : battleState.enemyUnits;
+    
+    const blockingUnits = getBlockingUnits(
+      targetUnits.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
+      !selectedUnit.isEnemy
+    );
+    
+    const targetingInfo = getTargetingInfo(
+      selectedUnit.gridId,
+      selectedAbility.minRange,
+      selectedAbility.maxRange,
+      selectedAbility.lineOfFire,
+      selectedUnit.isEnemy,
+      blockingUnits
+    );
+    
+    return new Set(
+      targetingInfo
+        .filter(t => t.inRange && !t.isBlocked)
+        .map(t => t.gridId)
+    );
+  }, [selectedUnit, selectedAbility, battleState]);
+
+  // Calculate damage previews for live battle (uses current HP/armor)
+  const damagePreviews = useMemo<DamagePreview[]>(() => {
+    if (!battleState || !selectedUnit || !selectedAbility || selectedUnit.isEnemy) return [];
+    
+    const totalShots = selectedAbility.shotsPerAttack * selectedAbility.attacksPerUse;
+    const targets = battleState.enemyUnits;
+    
+    const blockingUnits = getBlockingUnits(
+      targets.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
+      true
+    );
+
+    // Get affected positions based on ability type
+    let affectedPositions: { gridId: number; damagePercent: number }[];
+    
+    if (selectedAbility.isFixed && fixedAttackPositions.enemyGrid.length > 0) {
+      affectedPositions = fixedAttackPositions.enemyGrid;
+    } else if (!selectedAbility.isSingleTarget && selectedAbility.targetArea) {
+      affectedPositions = getAffectedGridPositions(enemyReticleGridId, selectedAbility.targetArea, true, selectedAbility.damageArea);
+    } else {
+      // Single target - calculate for all valid targets
+      affectedPositions = targets.map(u => ({ gridId: u.gridId, damagePercent: 100 }));
+    }
+
+    return targets
+      .filter(t => !t.isDead)
+      .map(target => {
+        const targetUnit = getUnitById(target.unitId);
+        const targetStats = targetUnit?.statsConfig?.stats?.[target.rank - 1];
+        const immunities = targetUnit?.statsConfig?.status_effect_immunities || [];
+        
+        const affectedPos = affectedPositions.find(p => p.gridId === target.gridId);
+        const damagePercent = affectedPos?.damagePercent ?? 100;
+        const isAffected = affectedPos !== undefined;
+        
+        const canTarget = canTargetUnit(target.unitId, selectedAbility.targets);
+        const defense = targetStats?.defense || 0;
+        const dodgeChance = calculateDodgeChance(defense, selectedAbility.offense);
+        
+        // Calculate crit chance with bonuses
+        let critChance = selectedAbility.critPercent;
+        const targetTags = targetUnit?.identity?.tags || [];
+        for (const tag of targetTags) {
+          if (selectedAbility.critBonuses[tag]) {
+            critChance += selectedAbility.critBonuses[tag];
+          }
+        }
+        
+        // Check range
+        const range = calculateRange(selectedUnit.gridId, target.gridId, false);
+        const inRange = range >= selectedAbility.minRange && range <= selectedAbility.maxRange;
+        
+        // Check line of fire blocking
+        const blockCheck = checkLineOfFire(
+          selectedUnit.gridId,
+          target.gridId,
+          selectedAbility.lineOfFire,
+          false,
+          blockingUnits
+        );
+        
+        // Calculate damage using current HP/armor values
+        const adjustedMinDamage = Math.floor(selectedAbility.minDamage * (damagePercent / 100));
+        const adjustedMaxDamage = Math.floor(selectedAbility.maxDamage * (damagePercent / 100));
+        
+        const minResult = calculateDamageWithArmor(
+          adjustedMinDamage,
+          target.currentArmor,
+          targetStats?.armor_damage_mods,
+          targetStats?.damage_mods,
+          selectedAbility.damageType,
+          selectedAbility.armorPiercing,
+          environmentalDamageMods
+        );
+        
+        const maxResult = calculateDamageWithArmor(
+          adjustedMaxDamage,
+          target.currentArmor,
+          targetStats?.armor_damage_mods,
+          targetStats?.damage_mods,
+          selectedAbility.damageType,
+          selectedAbility.armorPiercing,
+          environmentalDamageMods
+        );
+        
+        // Multiply by shots
+        const multiplyResult = (result: DamageResult, shots: number): DamageResult => ({
+          rawDamage: result.rawDamage * shots,
+          armorDamage: result.armorDamage * shots,
+          hpDamage: result.hpDamage * shots,
+          armorRemaining: result.armorRemaining,
+          effectiveMultiplier: result.effectiveMultiplier,
+        });
+        
+        // Calculate status effect previews
+        const avgDamage = Math.floor((selectedAbility.minDamage + selectedAbility.maxDamage) / 2);
+        const statusEffects: StatusEffectPreview[] = [];
+        for (const [effectIdStr, chance] of Object.entries(selectedAbility.statusEffects)) {
+          const effectId = parseInt(effectIdStr);
+          const effect = getStatusEffect(effectId);
+          if (!effect) continue;
+          
+          const isImmune = immunities.includes(effect.family);
+          const adjustedChance = Math.floor(chance * (damagePercent / 100));
+          
+          let dotDamage = 0;
+          if (effect.dot_ability_damage_mult || effect.dot_bonus_damage) {
+            dotDamage = Math.floor(avgDamage * (effect.dot_ability_damage_mult || 0) + (effect.dot_bonus_damage || 0));
+          }
+          
+          statusEffects.push({
+            effectId,
+            name: getStatusEffectDisplayName(effectId),
+            chance: adjustedChance,
+            duration: effect.duration,
+            damageType: effect.dot_damage_type || null,
+            dotDamage,
+            isImmune,
+            isStun: effect.stun_block_action === true,
+            color: getStatusEffectColor(effectId),
+          });
+        }
+        
+        // For single target abilities, only show preview if in range and not blocked
+        const shouldShow = selectedAbility.isSingleTarget 
+          ? (canTarget && inRange && !blockCheck.isBlocked)
+          : isAffected;
+        
+        return {
+          targetGridId: target.gridId,
+          targetUnitId: target.unitId,
+          minDamage: minResult,
+          maxDamage: maxResult,
+          totalShots,
+          minTotalDamage: multiplyResult(minResult, totalShots),
+          maxTotalDamage: multiplyResult(maxResult, totalShots),
+          dodgeChance,
+          critChance,
+          canTarget: shouldShow ? canTarget : false,
+          targetHasArmor: target.currentArmor > 0,
+          targetArmorHp: target.currentArmor,
+          targetHp: target.currentHp,
+          targetDefense: defense,
+          statusEffects,
+          damagePercent,
+          inRange,
+          range,
+          isBlocked: blockCheck.isBlocked,
+          blockedByUnitId: blockCheck.blockedBy?.unitId,
+          blockReason: blockCheck.reason,
+        };
+      });
+  }, [battleState, selectedUnit, selectedAbility, fixedAttackPositions, enemyReticleGridId, environmentalDamageMods]);
 
   // Get valid targets for selected ability
   const validTargets = useMemo<LiveBattleUnit[]>(() => {
@@ -308,5 +544,11 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     advanceWave,
     skipTurn,
     checkWaveAdvance,
+    // Targeting support
+    damagePreviews,
+    enemyReticleGridId,
+    setEnemyReticleGridId,
+    fixedAttackPositions,
+    validReticlePositions,
   };
 }
