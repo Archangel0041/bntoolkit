@@ -38,9 +38,6 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   const [selectedUnitIsEnemy, setSelectedUnitIsEnemy] = useState<boolean>(false);
   const [selectedAbilityId, setSelectedAbilityId] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  
-  // Ref to prevent double execution in StrictMode
-  const isEnemyTurnExecutingRef = useRef(false);
   // Get environmental damage mods
   const environmentalDamageMods = useMemo(() => {
     if (!encounter?.environmental_status_effect) return undefined;
@@ -486,19 +483,11 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   // 4. Return control to player
   const executeEnemyTurn = useCallback(() => {
     if (!battleState || battleState.isPlayerTurn || battleState.isBattleOver || isProcessing) return;
-    
-    // Prevent double execution in StrictMode
-    if (isEnemyTurnExecutingRef.current) {
-      console.log('[executeEnemyTurn] Skipping - already executing');
-      return;
-    }
-    isEnemyTurnExecutingRef.current = true;
 
     setIsProcessing(true);
 
-    // Compute new state OUTSIDE of setBattleState to avoid StrictMode double-execution
-    // Deep clone state to avoid mutation issues
-    const clonedState: LiveBattleState = {
+    // 1. Clone state as working copy
+    const newState: LiveBattleState = {
       ...battleState,
       friendlyUnits: battleState.friendlyUnits.map(u => ({
         ...u,
@@ -519,167 +508,108 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       battleLog: [...battleState.battleLog],
     };
 
-    const allActions: BattleAction[] = [];
+    const actions: BattleAction[] = [];
 
-    // Collapse grids - move units forward if front row is empty
-    collapseGrid(clonedState.friendlyUnits);
-    collapseGrid(clonedState.enemyUnits);
+    // 2. Collapse grids and process status effects
+    collapseGrid(newState.friendlyUnits);
+    collapseGrid(newState.enemyUnits);
+    actions.push(...processStatusEffects([...newState.friendlyUnits, ...newState.enemyUnits]));
 
-    // Process status effects at start of enemy phase
-    const statusActions = processStatusEffects([...clonedState.friendlyUnits, ...clonedState.enemyUnits]);
-    allActions.push(...statusActions);
-
-    // Check for deaths from status effects
-    const endCheckAfterStatus = checkBattleEnd(clonedState);
-    if (endCheckAfterStatus.isOver) {
-      const turn: BattleTurn = {
-        turnNumber: clonedState.currentTurn,
-        isPlayerTurn: false,
-        actions: allActions,
-      };
+    // 3. Check if battle ended from status effects
+    let endCheck = checkBattleEnd(newState);
+    if (endCheck.isOver) {
+      const turn: BattleTurn = { turnNumber: newState.currentTurn, isPlayerTurn: false, actions };
       setBattleState({
-        ...clonedState,
-        currentEnemyIndex: 0,
-        battleLog: [...clonedState.battleLog, turn],
+        ...newState,
+        battleLog: [...newState.battleLog, turn],
         isBattleOver: true,
-        isPlayerVictory: endCheckAfterStatus.playerWon,
+        isPlayerVictory: endCheck.playerWon,
       });
       setIsProcessing(false);
-      isEnemyTurnExecutingRef.current = false;
       return;
     }
 
-    // Get all alive, non-stunned enemies
-    const aliveEnemies = clonedState.enemyUnits.filter(e => !e.isDead);
+    // 4. Get alive enemies, filter to non-stunned
+    const aliveEnemies = newState.enemyUnits.filter(e => !e.isDead);
     const activeEnemies = aliveEnemies.filter(e => !e.activeStatusEffects.some(s => s.isStun));
-    
+
     // Log stunned enemies
-    for (const enemy of aliveEnemies) {
-      if (enemy.activeStatusEffects.some(s => s.isStun)) {
-        const enemyUnit = getUnitById(enemy.unitId);
-        const enemyName = enemyUnit ? t(enemyUnit.identity.name) : `Enemy ${enemy.unitId}`;
-        allActions.push({
-          type: "skip",
-          attackerGridId: enemy.gridId,
-          attackerName: enemyName,
-          message: `${enemyName} is stunned and cannot act`,
-        });
-      }
+    for (const enemy of aliveEnemies.filter(e => e.activeStatusEffects.some(s => s.isStun))) {
+      const unit = getUnitById(enemy.unitId);
+      actions.push({
+        type: "skip",
+        attackerGridId: enemy.gridId,
+        attackerName: unit?.identity?.name || `Unit ${enemy.unitId}`,
+        message: `Stunned and cannot act`,
+      });
     }
 
-    // Build a pool of all available abilities from all active enemies
-    type AbilityPoolEntry = {
-      enemy: LiveBattleUnit;
-      ability: AbilityInfo;
-      validTargets: LiveBattleUnit[];
-    };
-    
-    const abilityPool: AbilityPoolEntry[] = [];
-    
+    // 5. Build ability pool: each active enemy's available abilities with valid targets
+    const abilityPool: { enemy: LiveBattleUnit; ability: AbilityInfo; targets: LiveBattleUnit[] }[] = [];
     for (const enemy of activeEnemies) {
-      const abilities = getAvailableAbilities(enemy, clonedState.enemyUnits, clonedState.friendlyUnits);
-      
-      for (const ability of abilities) {
-        const targets = getValidTargets(enemy, ability, clonedState.enemyUnits, clonedState.friendlyUnits);
+      for (const ability of getAvailableAbilities(enemy, newState.enemyUnits, newState.friendlyUnits)) {
+        const targets = getValidTargets(enemy, ability, newState.enemyUnits, newState.friendlyUnits);
         if (targets.length > 0) {
-          abilityPool.push({ enemy, ability, validTargets: targets });
+          abilityPool.push({ enemy, ability, targets });
         }
       }
     }
 
-    console.log(`[executeEnemyTurn] Built ability pool with ${abilityPool.length} entries from ${activeEnemies.length} active enemies`);
-
-    // If no abilities available, end enemy turn
+    // 6. If no valid abilities, skip turn
     if (abilityPool.length === 0) {
       for (const enemy of activeEnemies) {
-        const enemyUnit = getUnitById(enemy.unitId);
-        const enemyName = enemyUnit ? t(enemyUnit.identity.name) : `Enemy ${enemy.unitId}`;
-        allActions.push({
+        const unit = getUnitById(enemy.unitId);
+        actions.push({
           type: "skip",
           attackerGridId: enemy.gridId,
-          attackerName: enemyName,
-          message: `${enemyName} has no valid targets`,
+          attackerName: unit?.identity?.name || `Unit ${enemy.unitId}`,
+          message: `No valid targets`,
         });
       }
-
-      reduceCooldowns(clonedState.enemyUnits);
-      
-      const turn: BattleTurn = {
-        turnNumber: clonedState.currentTurn,
-        isPlayerTurn: false,
-        actions: allActions,
-      };
-      
-      const endCheck = checkBattleEnd(clonedState);
-      setBattleState({
-        ...clonedState,
-        currentTurn: clonedState.currentTurn + 1,
-        isPlayerTurn: true,
-        currentEnemyIndex: 0,
-        battleLog: [...clonedState.battleLog, turn],
-        isBattleOver: endCheck.isOver,
-        isPlayerVictory: endCheck.playerWon,
-      });
-      setIsProcessing(false);
-      isEnemyTurnExecutingRef.current = false;
-      return;
-    }
-
-    // Pick ONE random ability from the pool
-    const selected = abilityPool[Math.floor(Math.random() * abilityPool.length)];
-    const { enemy, ability, validTargets: targets } = selected;
-    
-    // Pick random target
-    const target = targets[Math.floor(Math.random() * targets.length)];
-    
-    const enemyUnit = getUnitById(enemy.unitId);
-    const enemyName = enemyUnit ? t(enemyUnit.identity.name) : `Enemy ${enemy.unitId}`;
-    const abilityData = getAbilityById(ability.abilityId);
-    const localizedAbilityName = abilityData ? t(abilityData.name) : `Ability ${ability.abilityId}`;
-    
-    console.log(`[executeEnemyTurn] ${enemyName} using ${localizedAbilityName} on grid ${target.gridId}`);
-    
-    // Execute the attack
-    let attackActions: BattleAction[];
-    if (isRandomAttack(ability)) {
-      attackActions = executeRandomAttack(enemy, ability, clonedState, environmentalDamageMods);
     } else {
-      attackActions = executeAttack(enemy, ability, target.gridId, clonedState, environmentalDamageMods);
+      // 7. Pick one random ability from pool
+      const { enemy, ability, targets } = abilityPool[Math.floor(Math.random() * abilityPool.length)];
+      const target = targets[Math.floor(Math.random() * targets.length)];
+
+      // 8. Execute attack and get actions
+      let attackActions: BattleAction[];
+      if (isRandomAttack(ability)) {
+        attackActions = executeRandomAttack(enemy, ability, newState, environmentalDamageMods);
+      } else {
+        attackActions = executeAttack(enemy, ability, target.gridId, newState, environmentalDamageMods);
+      }
+
+      // Add localized names
+      const unit = getUnitById(enemy.unitId);
+      const abilityData = getAbilityById(ability.abilityId);
+      attackActions = attackActions.map(a => ({
+        ...a,
+        attackerName: unit ? t(unit.identity.name) : a.attackerName,
+        abilityName: abilityData ? t(abilityData.name) : a.abilityName,
+      }));
+      actions.push(...attackActions);
     }
-    
-    // Add attacker name and localized ability name
-    attackActions = attackActions.map(a => ({
-      ...a,
-      attackerName: enemyName,
-      abilityName: a.abilityName ? localizedAbilityName : a.abilityName,
-    }));
-    
-    allActions.push(...attackActions);
 
-    // Reduce cooldowns for all enemies after their phase
-    reduceCooldowns(clonedState.enemyUnits);
+    // 9. Reduce cooldowns for all enemies
+    reduceCooldowns(newState.enemyUnits);
 
-    // Check if battle ended
-    const endCheck = checkBattleEnd(clonedState);
-    
-    const turn: BattleTurn = {
-      turnNumber: clonedState.currentTurn,
-      isPlayerTurn: false,
-      actions: allActions,
-    };
+    // 10. Check battle end
+    endCheck = checkBattleEnd(newState);
+
+    // 11. Create turn log and set final state
+    const turn: BattleTurn = { turnNumber: newState.currentTurn, isPlayerTurn: false, actions };
     
     setBattleState({
-      ...clonedState,
-      currentTurn: clonedState.currentTurn + 1,
+      ...newState,
+      currentTurn: newState.currentTurn + 1,
       isPlayerTurn: true,
       currentEnemyIndex: 0,
-      battleLog: [...clonedState.battleLog, turn],
+      battleLog: [...newState.battleLog, turn],
       isBattleOver: endCheck.isOver,
       isPlayerVictory: endCheck.playerWon,
     });
-    
+
     setIsProcessing(false);
-    isEnemyTurnExecutingRef.current = false;
   }, [battleState, isProcessing, environmentalDamageMods, t]);
 
   // Check if all enemies are dead and auto-advance wave
