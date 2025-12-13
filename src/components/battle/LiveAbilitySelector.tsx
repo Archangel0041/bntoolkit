@@ -5,14 +5,46 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useLanguage } from "@/contexts/LanguageContext";
 import { getAbilityById } from "@/lib/abilities";
 import { getAbilityImageUrl } from "@/lib/abilityImages";
-import { getDamageTypeIconUrl } from "@/lib/damageImages";
+import { getDamageTypeIconUrl, getDamageTypeName } from "@/lib/damageImages";
 import { expandTargetTags } from "@/lib/tagHierarchy";
+import { getEffectDisplayNameTranslated, getEffectColor, getEffectIconUrl, getEffectDuration } from "@/lib/statusEffects";
 import type { AbilityInfo } from "@/types/battleSimulator";
 import { LineOfFireLabels } from "@/types/battleSimulator";
 import { AttackDirection, UnitTag } from "@/data/gameEnums";
-import { Check, X } from "lucide-react";
+import { Check, X, Crosshair, Target } from "lucide-react";
 
-// Detailed targeting categories matching what users care about
+// Targeting categories with colors
+const TARGETING_CATEGORIES = {
+  air: { tag: 39, label: "Air", color: "bg-sky-500/20 text-sky-700 dark:text-sky-300 border-sky-500/50" },
+  ground: { tag: 24, label: "Ground", color: "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/50" },
+  sea: { tag: 15, label: "Sea", color: "bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/50" },
+};
+
+function getTargetingCategories(targets: number[]): { canTarget: string[]; cannotTarget: string[] } {
+  if (targets.length === 0) {
+    return { canTarget: ["Air", "Ground", "Sea"], cannotTarget: [] };
+  }
+  
+  const expandedTargets = expandTargetTags(targets);
+  const canTarget: string[] = [];
+  const cannotTarget: string[] = [];
+  
+  if (targets.includes(51) || expandedTargets.includes(51)) {
+    return { canTarget: ["Air", "Ground", "Sea"], cannotTarget: [] };
+  }
+  
+  for (const [key, { tag, label }] of Object.entries(TARGETING_CATEGORIES)) {
+    if (targets.includes(tag) || expandedTargets.includes(tag)) {
+      canTarget.push(label);
+    } else {
+      cannotTarget.push(label);
+    }
+  }
+  
+  return { canTarget, cannotTarget };
+}
+
+// Detailed targeting types for tooltip
 const TARGETING_TYPES = [
   { tag: UnitTag.Air, label: "Air", key: "air" },
   { tag: UnitTag.Lta, label: "LTA", key: "lta" },
@@ -82,6 +114,7 @@ export function LiveAbilitySelector({
           const abilityName = abilityData ? t(abilityData.name) : `Ability ${ability.abilityId}`;
           const iconUrl = abilityData ? getAbilityImageUrl(abilityData.icon) : undefined;
           const dmgTypeIcon = getDamageTypeIconUrl(ability.damageType);
+          const dmgTypeName = getDamageTypeName(ability.damageType);
           
           const abilityCooldown = cooldowns[ability.abilityId] || 0;
           const weaponCooldown = weaponGlobalCooldowns[ability.weaponName] || 0;
@@ -97,6 +130,12 @@ export function LiveAbilitySelector({
           
           const isDisabled = disabled || isOnCooldown || !hasEnoughAmmo || isReloading;
           const totalShots = ability.shotsPerAttack * ability.attacksPerUse;
+          
+          // Get targeting categories
+          const { canTarget, cannotTarget } = getTargetingCategories(ability.targets);
+          
+          // Get status effects
+          const statusEffects = abilityData?.stats?.status_effects || ability.statusEffects || {};
 
           return (
             <Tooltip key={ability.abilityId}>
@@ -107,37 +146,76 @@ export function LiveAbilitySelector({
                   disabled={isDisabled}
                   onClick={() => onSelectAbility(ability.abilityId)}
                   className={cn(
-                    "relative flex items-center gap-2",
+                    "relative flex flex-col items-start gap-1 h-auto py-2 px-3 min-w-[180px]",
                     isDisabled && "opacity-50"
                   )}
                 >
-                  {iconUrl && (
-                    <img
-                      src={iconUrl}
-                      alt=""
-                      className="w-6 h-6 rounded"
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                    />
-                  )}
-                  <div className="text-left">
-                    <span className="truncate max-w-[100px] block text-xs font-medium">{abilityName}</span>
-                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                      {dmgTypeIcon && <img src={dmgTypeIcon} alt="" className="w-3 h-3" />}
-                      <span>
-                        {ability.minDamage}-{ability.maxDamage}
-                        {totalShots > 1 && ` x${totalShots}`}
-                      </span>
+                  <div className="flex items-center gap-2 w-full">
+                    {iconUrl && (
+                      <img
+                        src={iconUrl}
+                        alt=""
+                        className="w-8 h-8 rounded"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    )}
+                    <div className="flex-1 text-left">
+                      <span className="truncate max-w-[120px] block text-sm font-medium">{abilityName}</span>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        {dmgTypeIcon && <img src={dmgTypeIcon} alt="" className="w-3.5 h-3.5" />}
+                        <span>{dmgTypeName}</span>
+                      </div>
                     </div>
+                    {/* Ammo indicator */}
+                    {!isInfiniteAmmo && ability.ammoRequired > 0 && (
+                      <Badge
+                        variant={hasEnoughAmmo ? "outline" : "destructive"}
+                        className="h-5 px-1.5 text-xs"
+                      >
+                        {currentAmmo}/{ability.weaponMaxAmmo}
+                      </Badge>
+                    )}
                   </div>
-                  {/* Ammo indicator */}
-                  {!isInfiniteAmmo && ability.ammoRequired > 0 && (
-                    <Badge
-                      variant={hasEnoughAmmo ? "outline" : "destructive"}
-                      className="ml-1 h-5 px-1 text-xs"
-                    >
-                      {currentAmmo}/{ability.weaponMaxAmmo}
-                    </Badge>
-                  )}
+                  
+                  {/* Damage and stats row */}
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground w-full">
+                    <span className="font-medium text-foreground">
+                      {ability.minDamage}-{ability.maxDamage}
+                      {totalShots > 1 && <span className="text-primary ml-0.5">x{totalShots}</span>}
+                    </span>
+                    <span className="text-muted-foreground/70">|</span>
+                    <span>Off: {ability.offense}</span>
+                    <span className="text-muted-foreground/70">|</span>
+                    <span>{ability.minRange}-{ability.maxRange}</span>
+                  </div>
+                  
+                  {/* Target badges */}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {canTarget.map(cat => (
+                      <Badge 
+                        key={cat} 
+                        variant="outline" 
+                        className={cn(
+                          "text-[10px] h-4 px-1",
+                          cat === "Air" && TARGETING_CATEGORIES.air.color,
+                          cat === "Ground" && TARGETING_CATEGORIES.ground.color,
+                          cat === "Sea" && TARGETING_CATEGORIES.sea.color
+                        )}
+                      >
+                        ✓ {cat}
+                      </Badge>
+                    ))}
+                    {cannotTarget.map(cat => (
+                      <Badge 
+                        key={cat} 
+                        variant="outline" 
+                        className="text-[10px] h-4 px-1 bg-muted/50 text-muted-foreground line-through"
+                      >
+                        {cat}
+                      </Badge>
+                    ))}
+                  </div>
+                  
                   {/* Cooldown badge */}
                   {isOnCooldown && (
                     <Badge
@@ -158,18 +236,28 @@ export function LiveAbilitySelector({
                   )}
                 </Button>
               </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-xs">
-                <div className="text-xs space-y-1">
-                  <p className="font-semibold">{abilityName}</p>
+              <TooltipContent side="bottom" className="max-w-sm">
+                <div className="text-xs space-y-2">
+                  <div className="flex items-center gap-2">
+                    {iconUrl && <img src={iconUrl} alt="" className="w-6 h-6 rounded" />}
+                    <div>
+                      <p className="font-semibold">{abilityName}</p>
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        {dmgTypeIcon && <img src={dmgTypeIcon} alt="" className="w-3 h-3" />}
+                        <span>{dmgTypeName} Damage</span>
+                      </div>
+                    </div>
+                  </div>
+                  
                   <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-muted-foreground">
                     <span>Damage:</span>
-                    <span>{ability.minDamage}-{ability.maxDamage}{totalShots > 1 && ` x${totalShots}`}</span>
+                    <span className="text-foreground">{ability.minDamage}-{ability.maxDamage}{totalShots > 1 && ` x${totalShots}`}</span>
                     <span>Offense:</span>
-                    <span>{ability.offense}</span>
+                    <span className="text-foreground">{ability.offense}</span>
                     <span>Range:</span>
-                    <span>{ability.minRange}-{ability.maxRange}</span>
+                    <span className="text-foreground">{ability.minRange}-{ability.maxRange}</span>
                     <span>Line of Fire:</span>
-                    <span>{LineOfFireLabels[ability.lineOfFire] || "Direct"}</span>
+                    <span className="text-foreground">{LineOfFireLabels[ability.lineOfFire] || "Direct"}</span>
                     {ability.attackDirection === AttackDirection.Back && (
                       <>
                         <span>Direction:</span>
@@ -177,21 +265,21 @@ export function LiveAbilitySelector({
                       </>
                     )}
                     <span>Cooldown:</span>
-                    <span>{ability.cooldown}{ability.globalCooldown > 0 && ` (global: ${ability.globalCooldown})`}</span>
+                    <span className="text-foreground">{ability.cooldown}{ability.globalCooldown > 0 && ` (global: ${ability.globalCooldown})`}</span>
                     {ability.chargeTime > 0 && (
                       <>
                         <span>Charge:</span>
-                        <span>{ability.chargeTime}</span>
+                        <span className="text-foreground">{ability.chargeTime}</span>
                       </>
                     )}
                     <span>Armor Pierce:</span>
-                    <span>{Math.round(ability.armorPiercing * 100)}%</span>
+                    <span className="text-foreground">{Math.round(ability.armorPiercing * 100)}%</span>
                     <span>Crit:</span>
-                    <span>{ability.critPercent}%</span>
+                    <span className="text-foreground">{ability.critPercent}%</span>
                     {ability.suppressionMultiplier !== 1 && (
                       <>
                         <span>Suppression:</span>
-                        <span>{ability.suppressionMultiplier}x {ability.suppressionBonus > 0 && `+${ability.suppressionBonus}`}</span>
+                        <span className="text-foreground">{ability.suppressionMultiplier}x {ability.suppressionBonus > 0 && `+${ability.suppressionBonus}`}</span>
                       </>
                     )}
                     {ability.isFixed && (
@@ -203,22 +291,58 @@ export function LiveAbilitySelector({
                     {ability.targetArea && !ability.isFixed && ability.targetArea.targetType === 2 && (
                       <>
                         <span>Pattern:</span>
-                        <span>AOE ({ability.targetArea.data.length} tiles)</span>
-                      </>
-                    )}
-                    {!isInfiniteAmmo && (
-                      <>
-                        <span>Ammo:</span>
-                        <span>{ability.ammoRequired} per use | {currentAmmo}/{ability.weaponMaxAmmo}</span>
-                      </>
-                    )}
-                    {ability.weaponReloadTime > 0 && (
-                      <>
-                        <span>Reload:</span>
-                        <span>{ability.weaponReloadTime} turns</span>
+                        <span className="text-foreground">AOE ({ability.targetArea.data.length} tiles)</span>
                       </>
                     )}
                   </div>
+                  
+                  {/* Weapon stats */}
+                  <div className="pt-1 border-t">
+                    <p className="text-muted-foreground mb-1">Weapon Stats:</p>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-muted-foreground">
+                      {!isInfiniteAmmo && (
+                        <>
+                          <span>Ammo:</span>
+                          <span className="text-foreground">{ability.ammoRequired} per use | {currentAmmo}/{ability.weaponMaxAmmo}</span>
+                        </>
+                      )}
+                      {ability.weaponReloadTime > 0 && (
+                        <>
+                          <span>Reload:</span>
+                          <span className="text-foreground">{ability.weaponReloadTime} turns</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Status effects */}
+                  {Object.keys(statusEffects).length > 0 && (
+                    <div className="pt-1 border-t">
+                      <p className="text-muted-foreground mb-1">Inflicts:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {Object.entries(statusEffects).map(([effectId, chance]) => {
+                          const id = parseInt(effectId);
+                          const displayName = getEffectDisplayNameTranslated(id);
+                          const color = getEffectColor(id);
+                          const iconUrl = getEffectIconUrl(id);
+                          const duration = getEffectDuration(id);
+                          return (
+                            <div 
+                              key={effectId} 
+                              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-muted border"
+                              style={{ borderColor: color, borderLeftWidth: 2 }}
+                            >
+                              {iconUrl && (
+                                <img src={iconUrl} alt="" className="h-3 w-3 object-contain" />
+                              )}
+                              <span className="font-medium">{displayName}</span>
+                              <span className="text-muted-foreground">({chance as number}%{duration > 0 ? `, ${duration}t` : ""})</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Cooldown/reload status */}
                   {(isOnCooldown || isReloading || !hasEnoughAmmo) && (
@@ -246,7 +370,7 @@ export function LiveAbilitySelector({
                   
                   {/* Detailed targeting breakdown */}
                   <div className="pt-1 border-t space-y-1">
-                    <span className="text-muted-foreground font-medium">Targets:</span>
+                    <span className="text-muted-foreground font-medium">Targetable Unit Types:</span>
                     <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
                       {getTargetingDetails(ability.targets).map(({ tag, label, canHit }) => (
                         <div key={tag} className="flex items-center gap-1.5">
