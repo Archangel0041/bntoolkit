@@ -7,9 +7,11 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { getUnitById } from "@/lib/units";
 import { getUnitAbilities } from "@/lib/battleCalculations";
 import { getAbilityById, getLineOfFireLabel } from "@/lib/abilities";
+import { DamageType, DamageTypeLabels, AttackDirection, AttackDirectionLabels } from "@/data/gameEnums";
 import { UnitBlocking, UnitBlockingLabels, UnitClass, UnitClassLabels } from "@/data/gameEnums";
 import { cn } from "@/lib/utils";
 import type { LiveBattleUnit } from "@/types/liveBattle";
+import { getStatusEffectDisplayName, getStatusEffectIconUrl } from "@/lib/statusEffects";
 
 interface UnitInfoPanelProps {
   unitId: number;
@@ -193,6 +195,12 @@ export function UnitInfoPanel({
                   const abilityCooldown = abilityCooldowns?.[ability.abilityId] ?? 0;
                   const weaponCooldown = weaponGlobalCooldowns?.[ability.weaponName] ?? 0;
                   const lofLabel = getLineOfFireLabel(ability.lineOfFire);
+                  const damageTypeLabel = DamageTypeLabels[ability.damageType] || "Unknown";
+                  const attackDirLabel = AttackDirectionLabels[ability.attackDirection] || "Front";
+                  const ammoRequired = abilityData?.stats.ammo_required ?? 1;
+                  const shotsPerAttack = abilityData?.stats.shots_per_attack ?? 1;
+                  const attacksPerUse = ability.attacksPerUse ?? 1;
+                  const totalShots = shotsPerAttack * attacksPerUse;
                   
                   return (
                     <div key={ability.abilityId} className="text-sm border rounded p-2 space-y-1">
@@ -213,13 +221,15 @@ export function UnitInfoPanel({
                           )}
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-x-2 text-xs text-muted-foreground">
-                        <span>Dmg: {ability.minDamage}-{ability.maxDamage}</span>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
+                        <span>Dmg: {ability.minDamage}-{ability.maxDamage}{totalShots > 1 && ` x${totalShots}`}</span>
                         <span>Offense: {ability.offense}</span>
                         <span>Range: {ability.minRange}-{ability.maxRange}</span>
                         {lofLabel && <span>LoF: {lofLabel}</span>}
                         <span>CD: {ability.cooldown}t</span>
                         <span>GCD: {ability.globalCooldown}t</span>
+                        <span>Type: {damageTypeLabel}</span>
+                        <span>Ammo: {ammoRequired}</span>
                       </div>
                     </div>
                   );
@@ -285,11 +295,16 @@ export function UnitInfoPanel({
             <div>
               <div className="text-xs font-medium text-muted-foreground mb-1">Immunities</div>
               <div className="flex flex-wrap gap-1">
-                {unit.statsConfig.status_effect_immunities.map((immunity, i) => (
-                  <Badge key={i} variant="outline" className="text-xs">
-                    Effect {immunity}
-                  </Badge>
-                ))}
+                {unit.statsConfig.status_effect_immunities.map((immunity, i) => {
+                  const immunityName = getStatusEffectDisplayName(immunity);
+                  const iconUrl = getStatusEffectIconUrl(immunity);
+                  return (
+                    <Badge key={i} variant="outline" className="text-xs gap-1">
+                      {iconUrl && <img src={iconUrl} alt="" className="w-3 h-3" />}
+                      {immunityName}
+                    </Badge>
+                  );
+                })}
               </div>
             </div>
           </>
