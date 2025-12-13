@@ -522,6 +522,36 @@ export function LiveBattleGrid({
                 {unit.maxArmor > 0 && <span> | Armor: {unit.currentArmor}/{unit.maxArmor}</span>}
               </div>
               
+              {/* Active Status Effects */}
+              {unit.activeStatusEffects.length > 0 && (
+                <div className="border-t pt-1.5 space-y-1">
+                  <span className="text-xs text-muted-foreground font-medium">Active Effects:</span>
+                  {unit.activeStatusEffects.map((effect, i) => {
+                    const iconUrl = getEffectIconUrl(effect.effectId);
+                    const effectColor = getStatusEffectColor(effect.effectId);
+                    const effectName = getStatusEffectDisplayName(effect.effectId);
+                    return (
+                      <div key={i} className="flex items-center gap-2 text-xs">
+                        {iconUrl && <img src={iconUrl} alt="" className="w-3 h-3" />}
+                        <span 
+                          className="font-medium"
+                          style={{ color: effectColor }}
+                        >
+                          {effectName}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {effect.remainingDuration}t left
+                          {effect.dotDamage > 0 && ` | ${effect.dotDamage} dmg/t`}
+                        </span>
+                        {effect.isStun && (
+                          <Zap className="h-3 w-3 text-yellow-400" />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              
               {/* Damage preview with detailed info */}
               {hasValidDamagePreview && (
                 <div className="text-sm border-t pt-1.5 space-y-1">

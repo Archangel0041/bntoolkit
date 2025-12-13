@@ -1,5 +1,5 @@
 import { getUnitById } from "@/lib/units";
-import { UnitTag } from "@/data/gameEnums";
+import { UnitTag, DamageType } from "@/data/gameEnums";
 import { getAbilityById } from "@/lib/abilities";
 import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTargetUnit, getDamageModifier } from "@/lib/battleCalculations";
 import { getBlockingUnits, checkLineOfFire, calculateRange } from "@/lib/battleTargeting";
@@ -596,13 +596,13 @@ export function executeAttack(
       const adjustedChance = Math.floor(chance * (pos.damagePercent / 100));
       
       if (rollStatusEffect(adjustedChance)) {
-        // Calculate DoT damage
+        // Calculate DoT damage based on ACTUAL damage dealt (not average)
         let dotDamage = 0;
         if (effect.dot_ability_damage_mult || effect.dot_bonus_damage) {
-          const avgDamage = Math.floor((ability.minDamage + ability.maxDamage) / 2);
-          const baseDotDamage = Math.floor(avgDamage * (effect.dot_ability_damage_mult || 0) + (effect.dot_bonus_damage || 0));
-          // Scale DoT damage by damage percent (e.g., 25% splash = 25% DoT damage)
-          dotDamage = Math.floor(baseDotDamage * (pos.damagePercent / 100));
+          // Use actual damage dealt (HP + armor damage) as the base
+          const actualDamageDealt = totalHpDamage + totalArmorDamage;
+          const baseDotDamage = Math.floor(actualDamageDealt * (effect.dot_ability_damage_mult || 0) + (effect.dot_bonus_damage || 0));
+          dotDamage = baseDotDamage;
         }
         
         const isStun = effect.stun_block_action === true;
@@ -974,9 +974,16 @@ export function processStatusEffects(
       }
     }
     
-    // Reduce durations and remove expired effects
+    // Reduce durations, halve Fire DoT, and remove expired effects
     unit.activeStatusEffects = unit.activeStatusEffects.filter(e => {
       e.remainingDuration--;
+      
+      // Fire DoT (damage type 5) halves each turn
+      if (e.dotDamageType === DamageType.Fire && e.dotDamage > 0) {
+        e.dotDamage = Math.floor(e.dotDamage / 2);
+      }
+      // Poison and other DoTs remain the same
+      
       return e.remainingDuration > 0;
     });
   }
