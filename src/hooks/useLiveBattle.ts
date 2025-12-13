@@ -482,11 +482,15 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   // 3. Execute it
   // 4. Return control to player
   const executeEnemyTurn = useCallback(() => {
+    console.log('[executeEnemyTurn] Called. isPlayerTurn:', battleState?.isPlayerTurn, 'isProcessing:', isProcessing);
+    
     // Guard: only execute if it's enemy turn and not already processing
-    if (!battleState || battleState.isPlayerTurn || battleState.isBattleOver || isProcessing) return;
+    if (!battleState || battleState.isPlayerTurn || battleState.isBattleOver || isProcessing) {
+      console.log('[executeEnemyTurn] Early return - guard failed');
+      return;
+    }
 
-    // Immediately mark as player turn to prevent re-entry
-    setBattleState(prev => prev ? { ...prev, isPlayerTurn: true } : prev);
+    console.log('[executeEnemyTurn] Starting enemy turn');
     setIsProcessing(true);
 
     // 1. Clone state as working copy
@@ -557,6 +561,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         }
       }
     }
+    console.log('[executeEnemyTurn] Ability pool size:', abilityPool.length);
 
     // 6. If no valid abilities, skip turn
     if (abilityPool.length === 0) {
