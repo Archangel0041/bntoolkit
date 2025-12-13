@@ -7,22 +7,21 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { getUnitById } from "@/lib/units";
 import { getUnitAbilities } from "@/lib/battleCalculations";
 import { getAbilityById, getLineOfFireLabel } from "@/lib/abilities";
-import { DamageType, DamageTypeLabels, AttackDirection, AttackDirectionLabels } from "@/data/gameEnums";
-import { UnitBlocking, UnitBlockingLabels, UnitClass, UnitClassLabels } from "@/data/gameEnums";
+import { DamageTypeLabels } from "@/data/gameEnums";
+import { UnitBlocking, UnitBlockingLabels, UnitClassLabels } from "@/data/gameEnums";
 import { cn } from "@/lib/utils";
-import type { LiveBattleUnit } from "@/types/liveBattle";
-import { getStatusEffectDisplayName, getStatusEffectIconUrl } from "@/lib/statusEffects";
+import { getStatusEffectDisplayName, getStatusEffectIconUrl, getEffectDisplayNameTranslated, getEffectIconUrl, getStatusEffect } from "@/lib/statusEffects";
+import { getAbilityImageUrl } from "@/lib/abilityImages";
+import { getDamageTypeIconUrl } from "@/lib/damageImages";
 
 interface UnitInfoPanelProps {
   unitId: number;
   rank: number;
   gridId?: number;
   isEnemy?: boolean;
-  // Live battle state (optional)
   currentHp?: number;
   currentArmor?: number;
   weaponAmmo?: Record<string, number>;
-  // Cooldown tracking for live battle
   abilityCooldowns?: Record<number, number>;
   weaponGlobalCooldowns?: Record<string, number>;
   className?: string;
@@ -45,6 +44,17 @@ export function UnitInfoPanel({
   const unit = useMemo(() => getUnitById(unitId), [unitId]);
   const abilities = useMemo(() => getUnitAbilities(unitId, rank), [unitId, rank]);
   
+  // Group abilities by weapon
+  const abilitiesByWeapon = useMemo(() => {
+    const grouped: Record<string, typeof abilities> = {};
+    abilities.forEach(ability => {
+      const weaponName = ability.weaponName || "default";
+      if (!grouped[weaponName]) grouped[weaponName] = [];
+      grouped[weaponName].push(ability);
+    });
+    return grouped;
+  }, [abilities]);
+  
   if (!unit) return null;
 
   const stats = unit.statsConfig?.stats?.[rank - 1];
@@ -55,28 +65,21 @@ export function UnitInfoPanel({
   const classLabel = UnitClassLabels[className_] || `Class ${className_}`;
   const preferredRow = unit.statsConfig?.preferred_row || 1;
   const size = unit.statsConfig?.size || 1;
-  
-  // Get unit name
   const unitName = t(unit.identity.name);
 
-  // Stats
   const hp = stats?.hp || 0;
   const armorHp = stats?.armor_hp || 0;
   const accuracy = stats?.accuracy || 0;
   const defense = stats?.defense || 0;
-  const dodge = stats?.dodge || 0;
   const power = stats?.power || 0;
   const bravery = stats?.bravery || 0;
   const critical = stats?.critical || 0;
   const pv = stats?.pv || 0;
 
-  // Display current vs max if provided
   const displayHp = currentHp !== undefined ? `${currentHp}/${hp}` : hp;
   const displayArmor = currentArmor !== undefined ? `${currentArmor}/${armorHp}` : armorHp;
 
-  // Weapons info
   const weapons = unit.weapons?.weapons;
-  const weaponList = weapons ? Object.entries(weapons) : [];
 
   return (
     <Card className={cn("w-full", className)}>
@@ -182,111 +185,114 @@ export function UnitInfoPanel({
           </div>
         </div>
 
-        {/* Abilities Section */}
-        {abilities.length > 0 && (
-          <>
-            <Separator />
-            <div>
-              <div className="text-xs font-medium text-muted-foreground mb-1">Abilities</div>
+        {/* Weapons & Abilities (grouped) */}
+        {Object.entries(abilitiesByWeapon).map(([weaponName, weaponAbilities]) => {
+          const weapon = weapons?.[weaponName];
+          const currentAmmo = weaponAmmo?.[weaponName];
+          const maxAmmo = weapon?.stats.ammo ?? -1;
+          const hasInfiniteAmmo = maxAmmo === -1;
+          const reloadTime = weapon?.stats.reload_time;
+          const weaponCooldown = weaponGlobalCooldowns?.[weaponName] ?? 0;
+          const weaponDisplayName = weapon ? t(weapon.name) : `Weapon ${weaponName}`;
+
+          return (
+            <div key={weaponName}>
+              <Separator />
+              {/* Weapon Header */}
+              <div className="mt-2 mb-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">{weaponDisplayName}</span>
+                  <div className="flex items-center gap-2 text-xs">
+                    {weaponCooldown > 0 && (
+                      <Badge variant="secondary" className="text-xs h-5">CD: {weaponCooldown}</Badge>
+                    )}
+                    <span className={cn(
+                      "font-medium",
+                      currentAmmo !== undefined && currentAmmo === 0 && "text-red-500"
+                    )}>
+                      {hasInfiniteAmmo ? "∞" : (
+                        currentAmmo !== undefined ? `${currentAmmo}/${maxAmmo}` : `${maxAmmo} ammo`
+                      )}
+                    </span>
+                    {reloadTime && reloadTime > 0 && (
+                      <span className="text-muted-foreground">({reloadTime}t reload)</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Abilities for this weapon */}
               <div className="space-y-1.5">
-                {abilities.map((ability) => {
+                {weaponAbilities.map((ability) => {
                   const abilityData = getAbilityById(ability.abilityId);
                   const abilityName = abilityData ? t(abilityData.name) : `Ability ${ability.abilityId}`;
                   const abilityCooldown = abilityCooldowns?.[ability.abilityId] ?? 0;
-                  const weaponCooldown = weaponGlobalCooldowns?.[ability.weaponName] ?? 0;
                   const lofLabel = getLineOfFireLabel(ability.lineOfFire);
                   const damageTypeLabel = DamageTypeLabels[ability.damageType] || "Unknown";
-                  const attackDirLabel = AttackDirectionLabels[ability.attackDirection] || "Front";
+                  const damageTypeIcon = getDamageTypeIconUrl(ability.damageType);
+                  const abilityIcon = abilityData?.icon ? getAbilityImageUrl(abilityData.icon) : null;
                   const ammoRequired = abilityData?.stats.ammo_required ?? 1;
                   const shotsPerAttack = abilityData?.stats.shots_per_attack ?? 1;
                   const attacksPerUse = ability.attacksPerUse ?? 1;
                   const totalShots = shotsPerAttack * attacksPerUse;
                   
+                  // Get status effects from ability
+                  const statusEffects = abilityData?.stats.status_effects 
+                    ? Object.entries(abilityData.stats.status_effects) 
+                    : [];
+                  
                   return (
                     <div key={ability.abilityId} className="text-sm border rounded p-2 space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium truncate" title={abilityName}>
+                      <div className="flex items-center gap-2">
+                        {abilityIcon && (
+                          <img src={abilityIcon} alt="" className="w-6 h-6 rounded" />
+                        )}
+                        <span className="font-medium truncate flex-1" title={abilityName}>
                           {abilityName}
                         </span>
-                        <div className="flex items-center gap-1">
-                          {abilityCooldown > 0 && (
-                            <Badge variant="destructive" className="text-xs h-5">
-                              CD: {abilityCooldown}
-                            </Badge>
-                          )}
-                          {weaponCooldown > 0 && (
-                            <Badge variant="secondary" className="text-xs h-5">
-                              WCD: {weaponCooldown}
-                            </Badge>
-                          )}
-                        </div>
+                        {abilityCooldown > 0 && (
+                          <Badge variant="destructive" className="text-xs h-5">CD: {abilityCooldown}</Badge>
+                        )}
                       </div>
+                      
                       <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
-                        <span>Dmg: {ability.minDamage}-{ability.maxDamage}{totalShots > 1 && ` x${totalShots}`}</span>
+                        <span className="flex items-center gap-1">
+                          {damageTypeIcon && <img src={damageTypeIcon} alt="" className="w-3 h-3" />}
+                          {damageTypeLabel}: {ability.minDamage}-{ability.maxDamage}{totalShots > 1 && ` x${totalShots}`}
+                        </span>
                         <span>Offense: {ability.offense}</span>
                         <span>Range: {ability.minRange}-{ability.maxRange}</span>
                         {lofLabel && <span>LoF: {lofLabel}</span>}
-                        <span>CD: {ability.cooldown}t</span>
-                        <span>GCD: {ability.globalCooldown}t</span>
-                        <span>Type: {damageTypeLabel}</span>
+                        <span>CD: {ability.cooldown}t / GCD: {ability.globalCooldown}t</span>
                         <span>Ammo: {ammoRequired}</span>
                       </div>
+
+                      {/* Status Effects */}
+                      {statusEffects.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {statusEffects.map(([effectId, chance]) => {
+                            const effectIdNum = parseInt(effectId);
+                            const effectName = getEffectDisplayNameTranslated(effectIdNum);
+                            const effectIcon = getEffectIconUrl(effectIdNum);
+                            const effect = getStatusEffect(effectIdNum);
+                            const duration = effect?.duration ?? 0;
+                            
+                            return (
+                              <Badge key={effectId} variant="outline" className="text-xs gap-1">
+                                {effectIcon && <img src={effectIcon} alt="" className="w-3 h-3" />}
+                                {effectName} ({chance}%{duration > 0 && `, ${duration}t`})
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
             </div>
-          </>
-        )}
-
-        {/* Weapons & Ammo */}
-        {weaponList.length > 0 && (
-          <>
-            <Separator />
-            <div>
-              <div className="text-xs font-medium text-muted-foreground mb-1">Weapons</div>
-              <div className="space-y-1">
-                {weaponList.map(([name, weapon]) => {
-                  const currentAmmo = weaponAmmo?.[name];
-                  const maxAmmo = weapon.stats.ammo;
-                  const hasInfiniteAmmo = maxAmmo === -1;
-                  const reloadTime = weapon.stats.reload_time;
-                  const weaponCooldown = weaponGlobalCooldowns?.[name] ?? 0;
-
-                  return (
-                    <div key={name} className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground truncate max-w-[120px]" title={t(weapon.name)}>
-                        {t(weapon.name)}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        {weaponCooldown > 0 && (
-                          <Badge variant="secondary" className="text-xs h-5">
-                            CD: {weaponCooldown}
-                          </Badge>
-                        )}
-                        <span className={cn(
-                          "font-medium",
-                          currentAmmo !== undefined && currentAmmo === 0 && "text-red-500"
-                        )}>
-                          {hasInfiniteAmmo ? "∞" : (
-                            currentAmmo !== undefined 
-                              ? `${currentAmmo}/${maxAmmo}` 
-                              : maxAmmo
-                          )}
-                        </span>
-                        {reloadTime && reloadTime > 0 && (
-                          <span className="text-xs text-muted-foreground">
-                            ({reloadTime}t reload)
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </>
-        )}
+          );
+        })}
 
         {/* Status Effect Immunities */}
         {unit.statsConfig?.status_effect_immunities && unit.statsConfig.status_effect_immunities.length > 0 && (
