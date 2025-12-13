@@ -416,6 +416,17 @@ export function executeAttack(
   } else {
     affectedPositions = [{ gridId: targetGridId, damagePercent: 100 }];
   }
+  
+  // Deduplicate: each grid position should only be hit once per attack
+  // If same position appears multiple times, take the highest damage percent
+  const positionMap = new Map<number, number>();
+  for (const pos of affectedPositions) {
+    const existing = positionMap.get(pos.gridId);
+    if (existing === undefined || pos.damagePercent > existing) {
+      positionMap.set(pos.gridId, pos.damagePercent);
+    }
+  }
+  affectedPositions = Array.from(positionMap.entries()).map(([gridId, damagePercent]) => ({ gridId, damagePercent }));
 
   const abilityData = getAbilityById(ability.abilityId);
   const abilityName = abilityData?.name || `Ability ${ability.abilityId}`;
