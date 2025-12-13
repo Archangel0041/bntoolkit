@@ -1,9 +1,11 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import {
   initializeBattle,
   getAvailableAbilities,
   getValidTargets,
   executeAttack,
+  executeRandomAttack,
+  isRandomAttack,
   processStatusEffects,
   reduceCooldowns,
   checkBattleEnd,
@@ -31,6 +33,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   const [selectedUnitGridId, setSelectedUnitGridId] = useState<number | null>(null);
   const [selectedAbilityId, setSelectedAbilityId] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [currentEnemyIndex, setCurrentEnemyIndex] = useState<number>(0);
 
   // Get environmental damage mods
   const environmentalDamageMods = useMemo(() => {
@@ -48,6 +51,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     setSelectedUnitGridId(null);
     setSelectedAbilityId(null);
     setIsProcessing(false);
+    setCurrentEnemyIndex(0);
   }, [friendlyParty, waves, startingWave]);
 
   // Get currently selected unit
@@ -321,22 +325,35 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   const executePlayerAction = useCallback((targetGridId: number) => {
     if (!battleState || !selectedUnit || !selectedAbility || isProcessing) return;
     
-    // Validate target
-    if (!validTargets.some(t => t.gridId === targetGridId)) return;
+    // For random attacks, we don't need a specific target validation
+    const isRandom = isRandomAttack(selectedAbility);
+    
+    // Validate target only for non-random attacks
+    if (!isRandom && !validTargets.some(t => t.gridId === targetGridId)) return;
 
     setIsProcessing(true);
 
     setBattleState(prev => {
       if (!prev) return prev;
 
-      // Execute the attack
-      const actions = executeAttack(
-        selectedUnit,
-        selectedAbility,
-        targetGridId,
-        prev,
-        environmentalDamageMods
-      );
+      // Execute the attack (random or normal)
+      let actions: BattleAction[];
+      if (isRandom) {
+        actions = executeRandomAttack(
+          selectedUnit,
+          selectedAbility,
+          prev,
+          environmentalDamageMods
+        );
+      } else {
+        actions = executeAttack(
+          selectedUnit,
+          selectedAbility,
+          targetGridId,
+          prev,
+          environmentalDamageMods
+        );
+      }
 
       // Add turn to log
       const turn: BattleTurn = {
@@ -365,7 +382,8 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     setIsProcessing(false);
   }, [battleState, selectedUnit, selectedAbility, validTargets, isProcessing, environmentalDamageMods]);
 
-  // Execute enemy turn (AI)
+
+  // Execute one enemy action at a time
   const executeEnemyTurn = useCallback(() => {
     if (!battleState || battleState.isPlayerTurn || battleState.isBattleOver || isProcessing) return;
 
@@ -376,29 +394,59 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
 
       const allActions: BattleAction[] = [];
 
-      // Process status effects for all units at start of turn
-      const statusActions = processStatusEffects([...prev.friendlyUnits, ...prev.enemyUnits]);
-      allActions.push(...statusActions);
+      // Process status effects only at the start of enemy phase (first enemy)
+      if (currentEnemyIndex === 0) {
+        const statusActions = processStatusEffects([...prev.friendlyUnits, ...prev.enemyUnits]);
+        allActions.push(...statusActions);
 
-      // Check for deaths from status effects
-      const endCheckAfterStatus = checkBattleEnd(prev);
-      if (endCheckAfterStatus.isOver) {
+        // Check for deaths from status effects
+        const endCheckAfterStatus = checkBattleEnd(prev);
+        if (endCheckAfterStatus.isOver) {
+          const turn: BattleTurn = {
+            turnNumber: prev.currentTurn,
+            isPlayerTurn: false,
+            actions: allActions,
+          };
+          setCurrentEnemyIndex(0);
+          setIsProcessing(false);
+          return {
+            ...prev,
+            battleLog: [...prev.battleLog, turn],
+            isBattleOver: true,
+            isPlayerVictory: endCheckAfterStatus.playerWon,
+          };
+        }
+      }
+
+      // Get alive enemies
+      const aliveEnemies = prev.enemyUnits.filter(e => !e.isDead);
+      
+      if (aliveEnemies.length === 0) {
+        // No enemies alive, end enemy turn
+        const endCheck = checkBattleEnd(prev);
         const turn: BattleTurn = {
           turnNumber: prev.currentTurn,
           isPlayerTurn: false,
           actions: allActions,
         };
+        setCurrentEnemyIndex(0);
+        setIsProcessing(false);
         return {
           ...prev,
+          currentTurn: prev.currentTurn + 1,
+          isPlayerTurn: true,
           battleLog: [...prev.battleLog, turn],
-          isBattleOver: true,
-          isPlayerVictory: endCheckAfterStatus.playerWon,
+          isBattleOver: endCheck.isOver,
+          isPlayerVictory: endCheck.playerWon,
         };
       }
 
-      // Each enemy unit takes an action
-      for (const enemy of prev.enemyUnits) {
-        if (enemy.isDead) continue;
+      // Find the next enemy that can act
+      let enemyToAct: { enemy: LiveBattleUnit; action: ReturnType<typeof aiSelectAction> } | null = null;
+      let newEnemyIndex = currentEnemyIndex;
+      
+      for (let i = currentEnemyIndex; i < aliveEnemies.length; i++) {
+        const enemy = aliveEnemies[i];
         if (enemy.activeStatusEffects.some(e => e.isStun)) {
           allActions.push({
             type: "skip",
@@ -407,37 +455,81 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           });
           continue;
         }
-
+        
         const action = aiSelectAction(enemy, prev);
         if (action) {
-          const attackActions = executeAttack(
+          enemyToAct = { enemy, action };
+          newEnemyIndex = i + 1;
+          break;
+        } else {
+          // No valid action, this enemy passes
+          allActions.push({
+            type: "skip",
+            targetGridId: enemy.gridId,
+            message: "No valid targets, passing",
+          });
+        }
+      }
+
+      if (enemyToAct && enemyToAct.action) {
+        const { enemy, action } = enemyToAct;
+        
+        // Check if this is a random attack
+        let attackActions: BattleAction[];
+        if (isRandomAttack(action.ability)) {
+          attackActions = executeRandomAttack(
+            enemy,
+            action.ability,
+            prev,
+            environmentalDamageMods
+          );
+        } else {
+          attackActions = executeAttack(
             enemy,
             action.ability,
             action.targetGridId,
             prev,
             environmentalDamageMods
           );
-          allActions.push(...attackActions);
+        }
+        allActions.push(...attackActions);
 
-          // Check if battle ended mid-turn
-          const midTurnCheck = checkBattleEnd(prev);
-          if (midTurnCheck.isOver) {
-            const turn: BattleTurn = {
-              turnNumber: prev.currentTurn,
-              isPlayerTurn: false,
-              actions: allActions,
-            };
-            return {
-              ...prev,
-              battleLog: [...prev.battleLog, turn],
-              isBattleOver: true,
-              isPlayerVictory: midTurnCheck.playerWon,
-            };
-          }
+        // Check if battle ended
+        const midTurnCheck = checkBattleEnd(prev);
+        if (midTurnCheck.isOver) {
+          const turn: BattleTurn = {
+            turnNumber: prev.currentTurn,
+            isPlayerTurn: false,
+            actions: allActions,
+          };
+          setCurrentEnemyIndex(0);
+          setIsProcessing(false);
+          return {
+            ...prev,
+            battleLog: [...prev.battleLog, turn],
+            isBattleOver: true,
+            isPlayerVictory: midTurnCheck.playerWon,
+          };
+        }
+
+        // Check if more enemies need to act
+        if (newEnemyIndex < aliveEnemies.length) {
+          // More enemies to go - log this action and stay on enemy turn
+          const turn: BattleTurn = {
+            turnNumber: prev.currentTurn,
+            isPlayerTurn: false,
+            actions: allActions,
+          };
+          setCurrentEnemyIndex(newEnemyIndex);
+          setIsProcessing(false);
+          return {
+            ...prev,
+            battleLog: [...prev.battleLog, turn],
+          };
         }
       }
 
-      // Reduce cooldowns for enemy units
+      // All enemies have acted - reduce cooldowns and switch to player turn
       reduceCooldowns(prev.enemyUnits);
 
       const turn: BattleTurn = {
@@ -447,6 +539,8 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       };
 
       const endCheck = checkBattleEnd(prev);
+      setCurrentEnemyIndex(0);
+      setIsProcessing(false);
 
       return {
         ...prev,
@@ -457,9 +551,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         isPlayerVictory: endCheck.playerWon,
       };
     });
-
-    setIsProcessing(false);
-  }, [battleState, isProcessing, environmentalDamageMods]);
+  }, [battleState, isProcessing, environmentalDamageMods, currentEnemyIndex]);
 
   // Check if all enemies are dead and auto-advance wave
   const checkWaveAdvance = useCallback(() => {
@@ -475,6 +567,8 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   // Advance to next wave (enemies go first on subsequent waves)
   const advanceWave = useCallback(() => {
     if (!battleState || battleState.currentWave >= battleState.totalWaves - 1) return;
+
+    setCurrentEnemyIndex(0); // Reset enemy index for new wave
 
     setBattleState(prev => {
       if (!prev) return prev;
