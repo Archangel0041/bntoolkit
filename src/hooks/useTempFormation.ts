@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import type { PartyUnit } from "@/types/battleSimulator";
 import type { Encounter } from "@/types/encounters";
 import { getUnitById } from "@/lib/units";
@@ -12,6 +12,16 @@ interface UseTempFormationOptions {
 
 export function useTempFormation(options: UseTempFormationOptions = {}) {
   const [units, setUnits] = useState<PartyUnit[]>(options.initialUnits || []);
+  const hasInitialized = useRef(false);
+  
+  // Sync initial units on first render (handles async location.state)
+  useEffect(() => {
+    if (!hasInitialized.current && options.initialUnits && options.initialUnits.length > 0) {
+      console.log("Loading initial formation:", options.initialUnits);
+      setUnits([...options.initialUnits]);
+      hasInitialized.current = true;
+    }
+  }, [options.initialUnits]);
 
   const addUnit = useCallback((unitId: number, preferredGridId?: number): { success: boolean; error?: string } => {
     const unit = getUnitById(unitId);
