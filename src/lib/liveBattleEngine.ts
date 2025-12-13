@@ -187,14 +187,18 @@ export function getAvailableAbilities(
   
   const available = abilities.filter(ability => {
     // Check ability-specific cooldown
-    if (unit.abilityCooldowns[ability.abilityId] > 0) {
-      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} is on cooldown`);
+    const abilityCooldown = unit.abilityCooldowns[ability.abilityId] ?? 0;
+    console.log(`[getAvailableAbilities] Ability ${ability.abilityId} (${ability.weaponName}): abilityCooldown=${abilityCooldown} (from unit.abilityCooldowns), ability.cooldown=${ability.cooldown}`);
+    if (abilityCooldown > 0) {
+      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} is on cooldown (${abilityCooldown} turns remaining)`);
       return false;
     }
     
     // Check weapon global cooldown - blocks ALL abilities on this weapon
-    if (unit.weaponGlobalCooldown[ability.weaponName] > 0) {
-      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} blocked by weapon global cooldown (weapon: ${ability.weaponName})`);
+    const weaponCooldown = unit.weaponGlobalCooldown[ability.weaponName] ?? 0;
+    console.log(`[getAvailableAbilities] Ability ${ability.abilityId} (${ability.weaponName}): weaponGlobalCooldown=${weaponCooldown} (from unit.weaponGlobalCooldown), ability.globalCooldown=${ability.globalCooldown}`);
+    if (weaponCooldown > 0) {
+      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} blocked by weapon global cooldown (weapon: ${ability.weaponName}, ${weaponCooldown} turns remaining)`);
       return false;
     }
     
@@ -390,6 +394,10 @@ export function executeAttack(
   const actions: BattleAction[] = [];
   const allTargets = attacker.isEnemy ? state.friendlyUnits : state.enemyUnits;
   
+  // Get attacker name
+  const attackerUnit = getUnitById(attacker.unitId);
+  const attackerName = attackerUnit?.identity?.name || `Unit ${attacker.unitId}`;
+  
   // Get affected positions (for AOE/fixed attacks)
   let affectedPositions: { gridId: number; damagePercent: number }[];
   
@@ -412,6 +420,7 @@ export function executeAttack(
     if (!target) continue;
     
     const targetUnit = getUnitById(target.unitId);
+    const targetName = targetUnit?.identity?.name || `Unit ${target.unitId}`;
     const targetStats = targetUnit?.statsConfig?.stats?.[target.rank - 1];
     const defense = targetStats?.defense || 0;
     
@@ -434,7 +443,9 @@ export function executeAttack(
       actions.push({
         type: "dodge",
         attackerGridId: attacker.gridId,
+        attackerName,
         targetGridId: target.gridId,
+        targetName,
         abilityId: ability.abilityId,
         abilityName,
         wasDodged: true,
@@ -493,7 +504,9 @@ export function executeAttack(
         actions.push({
           type: "crit",
           attackerGridId: attacker.gridId,
+          attackerName,
           targetGridId: target.gridId,
+          targetName,
           abilityId: ability.abilityId,
           wasCrit: true,
           message: `Critical hit!`,
@@ -504,7 +517,9 @@ export function executeAttack(
     actions.push({
       type: "attack",
       attackerGridId: attacker.gridId,
+      attackerName,
       targetGridId: target.gridId,
+      targetName,
       abilityId: ability.abilityId,
       abilityName,
       damage: totalArmorDamage + totalHpDamage,
@@ -519,7 +534,8 @@ export function executeAttack(
       actions.push({
         type: "death",
         targetGridId: target.gridId,
-        message: `Unit defeated!`,
+        targetName,
+        message: `${targetName} defeated!`,
       });
     }
     
@@ -614,6 +630,10 @@ export function executeRandomAttack(
     return actions;
   }
   
+  // Get attacker name
+  const attackerUnit = getUnitById(attacker.unitId);
+  const attackerName = attackerUnit?.identity?.name || `Unit ${attacker.unitId}`;
+  
   const abilityData = getAbilityById(ability.abilityId);
   const abilityName = abilityData?.name || `Ability ${ability.abilityId}`;
   
@@ -660,6 +680,7 @@ export function executeRandomAttack(
     if (!target) continue;
     
     const targetUnit = getUnitById(target.unitId);
+    const targetName = targetUnit?.identity?.name || `Unit ${target.unitId}`;
     const targetStats = targetUnit?.statsConfig?.stats?.[target.rank - 1];
     const defense = targetStats?.defense || 0;
     const dodgeChance = calculateDodgeChance(defense, ability.offense);
@@ -673,7 +694,9 @@ export function executeRandomAttack(
         actions.push({
           type: "dodge",
           attackerGridId: attacker.gridId,
+          attackerName,
           targetGridId: target.gridId,
+          targetName,
           wasDodged: true,
           message: "Attack dodged!",
         });
@@ -685,7 +708,15 @@ export function executeRandomAttack(
       const finalDamage = isCrit ? Math.floor(baseDamage * 2) : baseDamage;
       
       if (isCrit) {
-        actions.push({ type: "crit", wasCrit: true, message: "Critical hit!" });
+        actions.push({
+          type: "crit",
+          attackerGridId: attacker.gridId,
+          attackerName,
+          targetGridId: target.gridId,
+          targetName,
+          wasCrit: true,
+          message: "Critical hit!",
+        });
       }
       
       const statusDamageMods = getStatusEffectDamageMods(target);
@@ -717,7 +748,9 @@ export function executeRandomAttack(
       actions.push({
         type: "attack",
         attackerGridId: attacker.gridId,
+        attackerName,
         targetGridId: target.gridId,
+        targetName,
         abilityId: ability.abilityId,
         abilityName,
         damage: totalArmorDamage + totalHpDamage,
@@ -729,7 +762,12 @@ export function executeRandomAttack(
     
     if (target.currentHp <= 0) {
       target.isDead = true;
-      actions.push({ type: "death", targetGridId: target.gridId, message: "Unit defeated!" });
+      actions.push({
+        type: "death",
+        targetGridId: target.gridId,
+        targetName,
+        message: `${targetName} defeated!`,
+      });
     }
   }
   
@@ -865,9 +903,20 @@ export function aiSelectAction(
   const unitData = getUnitById(unit.unitId);
   const unitName = unitData?.identity?.name || `Unit ${unit.unitId}`;
   
+  // Log all abilities for this unit with their cooldown states
+  const allAbilities = getUnitAbilities(unit.unitId, unit.rank);
+  console.log(`[AI] ${unitName} (grid ${unit.gridId}) - All abilities:`, allAbilities.map(a => ({
+    id: a.abilityId,
+    weapon: a.weaponName,
+    cooldown: a.cooldown,
+    globalCooldown: a.globalCooldown
+  })));
+  console.log(`[AI] ${unitName} - Current ability cooldowns:`, unit.abilityCooldowns);
+  console.log(`[AI] ${unitName} - Current weapon global cooldowns:`, unit.weaponGlobalCooldown);
+  
   const availableAbilities = getAvailableAbilities(unit, state.enemyUnits, state.friendlyUnits);
   
-  console.log(`[AI] ${unitName} (grid ${unit.gridId}): ${availableAbilities.length} available abilities`);
+  console.log(`[AI] ${unitName} (grid ${unit.gridId}): ${availableAbilities.length} available abilities after filtering`);
   
   if (availableAbilities.length === 0) {
     console.log(`[AI] ${unitName}: No available abilities`);
@@ -875,7 +924,7 @@ export function aiSelectAction(
   }
   
   const ability = availableAbilities[Math.floor(Math.random() * availableAbilities.length)];
-  console.log(`[AI] ${unitName}: Selected ability ${ability.abilityId}`);
+  console.log(`[AI] ${unitName}: Selected ability ${ability.abilityId} (weapon: ${ability.weaponName})`);
   
   const validTargets = getValidTargets(unit, ability, state.enemyUnits, state.friendlyUnits);
   console.log(`[AI] ${unitName}: ${validTargets.length} valid targets`);
@@ -886,7 +935,9 @@ export function aiSelectAction(
   }
   
   const target = validTargets[Math.floor(Math.random() * validTargets.length)];
-  console.log(`[AI] ${unitName}: Targeting grid ${target.gridId}`);
+  const targetData = getUnitById(target.unitId);
+  const targetName = targetData?.identity?.name || `Unit ${target.unitId}`;
+  console.log(`[AI] ${unitName}: Targeting ${targetName} (grid ${target.gridId})`);
   
   return { ability, targetGridId: target.gridId };
 }
