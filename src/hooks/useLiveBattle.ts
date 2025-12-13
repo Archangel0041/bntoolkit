@@ -22,7 +22,7 @@ import { UnitTag } from "@/data/gameEnums";
 import { getAbilityById } from "@/lib/abilities";
 import { getFixedAttackPositions, getAffectedGridPositions } from "@/types/battleSimulator";
 import { useLanguage } from "@/contexts/LanguageContext";
-import type { PartyUnit, AbilityInfo, DamagePreview, DamageResult, StatusEffectPreview } from "@/types/battleSimulator";
+import type { PartyUnit, AbilityInfo, DamagePreview, DamageResult, StatusEffectPreview, TargetArea } from "@/types/battleSimulator";
 import type { EncounterUnit, Encounter } from "@/types/encounters";
 import type { LiveBattleState, LiveBattleUnit, BattleAction, BattleTurn, TurnSummary } from "@/types/liveBattle";
 
@@ -202,18 +202,45 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     // Get affected positions based on ability type
     let affectedPositions: { gridId: number; damagePercent: number }[];
     
+    // Check if this is a "single-selection with splash" ability:
+    // - Has damageArea with non-center positions (splash)
+    // - targetArea is either missing, or only has center position (no movable reticle)
+    const hasNonCenterSplash = selectedAbility.damageArea?.some(d => d.x !== 0 || d.y !== 0) ?? false;
+    const targetAreaHasOnlyCenter = !selectedAbility.targetArea || 
+      (selectedAbility.targetArea.data.length === 1 && 
+       selectedAbility.targetArea.data[0].x === 0 && 
+       selectedAbility.targetArea.data[0].y === 0);
+    const isSingleSelectionWithSplash = hasNonCenterSplash && targetAreaHasOnlyCenter;
+    
     if (isRandom) {
       // For random attacks, all enemy positions are potentially affected
       affectedPositions = targets.map(u => ({ gridId: u.gridId, damagePercent: 100 }));
     } else if (selectedAbility.isFixed && fixedAttackPositions.enemyGrid.length > 0) {
       affectedPositions = fixedAttackPositions.enemyGrid;
+    } else if (isSingleSelectionWithSplash) {
+      // Single-selection with splash (like Legendary Sandworm's Maul)
+      // Calculate splash positions for ALL potential targets to show in preview
+      const allSplashPositions: { gridId: number; damagePercent: number }[] = [];
+      for (const target of targets.filter(t => !t.isDead)) {
+        const syntheticTargetArea: TargetArea = {
+          targetType: 2,
+          data: [{ x: 0, y: 0, damagePercent: 100 }],
+        };
+        const splashPositions = getAffectedGridPositions(target.gridId, syntheticTargetArea, true, selectedAbility.damageArea);
+        for (const pos of splashPositions) {
+          // Check if this position already exists
+          const existing = allSplashPositions.find(p => p.gridId === pos.gridId);
+          if (existing) {
+            // Take max damage percent (targets hit by multiple abilities would get multiple preview calculations)
+            existing.damagePercent = Math.max(existing.damagePercent, pos.damagePercent);
+          } else {
+            allSplashPositions.push({ gridId: pos.gridId, damagePercent: pos.damagePercent });
+          }
+        }
+      }
+      affectedPositions = allSplashPositions;
     } else if (!selectedAbility.isSingleTarget && selectedAbility.targetArea) {
       affectedPositions = getAffectedGridPositions(enemyReticleGridId, selectedAbility.targetArea, true, selectedAbility.damageArea);
-    } else if (selectedAbility.isSingleTarget && selectedAbility.damageArea) {
-      // Single-target with splash (like Legendary Sandworm's Maul)
-      // For preview, we need to calculate for each potential target as the center
-      // This is handled per-target below since each click location creates different splash
-      affectedPositions = targets.map(u => ({ gridId: u.gridId, damagePercent: 100 }));
     } else {
       // Pure single target - calculate for all valid targets
       affectedPositions = targets.map(u => ({ gridId: u.gridId, damagePercent: 100 }));
