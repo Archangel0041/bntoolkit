@@ -461,9 +461,10 @@ export function executeAttack(
 
   // Determine if this is an AOE or splash attack that should bypass per-position blocking
   // For these attacks, blocking is only checked for the primary target/reticle, not each affected position
+  // target_type: 2 = movable reticle AOE (like column attacks) - bypasses blocking
+  // target_type: 1 = fixed pattern (like turrets) - still checks blocking per position
   const isAoeOrSplashAttack = isSingleSelectionWithSplash ||
-                               (ability.targetArea && !ability.isSingleTarget) ||
-                               ability.isFixed;
+                               (ability.targetArea && ability.targetArea.targetType === 2);
 
   for (const pos of affectedPositions) {
     const target = allTargets.find(u => u.gridId === pos.gridId && !u.isDead);
