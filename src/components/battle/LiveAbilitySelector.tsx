@@ -13,6 +13,8 @@ interface LiveAbilitySelectorProps {
   onSelectAbility: (abilityId: number) => void;
   cooldowns: Record<number, number>;
   globalCooldown: number;
+  weaponAmmo?: Record<string, number>;
+  weaponReloadCooldown?: Record<string, number>;
   disabled?: boolean;
   className?: string;
 }
@@ -23,6 +25,8 @@ export function LiveAbilitySelector({
   onSelectAbility,
   cooldowns,
   globalCooldown,
+  weaponAmmo,
+  weaponReloadCooldown,
   disabled,
   className,
 }: LiveAbilitySelectorProps) {
@@ -38,6 +42,15 @@ export function LiveAbilitySelector({
         const abilityCooldown = cooldowns[ability.abilityId] || 0;
         const isOnCooldown = abilityCooldown > 0 || globalCooldown > 0;
         const isSelected = selectedAbilityId === ability.abilityId;
+        
+        // Ammo check
+        const currentAmmo = weaponAmmo?.[ability.weaponName] ?? ability.weaponMaxAmmo;
+        const isInfiniteAmmo = ability.weaponMaxAmmo === -1;
+        const hasEnoughAmmo = isInfiniteAmmo || currentAmmo >= ability.ammoRequired;
+        const isReloading = (weaponReloadCooldown?.[ability.weaponName] ?? 0) > 0;
+        const reloadTurns = weaponReloadCooldown?.[ability.weaponName] ?? 0;
+        
+        const isDisabled = disabled || isOnCooldown || !hasEnoughAmmo || isReloading;
 
         return (
           <TooltipProvider key={ability.abilityId}>
@@ -46,11 +59,11 @@ export function LiveAbilitySelector({
                 <Button
                   variant={isSelected ? "default" : "outline"}
                   size="sm"
-                  disabled={disabled || isOnCooldown}
+                  disabled={isDisabled}
                   onClick={() => onSelectAbility(ability.abilityId)}
                   className={cn(
                     "relative",
-                    isOnCooldown && "opacity-50"
+                    isDisabled && "opacity-50"
                   )}
                 >
                   {iconUrl && (
@@ -62,12 +75,31 @@ export function LiveAbilitySelector({
                     />
                   )}
                   <span className="truncate max-w-[100px]">{abilityName}</span>
+                  {/* Ammo indicator */}
+                  {!isInfiniteAmmo && ability.ammoRequired > 0 && (
+                    <Badge
+                      variant={hasEnoughAmmo ? "outline" : "destructive"}
+                      className="ml-1 h-5 px-1 text-xs"
+                    >
+                      {currentAmmo}/{ability.weaponMaxAmmo}
+                    </Badge>
+                  )}
+                  {/* Cooldown badge */}
                   {isOnCooldown && (
                     <Badge
                       variant="secondary"
                       className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs"
                     >
                       {Math.max(abilityCooldown, globalCooldown)}
+                    </Badge>
+                  )}
+                  {/* Reload badge */}
+                  {isReloading && (
+                    <Badge
+                      variant="secondary"
+                      className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs bg-blue-500"
+                    >
+                      {reloadTurns}
                     </Badge>
                   )}
                 </Button>
@@ -84,12 +116,30 @@ export function LiveAbilitySelector({
                   {ability.cooldown > 0 && (
                     <p className="text-sm">Cooldown: {ability.cooldown} turns</p>
                   )}
+                  {!isInfiniteAmmo && (
+                    <p className="text-sm">
+                      Ammo: {ability.ammoRequired} per use | {currentAmmo}/{ability.weaponMaxAmmo} remaining
+                    </p>
+                  )}
+                  {ability.weaponReloadTime > 0 && (
+                    <p className="text-sm">Reload: {ability.weaponReloadTime} turns</p>
+                  )}
                   {isOnCooldown && (
                     <p className="text-sm text-yellow-500">
                       {globalCooldown > 0 
                         ? `Global cooldown: ${globalCooldown} turns`
                         : `On cooldown: ${abilityCooldown} turns`
                       }
+                    </p>
+                  )}
+                  {isReloading && (
+                    <p className="text-sm text-blue-500">
+                      Reloading: {reloadTurns} turns
+                    </p>
+                  )}
+                  {!hasEnoughAmmo && !isReloading && (
+                    <p className="text-sm text-red-500">
+                      Not enough ammo (needs {ability.ammoRequired})
                     </p>
                   )}
                 </div>

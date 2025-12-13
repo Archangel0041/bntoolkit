@@ -10,6 +10,7 @@ import { LiveAbilitySelector } from "@/components/battle/LiveAbilitySelector";
 import { BattleLog } from "@/components/battle/BattleLog";
 import { UnitSelector } from "@/components/battle/UnitSelector";
 import { PartyManager } from "@/components/battle/PartyManager";
+import { UnitInfoPanel } from "@/components/battle/UnitInfoPanel";
 import { useParties } from "@/hooks/useParties";
 import { useTempFormation } from "@/hooks/useTempFormation";
 import { useLiveBattle } from "@/hooks/useLiveBattle";
@@ -326,6 +327,8 @@ const LiveBattleSimulator = () => {
                           onSelectAbility={setSelectedAbilityId}
                           cooldowns={selectedUnit.abilityCooldowns}
                           globalCooldown={selectedUnit.globalCooldown}
+                          weaponAmmo={selectedUnit.weaponAmmo}
+                          weaponReloadCooldown={selectedUnit.weaponReloadCooldown}
                           disabled={!battleState.isPlayerTurn || battleState.isBattleOver}
                         />
                       )}
@@ -356,6 +359,19 @@ const LiveBattleSimulator = () => {
 
               {/* Side panel */}
               <div className="space-y-4">
+                {/* Unit Info Panel */}
+                {selectedUnit && (
+                  <UnitInfoPanel
+                    unitId={selectedUnit.unitId}
+                    rank={selectedUnit.rank}
+                    gridId={selectedUnit.gridId}
+                    isEnemy={selectedUnit.isEnemy}
+                    currentHp={selectedUnit.currentHp}
+                    currentArmor={selectedUnit.currentArmor}
+                    weaponAmmo={selectedUnit.weaponAmmo}
+                  />
+                )}
+
                 {/* Controls */}
                 <Card>
                   <CardHeader className="py-3">

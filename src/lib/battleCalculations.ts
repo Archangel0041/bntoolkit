@@ -274,6 +274,10 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
         damageArea,
         isFixed,
         isSingleTarget,
+        // Ammo system
+        ammoRequired: ability.stats.ammo_required || 0,
+        weaponMaxAmmo: weapon.stats.ammo,
+        weaponReloadTime: weapon.stats.reload_time || 0,
       });
     });
   });

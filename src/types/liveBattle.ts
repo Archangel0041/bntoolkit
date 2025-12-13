@@ -16,6 +16,10 @@ export interface LiveBattleUnit {
   abilityCooldowns: Record<number, number>;
   // Global cooldown turns remaining
   globalCooldown: number;
+  // Weapon ammo: weaponName -> current ammo count
+  weaponAmmo: Record<string, number>;
+  // Weapon reload cooldown: weaponName -> turns until reloaded
+  weaponReloadCooldown: Record<string, number>;
   // Status effects: effectId -> { duration, dotDamage, damageType }
   activeStatusEffects: ActiveStatusEffect[];
 }
