@@ -4,7 +4,7 @@ import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTa
 import { getBlockingUnits, checkLineOfFire, calculateRange } from "@/lib/battleTargeting";
 import { getStatusEffect } from "@/lib/statusEffects";
 import { unitMatchesTargets } from "@/lib/tagHierarchy";
-import { getAffectedGridPositions, getFixedAttackPositions } from "@/types/battleSimulator";
+import { getAffectedGridPositions, getFixedAttackPositions, GRID_ID_TO_COORDS, COORDS_TO_GRID_ID } from "@/types/battleSimulator";
 import type { AbilityInfo, PartyUnit, TargetArea, DamageAreaPosition } from "@/types/battleSimulator";
 import type { EncounterUnit } from "@/types/encounters";
 import type { 
@@ -261,14 +261,15 @@ export function getValidTargets(
   allFriendlies: LiveBattleUnit[]
 ): LiveBattleUnit[] {
   const targets = attacker.isEnemy ? allFriendlies : allEnemies;
+  const aliveTargets = targets.filter(t => !t.isDead);
+  
+  // Only alive units can block
   const blockingUnits = getBlockingUnits(
-    targets.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
+    aliveTargets.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
     !attacker.isEnemy
   );
 
-  return targets.filter(target => {
-    if (target.isDead) return false;
-    
+  return aliveTargets.filter(target => {
     // Check tag targeting
     if (!canTargetUnit(target.unitId, ability.targets)) return false;
     
@@ -287,6 +288,47 @@ export function getValidTargets(
     
     return !blockCheck.isBlocked;
   });
+}
+
+// Collapse grid - move units forward when front row is empty
+// Row 0 is front, row 1 is middle, row 2 is back
+export function collapseGrid(units: LiveBattleUnit[]): void {
+  const aliveUnits = units.filter(u => !u.isDead);
+  if (aliveUnits.length === 0) return;
+  
+  // Check each row from front to back
+  // If a row is empty and there are units behind it, move them forward
+  for (let targetRow = 0; targetRow <= 1; targetRow++) {
+    const unitsInRow = aliveUnits.filter(u => {
+      const coords = GRID_ID_TO_COORDS[u.gridId];
+      return coords?.y === targetRow;
+    });
+    
+    if (unitsInRow.length === 0) {
+      // Row is empty, move units from next row forward
+      for (let sourceRow = targetRow + 1; sourceRow <= 2; sourceRow++) {
+        const unitsToMove = aliveUnits.filter(u => {
+          const coords = GRID_ID_TO_COORDS[u.gridId];
+          return coords?.y === sourceRow;
+        });
+        
+        if (unitsToMove.length > 0) {
+          // Move these units one row forward
+          for (const unit of unitsToMove) {
+            const coords = GRID_ID_TO_COORDS[unit.gridId];
+            if (coords) {
+              const newGridId = COORDS_TO_GRID_ID[`${coords.x},${targetRow}`];
+              if (newGridId !== undefined) {
+                console.log(`[collapseGrid] Moving unit ${unit.unitId} from grid ${unit.gridId} to ${newGridId}`);
+                unit.gridId = newGridId;
+              }
+            }
+          }
+          break; // Only move from the next occupied row
+        }
+      }
+    }
+  }
 }
 
 // Execute an attack and return the actions

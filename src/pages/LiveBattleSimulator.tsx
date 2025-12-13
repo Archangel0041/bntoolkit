@@ -338,6 +338,12 @@ const LiveBattleSimulator = () => {
                   damagePreviews={damagePreviews}
                   reticleGridId={enemyReticleGridId}
                   onReticleMove={setEnemyReticleGridId}
+                  onReticleConfirm={() => {
+                    // Execute AOE attack at current reticle position
+                    if (selectedAbility && enemyReticleGridId !== undefined) {
+                      executePlayerAction(enemyReticleGridId);
+                    }
+                  }}
                   showReticle={!!selectedAbility && !selectedAbility.isSingleTarget && !selectedAbility.isFixed && !isRandomAttack}
                   targetArea={selectedAbility?.targetArea}
                   damageArea={selectedAbility?.damageArea}
