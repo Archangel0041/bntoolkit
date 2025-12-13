@@ -291,15 +291,24 @@ export function getValidTargets(
     // For enemies attacking friendlies, "front" is highest y (row 2 is closest to enemy grid)
     // For friendlies attacking enemies, "front" is lowest y (row 0 is closest to friendly grid)
     let closestRow = attacker.isEnemy ? -Infinity : Infinity;
+    
+    console.log(`[getValidTargets-Contact] Attacker grid ${attacker.gridId}, isEnemy=${attacker.isEnemy}, abilityId=${ability.abilityId}`);
+    console.log(`[getValidTargets-Contact] Alive targets:`, aliveTargets.map(t => ({ gridId: t.gridId, unitId: t.unitId, coords: GRID_ID_TO_COORDS[t.gridId] })));
+    
     for (const target of aliveTargets) {
       const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy);
+      const canTarget = canTargetUnit(target.unitId, ability.targets);
+      const coords = GRID_ID_TO_COORDS[target.gridId];
+      console.log(`[getValidTargets-Contact] Target grid ${target.gridId}: range=${range} (min=${ability.minRange}, max=${ability.maxRange}), canTarget=${canTarget}, coords=${JSON.stringify(coords)}`);
+      
       if (range >= ability.minRange && range <= ability.maxRange) {
-        if (canTargetUnit(target.unitId, ability.targets)) {
-          const coords = GRID_ID_TO_COORDS[target.gridId];
+        if (canTarget) {
           if (coords) {
             if (attacker.isEnemy && coords.y > closestRow) {
+              console.log(`[getValidTargets-Contact] Enemy attacker: updating closestRow from ${closestRow} to ${coords.y}`);
               closestRow = coords.y;
             } else if (!attacker.isEnemy && coords.y < closestRow) {
+              console.log(`[getValidTargets-Contact] Friendly attacker: updating closestRow from ${closestRow} to ${coords.y}`);
               closestRow = coords.y;
             }
           }
@@ -307,16 +316,21 @@ export function getValidTargets(
       }
     }
     
+    console.log(`[getValidTargets-Contact] Final closestRow=${closestRow}`);
+    
     // Only return targets in that closest row
     if (closestRow !== (attacker.isEnemy ? -Infinity : Infinity)) {
-      return aliveTargets.filter(target => {
+      const validTargets = aliveTargets.filter(target => {
         const coords = GRID_ID_TO_COORDS[target.gridId];
         if (!coords || coords.y !== closestRow) return false;
         if (!canTargetUnit(target.unitId, ability.targets)) return false;
         const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy);
         return range >= ability.minRange && range <= ability.maxRange;
       });
+      console.log(`[getValidTargets-Contact] Returning ${validTargets.length} valid targets:`, validTargets.map(t => t.gridId));
+      return validTargets;
     }
+    console.log(`[getValidTargets-Contact] No valid targets found`);
     return [];
   }
 
