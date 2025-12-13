@@ -65,6 +65,12 @@ export function checkLineOfFire(
     return { isBlocked: false };
   }
 
+  // Contact fire doesn't use blocking - it only hits the closest row
+  // The row constraint is handled in getValidTargets, not via blocking
+  if (lineOfFire === LineOfFire.Contact) {
+    return { isBlocked: false };
+  }
+
   const attackerCoords = GRID_ID_TO_COORDS[attackerGridId];
   const targetCoords = GRID_ID_TO_COORDS[targetGridId];
   
@@ -101,14 +107,7 @@ export function checkLineOfFire(
     const blocking = blockingUnit.blocking;
     
     switch (lineOfFire) {
-      case LineOfFire.Contact:
-        // Contact: blocked by ANY unit in front (even None blocking counts as presence)
-        // Actually, Contact should be blocked by the presence of any unit
-        return { 
-          isBlocked: true, 
-          blockedBy: blockingUnit,
-          reason: "Contact fire - unit in path"
-        };
+      // Contact is handled above (returns early with isBlocked: false)
         
       case LineOfFire.Direct:
         // Direct: Can fire PAST None blocking units
