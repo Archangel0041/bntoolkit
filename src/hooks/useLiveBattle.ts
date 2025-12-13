@@ -12,6 +12,7 @@ import {
   aiSelectAction,
   createLiveBattleUnit,
   collapseGrid,
+  calculateTurnSummary,
 } from "@/lib/liveBattleEngine";
 import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTargetUnit } from "@/lib/battleCalculations";
 import { getBlockingUnits, checkLineOfFire, calculateRange, findFrontmostUnblockedPosition, getTargetingInfo } from "@/lib/battleTargeting";
@@ -22,7 +23,7 @@ import { getFixedAttackPositions, getAffectedGridPositions } from "@/types/battl
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { PartyUnit, AbilityInfo, DamagePreview, DamageResult, StatusEffectPreview } from "@/types/battleSimulator";
 import type { EncounterUnit, Encounter } from "@/types/encounters";
-import type { LiveBattleState, LiveBattleUnit, BattleAction, BattleTurn } from "@/types/liveBattle";
+import type { LiveBattleState, LiveBattleUnit, BattleAction, BattleTurn, TurnSummary } from "@/types/liveBattle";
 
 interface UseLiveBattleOptions {
   encounter?: Encounter | null;
@@ -441,11 +442,12 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         abilityName: a.abilityName ? localizedAbilityName : a.abilityName,
       }));
 
-      // Add turn to log
+      // Add turn to log with summary
       const turn: BattleTurn = {
         turnNumber: clonedState.currentTurn,
         isPlayerTurn: true,
         actions,
+        summary: calculateTurnSummary(actions),
       };
 
       // Check battle end
@@ -604,8 +606,8 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     // 10. Check battle end
     endCheck = checkBattleEnd(newState);
 
-    // 11. Create turn log and set final state
-    const turn: BattleTurn = { turnNumber: newState.currentTurn, isPlayerTurn: false, actions };
+    // 11. Create turn log with summary and set final state
+    const turn: BattleTurn = { turnNumber: newState.currentTurn, isPlayerTurn: false, actions, summary: calculateTurnSummary(actions) };
     
     setBattleState({
       ...newState,

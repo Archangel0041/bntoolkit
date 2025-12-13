@@ -13,7 +13,8 @@ import type {
   BattleAction, 
   BattleTurn,
   DamageRoll,
-  ActiveStatusEffect 
+  ActiveStatusEffect,
+  TurnSummary 
 } from "@/types/liveBattle";
 
 // Get combined damage modifiers from a unit's active status effects
@@ -893,22 +894,57 @@ export function processStatusEffects(
     
     const unitData = getUnitById(unit.unitId);
     const unitName = unitData?.identity?.name || `Unit ${unit.unitId}`;
+    const unitStats = unitData?.statsConfig?.stats?.[unit.rank - 1];
     
     for (const effect of unit.activeStatusEffects) {
-      if (effect.dotDamage > 0) {
-        let hpDamage = effect.dotDamage;
+      if (effect.dotDamage > 0 && effect.dotDamageType !== null) {
+        let rawDotDamage = effect.dotDamage;
         
         // Apply environmental damage mods to DOT damage (e.g., Firemod increases Fire/Poison damage)
-        if (environmentalDamageMods && effect.dotDamageType !== null) {
+        if (environmentalDamageMods) {
           const envMod = environmentalDamageMods[effect.dotDamageType.toString()];
           if (envMod !== undefined) {
-            hpDamage = Math.floor(hpDamage * envMod);
+            rawDotDamage = Math.floor(rawDotDamage * envMod);
           }
         }
         
-        unit.currentHp = Math.max(0, unit.currentHp - hpDamage);
+        // Get status effect damage mods from other active effects (like freeze/shatter)
+        const statusDamageMods = getStatusEffectDamageMods(unit);
+        const statusArmorDamageMods = getStatusEffectArmorDamageMods(unit);
+        
+        // Check if armor should be bypassed (active armor units when stunned)
+        const bypassArmor = hasArmorBypassingStun(unit, unitStats?.armor_def_style === 1 ? 'active' : 'passive');
+        
+        // Calculate damage with armor, resistances, and all modifiers
+        const damageResult = calculateDamageWithArmor(
+          rawDotDamage,
+          unit.currentArmor,
+          unitStats?.armor_damage_mods,
+          unitStats?.damage_mods,
+          effect.dotDamageType,
+          0, // DOT has no armor piercing
+          environmentalDamageMods,
+          statusDamageMods,
+          statusArmorDamageMods,
+          bypassArmor
+        );
+        
+        // Apply damage to armor first, then HP
+        unit.currentArmor = Math.max(0, unit.currentArmor - damageResult.armorDamage);
+        unit.currentHp = Math.max(0, unit.currentHp - damageResult.hpDamage);
         
         const effectName = getEffectDisplayNameTranslated(effect.effectId);
+        const turnsLeft = effect.remainingDuration - 1;
+        
+        // Build damage message parts
+        const damageParts: string[] = [];
+        if (damageResult.hpDamage > 0) {
+          damageParts.push(`${damageResult.hpDamage} HP`);
+        }
+        if (damageResult.armorDamage > 0) {
+          damageParts.push(`${damageResult.armorDamage} armor`);
+        }
+        const damageText = damageParts.length > 0 ? damageParts.join(' and ') : '0';
         
         actions.push({
           type: "status_tick",
@@ -916,8 +952,9 @@ export function processStatusEffects(
           targetName: unitName,
           statusEffectId: effect.effectId,
           statusEffectName: effectName,
-          hpDamage,
-          message: `${unitName} (${unit.gridId}) took ${hpDamage} ${effectName} damage (${effect.remainingDuration - 1}t left)`,
+          hpDamage: damageResult.hpDamage,
+          armorDamage: damageResult.armorDamage,
+          message: `took ${damageText} ${effectName} damage (${turnsLeft}t left)`,
         });
         
         if (unit.currentHp <= 0) {
@@ -926,7 +963,8 @@ export function processStatusEffects(
             type: "death", 
             targetGridId: unit.gridId, 
             targetName: unitName,
-            message: `${unitName} defeated by ${effectName}!` 
+            statusEffectName: effectName,
+            message: `defeated by ${effectName}!` 
           });
         }
       }
@@ -940,6 +978,39 @@ export function processStatusEffects(
   }
   
   return actions;
+}
+
+// Calculate turn summary from actions
+export function calculateTurnSummary(actions: BattleAction[]): TurnSummary {
+  let totalDamage = 0;
+  let totalHpDamage = 0;
+  let totalArmorDamage = 0;
+  let dodges = 0;
+  let crits = 0;
+  let statusEffectsApplied = 0;
+  let kills = 0;
+  
+  for (const action of actions) {
+    if (action.type === 'attack' || action.type === 'status_tick') {
+      totalHpDamage += action.hpDamage || 0;
+      totalArmorDamage += action.armorDamage || 0;
+      totalDamage += (action.hpDamage || 0) + (action.armorDamage || 0);
+    }
+    if (action.type === 'dodge') {
+      dodges++;
+    }
+    if (action.type === 'crit' || action.wasCrit) {
+      crits++;
+    }
+    if (action.type === 'status_applied') {
+      statusEffectsApplied++;
+    }
+    if (action.type === 'death') {
+      kills++;
+    }
+  }
+  
+  return { totalDamage, totalHpDamage, totalArmorDamage, dodges, crits, statusEffectsApplied, kills };
 }
 
 // Reduce cooldowns at end of turn
