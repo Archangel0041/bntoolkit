@@ -280,37 +280,34 @@ export function getValidTargets(
     true // Always use EncounterUnit format (grid_id) since we're mapping with grid_id
   );
 
-  // For Contact line of fire, only target units at the closest range
+  // For Contact line of fire, target the closest unit in EACH column (not overall closest)
   if (ability.lineOfFire === 0) { // Contact
     console.log(`[getValidTargets-Contact] Attacker grid ${attacker.gridId}, isEnemy=${attacker.isEnemy}, abilityId=${ability.abilityId}`);
     
-    // Find the minimum range that has valid targetable units
-    let closestRange = Infinity;
+    // Group targets by column (x coordinate), find closest in each column
+    const columnClosest: Map<number, { target: LiveBattleUnit; range: number }> = new Map();
+    
     for (const target of aliveTargets) {
       const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy);
-      if (range >= ability.minRange && range <= ability.maxRange) {
-        if (canTargetUnit(target.unitId, ability.targets)) {
-          if (range < closestRange) {
-            closestRange = range;
-          }
-        }
+      if (range < ability.minRange || range > ability.maxRange) continue;
+      if (!canTargetUnit(target.unitId, ability.targets)) continue;
+      
+      const coords = GRID_ID_TO_COORDS[target.gridId];
+      if (!coords) continue;
+      
+      const column = coords.x;
+      const existing = columnClosest.get(column);
+      
+      // Keep the closest unit in this column (smallest range)
+      if (!existing || range < existing.range) {
+        columnClosest.set(column, { target, range });
       }
     }
     
-    console.log(`[getValidTargets-Contact] Closest range with valid targets: ${closestRange}`);
-    
-    // Return only targets at the closest range
-    if (closestRange !== Infinity) {
-      const validTargets = aliveTargets.filter(target => {
-        if (!canTargetUnit(target.unitId, ability.targets)) return false;
-        const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy);
-        return range === closestRange;
-      });
-      console.log(`[getValidTargets-Contact] Returning ${validTargets.length} valid targets at range ${closestRange}:`, validTargets.map(t => t.gridId));
-      return validTargets;
-    }
-    console.log(`[getValidTargets-Contact] No valid targets found`);
-    return [];
+    const validTargets = Array.from(columnClosest.values()).map(v => v.target);
+    console.log(`[getValidTargets-Contact] Returning ${validTargets.length} valid targets (closest per column):`, 
+      validTargets.map(t => ({ gridId: t.gridId, range: calculateRange(attacker.gridId, t.gridId, attacker.isEnemy) })));
+    return validTargets;
   }
 
   return aliveTargets.filter(target => {
