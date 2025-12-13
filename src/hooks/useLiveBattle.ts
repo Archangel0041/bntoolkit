@@ -18,6 +18,7 @@ import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTa
 import { getBlockingUnits, checkLineOfFire, calculateRange, findFrontmostUnblockedPosition, getTargetingInfo } from "@/lib/battleTargeting";
 import { getStatusEffect, getStatusEffectDisplayName, getStatusEffectColor, getEffectDisplayNameTranslated } from "@/lib/statusEffects";
 import { getUnitById } from "@/lib/units";
+import { UnitTag } from "@/data/gameEnums";
 import { getAbilityById } from "@/lib/abilities";
 import { getFixedAttackPositions, getAffectedGridPositions } from "@/types/battleSimulator";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -636,8 +637,16 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   const checkWaveAdvance = useCallback(() => {
     if (!battleState) return false;
     
-    const allEnemiesDead = battleState.enemyUnits.every(u => u.isDead);
-    if (allEnemiesDead && battleState.currentWave < battleState.totalWaves - 1) {
+    // Check if all non-ignorable enemies are dead
+    // Units with the Ignorable tag (like Stone Slab) don't count for wave completion
+    const allNonIgnorableEnemiesDead = battleState.enemyUnits.every(u => {
+      if (u.isDead) return true;
+      const unit = getUnitById(u.unitId);
+      const tags = unit?.identity?.tags || [];
+      return tags.includes(UnitTag.Ignorable);
+    });
+    
+    if (allNonIgnorableEnemiesDead && battleState.currentWave < battleState.totalWaves - 1) {
       return true;
     }
     return false;

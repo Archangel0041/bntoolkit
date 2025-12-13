@@ -1,4 +1,5 @@
 import { getUnitById } from "@/lib/units";
+import { UnitTag } from "@/data/gameEnums";
 import { getAbilityById } from "@/lib/abilities";
 import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTargetUnit, getDamageModifier } from "@/lib/battleCalculations";
 import { getBlockingUnits, checkLineOfFire, calculateRange } from "@/lib/battleTargeting";
@@ -1067,11 +1068,14 @@ export function checkBattleEnd(state: LiveBattleState): { isOver: boolean; playe
   }
   
   // Check if any important enemy units are alive
+  // Units with Ignorable tag (like Stone Slab) don't count for victory
   const enemyImportantAlive = state.enemyUnits.some(u => {
     if (u.isDead) return false;
     const unitData = getUnitById(u.unitId);
     const isUnimportant = unitData?.statsConfig?.unimportant === true;
-    return !isUnimportant;
+    const tags = unitData?.identity?.tags || [];
+    const isIgnorable = tags.includes(UnitTag.Ignorable);
+    return !isUnimportant && !isIgnorable;
   });
   
   if (!enemyImportantAlive) {
