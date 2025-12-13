@@ -628,15 +628,27 @@ export function reduceCooldowns(units: LiveBattleUnit[]): void {
 }
 
 // Check if battle is over
+// A side loses when all their "important" units are dead (units with unimportant: false or undefined)
 export function checkBattleEnd(state: LiveBattleState): { isOver: boolean; playerWon: boolean | null } {
-  const friendlyAlive = state.friendlyUnits.some(u => !u.isDead);
-  const enemyAlive = state.enemyUnits.some(u => !u.isDead);
+  // Check if any important friendly units are alive
+  const friendlyImportantAlive = state.friendlyUnits.some(u => {
+    if (u.isDead) return false;
+    const unitData = getUnitById(u.unitId);
+    return unitData?.statsConfig?.unimportant !== true;
+  });
   
-  if (!friendlyAlive) {
+  // Check if any important enemy units are alive
+  const enemyImportantAlive = state.enemyUnits.some(u => {
+    if (u.isDead) return false;
+    const unitData = getUnitById(u.unitId);
+    return unitData?.statsConfig?.unimportant !== true;
+  });
+  
+  if (!friendlyImportantAlive) {
     return { isOver: true, playerWon: false };
   }
   
-  if (!enemyAlive) {
+  if (!enemyImportantAlive) {
     // Check if there are more waves
     if (state.currentWave < state.totalWaves - 1) {
       return { isOver: false, playerWon: null }; // Wave complete, not battle
