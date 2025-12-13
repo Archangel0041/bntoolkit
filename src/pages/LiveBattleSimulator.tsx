@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Play, SkipForward, RotateCcw, Swords, Trophy, Skull } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,16 @@ import { getUnitById } from "@/lib/units";
 import { UnitImage } from "@/components/units/UnitImage";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+
+// Kill feed entry
+interface KillFeedEntry {
+  id: number;
+  killerName: string;
+  victimName: string;
+  victimIcon: string;
+  isPlayerKill: boolean;
+  timestamp: number;
+}
 
 const LiveBattleSimulator = () => {
   const { encounterId } = useParams();
@@ -175,6 +185,83 @@ const LiveBattleSimulator = () => {
   // Animation trigger - changes whenever battle log updates
   const attackAnimationTrigger = battleState?.battleLog.length || 0;
 
+  // Track recently dead units for death animation
+  const [recentlyDeadGridIds, setRecentlyDeadGridIds] = useState<{ enemy: Set<number>; friendly: Set<number> }>({
+    enemy: new Set(),
+    friendly: new Set(),
+  });
+
+  // Kill feed state
+  const [killFeed, setKillFeed] = useState<KillFeedEntry[]>([]);
+  const killFeedIdRef = useRef(0);
+
+  // Track deaths from battle log
+  useEffect(() => {
+    if (!battleState?.battleLog.length) return;
+    
+    const lastTurnData = battleState.battleLog[battleState.battleLog.length - 1];
+    const deathActions = lastTurnData.actions.filter(a => a.type === 'death');
+    
+    if (deathActions.length > 0) {
+      const newEnemyDeadIds = new Set<number>();
+      const newFriendlyDeadIds = new Set<number>();
+      const newKillEntries: KillFeedEntry[] = [];
+      
+      for (const action of deathActions) {
+        if (action.targetGridId !== undefined) {
+          // If player's turn, enemy died. If enemy's turn, friendly died.
+          if (lastTurnData.isPlayerTurn) {
+            newEnemyDeadIds.add(action.targetGridId);
+          } else {
+            newFriendlyDeadIds.add(action.targetGridId);
+          }
+          
+          // Find victim unit info
+          const victimUnit = lastTurnData.isPlayerTurn
+            ? battleState.enemyUnits.find(u => u.gridId === action.targetGridId)
+            : battleState.friendlyUnits.find(u => u.gridId === action.targetGridId);
+          
+          const victimData = victimUnit ? getUnitById(victimUnit.unitId) : null;
+          
+          newKillEntries.push({
+            id: killFeedIdRef.current++,
+            killerName: action.attackerName || "Unknown",
+            victimName: action.targetName || "Unknown",
+            victimIcon: victimData?.identity.icon || "",
+            isPlayerKill: lastTurnData.isPlayerTurn,
+            timestamp: Date.now(),
+          });
+        }
+      }
+      
+      if (newEnemyDeadIds.size > 0 || newFriendlyDeadIds.size > 0) {
+        setRecentlyDeadGridIds({
+          enemy: newEnemyDeadIds,
+          friendly: newFriendlyDeadIds,
+        });
+        
+        // Clear after animation completes
+        setTimeout(() => {
+          setRecentlyDeadGridIds({ enemy: new Set(), friendly: new Set() });
+        }, 600);
+      }
+      
+      if (newKillEntries.length > 0) {
+        setKillFeed(prev => [...newKillEntries, ...prev].slice(0, 5)); // Keep last 5 kills
+      }
+    }
+  }, [battleState?.battleLog.length]);
+
+  // Clear kill feed after some time
+  useEffect(() => {
+    if (killFeed.length === 0) return;
+    
+    const timer = setTimeout(() => {
+      setKillFeed(prev => prev.filter(k => Date.now() - k.timestamp < 8000));
+    }, 8000);
+    
+    return () => clearTimeout(timer);
+  }, [killFeed]);
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -380,6 +467,35 @@ const LiveBattleSimulator = () => {
               </div>
             )}
 
+            {/* Kill Feed */}
+            {killFeed.length > 0 && (
+              <div className="fixed top-20 right-4 z-50 space-y-2 pointer-events-none">
+                {killFeed.map((kill) => (
+                  <div
+                    key={kill.id}
+                    className={cn(
+                      "flex items-center gap-2 py-1.5 px-3 rounded-lg text-sm font-medium animate-slide-in-left",
+                      kill.isPlayerKill
+                        ? "bg-green-600/90 text-green-50"
+                        : "bg-red-600/90 text-red-50"
+                    )}
+                  >
+                    <Skull className="h-4 w-4" />
+                    <span className="font-bold">{t(kill.killerName)}</span>
+                    <span className="opacity-70">killed</span>
+                    {kill.victimIcon && (
+                      <UnitImage
+                        iconName={kill.victimIcon}
+                        alt=""
+                        className="h-5 w-5 rounded-sm"
+                      />
+                    )}
+                    <span className="font-bold">{t(kill.victimName)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Battle grids and controls */}
             <div className="grid lg:grid-cols-3 gap-6">
               {/* Main battle area */}
@@ -414,6 +530,7 @@ const LiveBattleSimulator = () => {
                   validReticlePositions={validReticlePositions}
                   isRandomAttack={isRandomAttack}
                   attackAnimationTrigger={attackAnimationTrigger}
+                  recentlyDeadGridIds={recentlyDeadGridIds.enemy}
                 />
 
                 {/* Unit info and ability selector */}
@@ -467,6 +584,7 @@ const LiveBattleSimulator = () => {
                   lastActionGridIds={friendlyLastActionGridIds}
                   damagePreviews={[]}
                   attackAnimationTrigger={attackAnimationTrigger}
+                  recentlyDeadGridIds={recentlyDeadGridIds.friendly}
                 />
               </div>
 
