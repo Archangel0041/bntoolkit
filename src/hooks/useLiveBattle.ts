@@ -38,7 +38,9 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   const [selectedUnitIsEnemy, setSelectedUnitIsEnemy] = useState<boolean>(false);
   const [selectedAbilityId, setSelectedAbilityId] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-
+  
+  // Ref to prevent double execution in StrictMode
+  const isEnemyTurnExecutingRef = useRef(false);
   // Get environmental damage mods
   const environmentalDamageMods = useMemo(() => {
     if (!encounter?.environmental_status_effect) return undefined;
@@ -484,12 +486,20 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   // 4. Return control to player
   const executeEnemyTurn = useCallback(() => {
     if (!battleState || battleState.isPlayerTurn || battleState.isBattleOver || isProcessing) return;
+    
+    // Prevent double execution in StrictMode
+    if (isEnemyTurnExecutingRef.current) {
+      console.log('[executeEnemyTurn] Skipping - already executing');
+      return;
+    }
+    isEnemyTurnExecutingRef.current = true;
 
     setIsProcessing(true);
 
     setBattleState(prev => {
       if (!prev) {
         setIsProcessing(false);
+        isEnemyTurnExecutingRef.current = false;
         return prev;
       }
 
@@ -531,7 +541,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           isPlayerTurn: false,
           actions: allActions,
         };
-        setTimeout(() => setIsProcessing(false), 0);
+        setTimeout(() => { setIsProcessing(false); isEnemyTurnExecutingRef.current = false; }, 0);
         return {
           ...clonedState,
           currentEnemyIndex: 0,
@@ -606,7 +616,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         };
         
         const endCheck = checkBattleEnd(clonedState);
-        setTimeout(() => setIsProcessing(false), 0);
+        setTimeout(() => { setIsProcessing(false); isEnemyTurnExecutingRef.current = false; }, 0);
         
         return {
           ...clonedState,
@@ -662,8 +672,10 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         actions: allActions,
       };
       
-      setTimeout(() => setIsProcessing(false), 0);
-      
+      setTimeout(() => {
+        setIsProcessing(false);
+        isEnemyTurnExecutingRef.current = false;
+      }, 0);
       return {
         ...clonedState,
         currentTurn: clonedState.currentTurn + 1,
