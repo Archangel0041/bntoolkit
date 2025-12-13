@@ -12,6 +12,7 @@ import { BattleLog } from "@/components/battle/BattleLog";
 import { UnitSelector } from "@/components/battle/UnitSelector";
 import { PartyManager } from "@/components/battle/PartyManager";
 import { UnitInfoPanel } from "@/components/battle/UnitInfoPanel";
+import type { PartyUnit } from "@/types/battleSimulator";
 import { useParties } from "@/hooks/useParties";
 import { useTempFormation } from "@/hooks/useTempFormation";
 import { useLiveBattle } from "@/hooks/useLiveBattle";
@@ -41,17 +42,10 @@ const LiveBattleSimulator = () => {
     removeParty,
     renameParty,
   } = useParties();
-
-  const tempFormation = useTempFormation({ encounter });
-  
   // Load formation from battle simulator if passed via state
-  const initialFormation = (location.state as any)?.formation;
+  const initialFormation = (location.state as any)?.formation as PartyUnit[] | undefined;
   
-  useEffect(() => {
-    if (initialFormation && initialFormation.length > 0) {
-      tempFormation.loadFromParty(initialFormation);
-    }
-  }, []); // Only run once on mount
+  const tempFormation = useTempFormation({ encounter, initialUnits: initialFormation });
 
   const {
     battleState,
