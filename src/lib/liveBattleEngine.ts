@@ -393,6 +393,13 @@ export function executeAttack(
 ): BattleAction[] {
   const actions: BattleAction[] = [];
   const allTargets = attacker.isEnemy ? state.friendlyUnits : state.enemyUnits;
+  const aliveTargets = allTargets.filter(t => !t.isDead);
+  
+  // Build blocking units map for line of fire checks
+  const blockingUnits = getBlockingUnits(
+    aliveTargets.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
+    true
+  );
   
   // Get attacker name
   const attackerUnit = getUnitById(attacker.unitId);
@@ -418,6 +425,22 @@ export function executeAttack(
   for (const pos of affectedPositions) {
     const target = allTargets.find(u => u.gridId === pos.gridId && !u.isDead);
     if (!target) continue;
+    
+    // For non-splash attacks (single target), validate line of fire blocking
+    // Splash/AOE attacks only check blocking for the reticle center, not each splash position
+    if (ability.isSingleTarget) {
+      const blockCheck = checkLineOfFire(
+        attacker.gridId,
+        target.gridId,
+        ability.lineOfFire,
+        attacker.isEnemy,
+        blockingUnits
+      );
+      if (blockCheck.isBlocked) {
+        console.log(`[executeAttack] Target at grid ${target.gridId} blocked by unit ${blockCheck.blockedBy?.unitId}`);
+        continue; // Skip this target, it's blocked
+      }
+    }
     
     const targetUnit = getUnitById(target.unitId);
     const targetName = targetUnit?.identity?.name || `Unit ${target.unitId}`;
@@ -587,6 +610,9 @@ export function executeAttack(
   }
   
   // Set cooldowns (add +1 because cooldowns are reduced at end of turn, so we need to account for that)
+  console.log(`[executeAttack] Ability ${ability.abilityId} used. weaponName="${ability.weaponName}", ability.cooldown=${ability.cooldown}, ability.globalCooldown=${ability.globalCooldown}`);
+  console.log(`[executeAttack] Current weaponGlobalCooldowns BEFORE setting:`, JSON.stringify(attacker.weaponGlobalCooldown));
+  
   if (ability.cooldown > 0) {
     attacker.abilityCooldowns[ability.abilityId] = ability.cooldown + 1;
     console.log(`[executeAttack] Set ability ${ability.abilityId} cooldown to ${ability.cooldown + 1}`);
@@ -596,6 +622,7 @@ export function executeAttack(
     attacker.weaponGlobalCooldown[ability.weaponName] = ability.globalCooldown + 1;
     console.log(`[executeAttack] Set weapon "${ability.weaponName}" cooldown to ${ability.globalCooldown + 1} for unit gridId ${attacker.gridId}`);
   }
+  console.log(`[executeAttack] Current weaponGlobalCooldowns AFTER setting:`, JSON.stringify(attacker.weaponGlobalCooldown));
   
   // Consume ammo
   if (ability.weaponMaxAmmo !== -1 && ability.ammoRequired > 0) {
