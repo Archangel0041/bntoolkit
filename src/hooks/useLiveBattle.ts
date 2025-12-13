@@ -94,7 +94,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     
     const blockingUnits = getBlockingUnits(
       targetUnits.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
-      !selectedUnit.isEnemy
+      true // Always use EncounterUnit format (grid_id) since we're mapping with grid_id
     );
     
     const frontmostPosition = findFrontmostUnblockedPosition(
@@ -141,7 +141,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     
     const blockingUnits = getBlockingUnits(
       targetUnits.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
-      !selectedUnit.isEnemy
+      true // Always use EncounterUnit format (grid_id) since we're mapping with grid_id
     );
     
     const targetingInfo = getTargetingInfo(

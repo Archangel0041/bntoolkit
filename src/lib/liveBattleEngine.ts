@@ -210,7 +210,7 @@ export function getAvailableAbilities(
     
     const blockingUnits = getBlockingUnits(
       aliveTargets.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
-      !unit.isEnemy
+      true // Always use EncounterUnit format (grid_id) since we're mapping with grid_id
     );
 
     // For single target abilities, check if any target is valid
@@ -264,9 +264,10 @@ export function getValidTargets(
   const aliveTargets = targets.filter(t => !t.isDead);
   
   // Only alive units can block
+  // Use grid_id format for EncounterUnit-style mapping (isEnemy=true uses grid_id)
   const blockingUnits = getBlockingUnits(
     aliveTargets.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
-    !attacker.isEnemy
+    true // Always use EncounterUnit format (grid_id) since we're mapping with grid_id
   );
 
   return aliveTargets.filter(target => {
