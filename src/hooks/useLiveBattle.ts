@@ -100,7 +100,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       : battleState.enemyUnits;
     
     const blockingUnits = getBlockingUnits(
-      targetUnits.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
+      targetUnits.filter(u => !u.isDead).map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
       true // Always use EncounterUnit format (grid_id) since we're mapping with grid_id
     );
     
@@ -147,7 +147,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       : battleState.enemyUnits;
     
     const blockingUnits = getBlockingUnits(
-      targetUnits.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
+      targetUnits.filter(u => !u.isDead).map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
       true // Always use EncounterUnit format (grid_id) since we're mapping with grid_id
     );
     
@@ -175,7 +175,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     const targets = battleState.enemyUnits;
     
     const blockingUnits = getBlockingUnits(
-      targets.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
+      targets.filter(u => !u.isDead).map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
       true
     );
 
