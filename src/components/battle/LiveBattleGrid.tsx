@@ -27,23 +27,28 @@ export function LiveBattleGrid({
 }: LiveBattleGridProps) {
   const { t } = useLanguage();
 
-  // Standard 5x3 grid layout
+  // Standard 5x3 grid layout - matches BattleGrid 0-indexed layout
   const gridLayout = useMemo(() => {
     const rows = isEnemy
       ? [
-          [11, 12, 13, 14, 15], // Row 3 (back)
-          [6, 7, 8, 9, 10],    // Row 2 (middle)
-          [1, 2, 3, 4, 5],     // Row 1 (front)
+          [13, 12, 11, null, null], // Row 3 (back, 3 slots centered)
+          [9, 8, 7, 6, 5],          // Row 2 (middle)
+          [4, 3, 2, 1, 0],          // Row 1 (front)
         ]
       : [
-          [1, 2, 3, 4, 5],     // Row 1 (front)
-          [6, 7, 8, 9, 10],    // Row 2 (middle)
-          [11, 12, 13],        // Row 3 (back, 3 slots)
+          [0, 1, 2, 3, 4],          // Row 1 (front)
+          [5, 6, 7, 8, 9],          // Row 2 (middle)
+          [null, 11, 12, 13, null], // Row 3 (back, 3 slots centered)
         ];
     return rows;
   }, [isEnemy]);
 
-  const renderSlot = (gridId: number) => {
+  const renderSlot = (gridId: number | null) => {
+    // Handle null slots (empty spaces for centering)
+    if (gridId === null) {
+      return <div key={`empty-${Math.random()}`} className="aspect-square" />;
+    }
+    
     const unit = units.find(u => u.gridId === gridId);
     const unitData = unit ? getUnitById(unit.unitId) : null;
     const unitName = unitData ? t(unitData.identity.name) : "";
@@ -176,13 +181,9 @@ export function LiveBattleGrid({
         {gridLayout.map((row, rowIndex) => (
           <div
             key={rowIndex}
-            className={cn(
-              "grid gap-1",
-              row.length === 5 && "grid-cols-5",
-              row.length === 3 && "grid-cols-3 max-w-[60%] mx-auto"
-            )}
+            className="grid grid-cols-5 gap-1"
           >
-            {row.map(gridId => renderSlot(gridId))}
+            {row.map((gridId, colIndex) => renderSlot(gridId))}
           </div>
         ))}
       </div>
