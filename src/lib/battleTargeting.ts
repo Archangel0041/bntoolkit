@@ -180,21 +180,47 @@ export function findFrontmostUnblockedPosition(
 }
 
 // Calculate row distance from attacker to target for range checking
-// Returns the number of "rows" between them
+// Returns the number of "rows" between them, accounting for collapsed rows
+// Collapsed rows on either side reduce the effective range needed
 export function calculateRange(
   attackerGridId: number,
   targetGridId: number,
-  attackerIsEnemy: boolean
+  attackerIsEnemy: boolean,
+  attackerCollapsedRows?: Set<number>,
+  targetCollapsedRows?: Set<number>
 ): number {
   const attackerCoords = GRID_ID_TO_COORDS[attackerGridId];
   const targetCoords = GRID_ID_TO_COORDS[targetGridId];
   
   if (!attackerCoords || !targetCoords) return 999;
   
-  // Both grids use y=0 as front, y=2 as back
-  // Distance from attacker to target across the gap:
-  // Attacker y + Target y + 1 (for the gap between grids)
-  return attackerCoords.y + targetCoords.y + 1;
+  // Count collapsed rows between attacker and the "gap" between grids
+  // Attacker side: rows 0 to (attackerY - 1) that are collapsed
+  let attackerCollapsedCount = 0;
+  if (attackerCollapsedRows) {
+    for (let row = 0; row < attackerCoords.y; row++) {
+      if (attackerCollapsedRows.has(row)) {
+        attackerCollapsedCount++;
+      }
+    }
+  }
+  
+  // Target side: rows 0 to (targetY - 1) that are collapsed
+  let targetCollapsedCount = 0;
+  if (targetCollapsedRows) {
+    for (let row = 0; row < targetCoords.y; row++) {
+      if (targetCollapsedRows.has(row)) {
+        targetCollapsedCount++;
+      }
+    }
+  }
+  
+  // Base distance: attacker row + target row + 1 (gap between grids)
+  // Subtract collapsed rows from both sides
+  const effectiveAttackerY = attackerCoords.y - attackerCollapsedCount;
+  const effectiveTargetY = targetCoords.y - targetCollapsedCount;
+  
+  return effectiveAttackerY + effectiveTargetY + 1;
 }
 
 // Check if a target is within ability range

@@ -36,6 +36,8 @@ interface LiveBattleGridProps {
   attackAnimationTrigger?: number;
   // Recently dead unit grid IDs for death animation
   recentlyDeadGridIds?: Set<number>;
+  // Collapsed rows (rows with no alive units that should be visually hidden)
+  collapsedRows?: Set<number>;
 }
 
 export function LiveBattleGrid({
@@ -57,6 +59,7 @@ export function LiveBattleGrid({
   isRandomAttack = false,
   attackAnimationTrigger = 0,
   recentlyDeadGridIds = new Set(),
+  collapsedRows = new Set(),
 }: LiveBattleGridProps) {
   const { t } = useLanguage();
   const layout = isEnemy ? ENEMY_GRID_LAYOUT : FRIENDLY_GRID_LAYOUT;
@@ -718,27 +721,45 @@ export function LiveBattleGrid({
         
         {isEnemy ? (
           <>
-            <div className="flex gap-1 justify-center">
-              {layout.ROW_3.map(gridId => renderSlot(gridId))}
-            </div>
-            <div className="flex gap-1">
-              {layout.ROW_2.map(gridId => renderSlot(gridId))}
-            </div>
-            <div className="flex gap-1">
-              {layout.ROW_1.map(gridId => renderSlot(gridId))}
-            </div>
+            {/* Row 3 (back row for enemies, displayed at top) - hide if collapsed */}
+            {!collapsedRows.has(2) && (
+              <div className="flex gap-1 justify-center">
+                {layout.ROW_3.map(gridId => renderSlot(gridId))}
+              </div>
+            )}
+            {/* Row 2 (middle row) - hide if collapsed */}
+            {!collapsedRows.has(1) && (
+              <div className="flex gap-1">
+                {layout.ROW_2.map(gridId => renderSlot(gridId))}
+              </div>
+            )}
+            {/* Row 1 (front row for enemies, displayed at bottom) - hide if collapsed */}
+            {!collapsedRows.has(0) && (
+              <div className="flex gap-1">
+                {layout.ROW_1.map(gridId => renderSlot(gridId))}
+              </div>
+            )}
           </>
         ) : (
           <>
-            <div className="flex gap-1">
-              {layout.ROW_1.map(gridId => renderSlot(gridId))}
-            </div>
-            <div className="flex gap-1">
-              {layout.ROW_2.map(gridId => renderSlot(gridId))}
-            </div>
-            <div className="flex gap-1 justify-center">
-              {layout.ROW_3.map(gridId => renderSlot(gridId))}
-            </div>
+            {/* Row 1 (front row for friendlies, displayed at top) - hide if collapsed */}
+            {!collapsedRows.has(0) && (
+              <div className="flex gap-1">
+                {layout.ROW_1.map(gridId => renderSlot(gridId))}
+              </div>
+            )}
+            {/* Row 2 (middle row) - hide if collapsed */}
+            {!collapsedRows.has(1) && (
+              <div className="flex gap-1">
+                {layout.ROW_2.map(gridId => renderSlot(gridId))}
+              </div>
+            )}
+            {/* Row 3 (back row for friendlies, displayed at bottom) - hide if collapsed */}
+            {!collapsedRows.has(2) && (
+              <div className="flex gap-1 justify-center">
+                {layout.ROW_3.map(gridId => renderSlot(gridId))}
+              </div>
+            )}
           </>
         )}
       </div>
