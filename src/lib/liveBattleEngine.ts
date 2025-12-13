@@ -605,24 +605,33 @@ export function executeAttack(
       if (rollStatusEffect(adjustedChance)) {
         // Calculate DoT damage based on ACTUAL damage dealt (not average)
         // The actual damage dealt already has environmental mods applied from the attack
-        // Then we multiply by environmental mod AGAIN to get the base DoT damage
+        // Then we multiply by environmental mod AND resistance mod AGAIN to get the base DoT damage
         let dotDamage = 0;
         if (effect.dot_ability_damage_mult || effect.dot_bonus_damage) {
           // Use actual damage dealt (HP + armor damage) as the base
           // This already includes environmental mods from the attack calculation
-          const actualDamageDealt = totalHpDamage + totalArmorDamage;
-          let baseDotDamage = Math.floor(actualDamageDealt * (effect.dot_ability_damage_mult || 0) + (effect.dot_bonus_damage || 0));
+          let modifiedDamageDealt = totalHpDamage + totalArmorDamage;
           
           // Apply environmental damage mods AGAIN for the DoT's damage type
-          // e.g., 30 damage -> 66 with Firemod (2.2x) -> 145 base DoT (66 * 2.2)
+          // e.g., 30 damage -> 66 with Firemod (2.2x) -> 145 base (66 * 2.2)
           if (environmentalDamageMods && effect.dot_damage_type !== undefined) {
             const envMod = environmentalDamageMods[effect.dot_damage_type.toString()];
             if (envMod !== undefined) {
-              baseDotDamage = Math.floor(baseDotDamage * envMod);
+              modifiedDamageDealt = Math.floor(modifiedDamageDealt * envMod);
             }
           }
           
-          dotDamage = baseDotDamage;
+          // Apply target's resistance to the DoT damage type
+          const targetDamageMods = targetStats?.damage_mods;
+          if (targetDamageMods && effect.dot_damage_type !== undefined) {
+            const resistMod = targetDamageMods[effect.dot_damage_type.toString()];
+            if (resistMod !== undefined) {
+              modifiedDamageDealt = Math.floor(modifiedDamageDealt * resistMod);
+            }
+          }
+          
+          // Now calculate the base DoT damage using the modified damage dealt
+          dotDamage = Math.floor(modifiedDamageDealt * (effect.dot_ability_damage_mult || 0) + (effect.dot_bonus_damage || 0));
         }
         
         const isStun = effect.stun_block_action === true;
