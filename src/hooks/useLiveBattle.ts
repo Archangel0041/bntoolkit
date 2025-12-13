@@ -733,9 +733,11 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         .filter((u): u is LiveBattleUnit => u !== null);
 
       // On subsequent waves, enemies go first
+      // Reset enemy collapsed rows since new enemies spawn on the full grid
       return {
         ...prev,
         enemyUnits,
+        enemyCollapsedRows: new Set<number>(), // Reset enemy grid layout for new wave
         currentWave: nextWave,
         currentEnemyIndex: 0, // Reset enemy index for new wave
         isPlayerTurn: false, // Enemy goes first on wave 2+
