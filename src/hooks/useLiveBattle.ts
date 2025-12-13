@@ -561,8 +561,14 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     }
 
     // 4. Get alive enemies, filter to non-stunned
+    // Filter AGAIN after DoT processing to exclude any enemies that died from DoT
     const aliveEnemies = newState.enemyUnits.filter(e => !e.isDead);
     const activeEnemies = aliveEnemies.filter(e => !e.activeStatusEffects.some(s => s.isStun));
+    
+    // Also get alive friendlies AFTER DoT processing
+    const aliveFriendlies = newState.friendlyUnits.filter(f => !f.isDead);
+    
+    console.log('[executeEnemyTurn] After DoT: aliveEnemies=', aliveEnemies.length, 'aliveFriendlies=', aliveFriendlies.length);
 
     // Log stunned enemies
     for (const enemy of aliveEnemies.filter(e => e.activeStatusEffects.some(s => s.isStun))) {
@@ -576,10 +582,11 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     }
 
     // 5. Build ability pool: each active enemy's available abilities with valid targets
+    // IMPORTANT: Pass only ALIVE units to ability/target checks
     const abilityPool: { enemy: LiveBattleUnit; ability: AbilityInfo; targets: LiveBattleUnit[] }[] = [];
     for (const enemy of activeEnemies) {
-      for (const ability of getAvailableAbilities(enemy, newState.enemyUnits, newState.friendlyUnits)) {
-        const targets = getValidTargets(enemy, ability, newState.enemyUnits, newState.friendlyUnits);
+      for (const ability of getAvailableAbilities(enemy, aliveEnemies, aliveFriendlies)) {
+        const targets = getValidTargets(enemy, ability, aliveEnemies, aliveFriendlies);
         if (targets.length > 0) {
           abilityPool.push({ enemy, ability, targets });
         }
