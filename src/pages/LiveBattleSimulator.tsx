@@ -375,7 +375,7 @@ const LiveBattleSimulator = () => {
                           selectedAbilityId={selectedAbilityId}
                           onSelectAbility={setSelectedAbilityId}
                           cooldowns={selectedUnit.abilityCooldowns}
-                          globalCooldown={selectedUnit.globalCooldown}
+                          weaponGlobalCooldowns={selectedUnit.weaponGlobalCooldown}
                           weaponAmmo={selectedUnit.weaponAmmo}
                           weaponReloadCooldown={selectedUnit.weaponReloadCooldown}
                           disabled={!battleState.isPlayerTurn || battleState.isBattleOver}

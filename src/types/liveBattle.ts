@@ -14,8 +14,8 @@ export interface LiveBattleUnit {
   isDead: boolean;
   // Cooldowns for abilities: abilityId -> turns remaining
   abilityCooldowns: Record<number, number>;
-  // Global cooldown turns remaining
-  globalCooldown: number;
+  // Global cooldown per weapon: weaponName -> turns remaining
+  weaponGlobalCooldown: Record<string, number>;
   // Weapon ammo: weaponName -> current ammo count
   weaponAmmo: Record<string, number>;
   // Weapon reload cooldown: weaponName -> turns until reloaded

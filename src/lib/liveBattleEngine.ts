@@ -99,7 +99,7 @@ export function createLiveBattleUnit(
     maxArmor: armor,
     isDead: false,
     abilityCooldowns: {},
-    globalCooldown: 0,
+    weaponGlobalCooldown: {},
     weaponAmmo,
     weaponReloadCooldown,
     activeStatusEffects: [],
@@ -182,18 +182,19 @@ export function getAvailableAbilities(
   allEnemies: LiveBattleUnit[],
   allFriendlies: LiveBattleUnit[]
 ): AbilityInfo[] {
-  if (unit.globalCooldown > 0) {
-    console.log(`[getAvailableAbilities] Unit ${unit.unitId} has global cooldown ${unit.globalCooldown}`);
-    return [];
-  }
-
   const abilities = getUnitAbilities(unit.unitId, unit.rank);
   console.log(`[getAvailableAbilities] Unit ${unit.unitId} has ${abilities.length} total abilities`);
   
   const available = abilities.filter(ability => {
-    // Check cooldown
+    // Check ability-specific cooldown
     if (unit.abilityCooldowns[ability.abilityId] > 0) {
       console.log(`[getAvailableAbilities] Ability ${ability.abilityId} is on cooldown`);
+      return false;
+    }
+    
+    // Check weapon global cooldown
+    if (unit.weaponGlobalCooldown[ability.weaponName] > 0) {
+      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} blocked by weapon global cooldown`);
       return false;
     }
     
@@ -207,25 +208,31 @@ export function getAvailableAbilities(
     const targets = unit.isEnemy ? allFriendlies : allEnemies;
     const aliveTargets = targets.filter(t => !t.isDead);
     
-    // For Contact line of fire, only target units in the closest row
+  // For Contact line of fire, only target units in the closest row
     if (ability.lineOfFire === 0) { // Contact
-      let minRow = Infinity;
+      // For enemies attacking friendlies, "front" is highest y (row 2 is closest to enemy grid)
+      // For friendlies attacking enemies, "front" is lowest y (row 0 is closest to friendly grid)
+      let closestRow = unit.isEnemy ? -Infinity : Infinity;
       for (const target of aliveTargets) {
         const range = calculateRange(unit.gridId, target.gridId, unit.isEnemy);
         if (range >= ability.minRange && range <= ability.maxRange) {
           if (canTargetUnit(target.unitId, ability.targets)) {
             const coords = GRID_ID_TO_COORDS[target.gridId];
-            if (coords && coords.y < minRow) {
-              minRow = coords.y;
+            if (coords) {
+              if (unit.isEnemy && coords.y > closestRow) {
+                closestRow = coords.y;
+              } else if (!unit.isEnemy && coords.y < closestRow) {
+                closestRow = coords.y;
+              }
             }
           }
         }
       }
-      if (minRow === Infinity) {
+      if (closestRow === (unit.isEnemy ? -Infinity : Infinity)) {
         console.log(`[getAvailableAbilities] Ability ${ability.abilityId} (Contact) has no valid targets`);
         return false;
       }
-      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} (Contact) has targets in row ${minRow}`);
+      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} (Contact) has targets in row ${closestRow}`);
       return true;
     }
     
@@ -273,25 +280,30 @@ export function getValidTargets(
 
   // For Contact line of fire, only target units in the closest row with valid targets
   if (ability.lineOfFire === 0) { // Contact
-    // Find the minimum row (y) that has valid targets in range
-    let minRow = Infinity;
+    // For enemies attacking friendlies, "front" is highest y (row 2 is closest to enemy grid)
+    // For friendlies attacking enemies, "front" is lowest y (row 0 is closest to friendly grid)
+    let closestRow = attacker.isEnemy ? -Infinity : Infinity;
     for (const target of aliveTargets) {
       const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy);
       if (range >= ability.minRange && range <= ability.maxRange) {
         if (canTargetUnit(target.unitId, ability.targets)) {
           const coords = GRID_ID_TO_COORDS[target.gridId];
-          if (coords && coords.y < minRow) {
-            minRow = coords.y;
+          if (coords) {
+            if (attacker.isEnemy && coords.y > closestRow) {
+              closestRow = coords.y;
+            } else if (!attacker.isEnemy && coords.y < closestRow) {
+              closestRow = coords.y;
+            }
           }
         }
       }
     }
     
-    // Only return targets in that minimum row
-    if (minRow !== Infinity) {
+    // Only return targets in that closest row
+    if (closestRow !== (attacker.isEnemy ? -Infinity : Infinity)) {
       return aliveTargets.filter(target => {
         const coords = GRID_ID_TO_COORDS[target.gridId];
-        if (!coords || coords.y !== minRow) return false;
+        if (!coords || coords.y !== closestRow) return false;
         if (!canTargetUnit(target.unitId, ability.targets)) return false;
         const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy);
         return range >= ability.minRange && range <= ability.maxRange;
@@ -563,7 +575,7 @@ export function executeAttack(
     attacker.abilityCooldowns[ability.abilityId] = ability.cooldown + 1;
   }
   if (ability.globalCooldown > 0) {
-    attacker.globalCooldown = ability.globalCooldown + 1;
+    attacker.weaponGlobalCooldown[ability.weaponName] = ability.globalCooldown + 1;
   }
   
   // Consume ammo (if not infinite)
@@ -639,9 +651,11 @@ export function reduceCooldowns(units: LiveBattleUnit[]): void {
       }
     }
     
-    // Reduce global cooldown
-    if (unit.globalCooldown > 0) {
-      unit.globalCooldown--;
+    // Reduce weapon global cooldowns
+    for (const weaponName of Object.keys(unit.weaponGlobalCooldown)) {
+      if (unit.weaponGlobalCooldown[weaponName] > 0) {
+        unit.weaponGlobalCooldown[weaponName]--;
+      }
     }
     
     // Handle weapon reload cooldowns
@@ -986,7 +1000,7 @@ export function executeRandomAttack(
     attacker.abilityCooldowns[ability.abilityId] = ability.cooldown + 1;
   }
   if (ability.globalCooldown > 0) {
-    attacker.globalCooldown = ability.globalCooldown + 1;
+    attacker.weaponGlobalCooldown[ability.weaponName] = ability.globalCooldown + 1;
   }
   
   // Consume ammo

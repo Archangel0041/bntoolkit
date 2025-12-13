@@ -12,7 +12,7 @@ interface LiveAbilitySelectorProps {
   selectedAbilityId: number | null;
   onSelectAbility: (abilityId: number) => void;
   cooldowns: Record<number, number>;
-  globalCooldown: number;
+  weaponGlobalCooldowns: Record<string, number>;
   weaponAmmo?: Record<string, number>;
   weaponReloadCooldown?: Record<string, number>;
   disabled?: boolean;
@@ -24,7 +24,7 @@ export function LiveAbilitySelector({
   selectedAbilityId,
   onSelectAbility,
   cooldowns,
-  globalCooldown,
+  weaponGlobalCooldowns,
   weaponAmmo,
   weaponReloadCooldown,
   disabled,
@@ -40,7 +40,8 @@ export function LiveAbilitySelector({
         const iconUrl = abilityData ? getAbilityImageUrl(abilityData.icon) : undefined;
         
         const abilityCooldown = cooldowns[ability.abilityId] || 0;
-        const isOnCooldown = abilityCooldown > 0 || globalCooldown > 0;
+        const weaponCooldown = weaponGlobalCooldowns[ability.weaponName] || 0;
+        const isOnCooldown = abilityCooldown > 0 || weaponCooldown > 0;
         const isSelected = selectedAbilityId === ability.abilityId;
         
         // Ammo check
@@ -90,7 +91,7 @@ export function LiveAbilitySelector({
                       variant="secondary"
                       className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs"
                     >
-                      {Math.max(abilityCooldown, globalCooldown)}
+                      {Math.max(abilityCooldown, weaponCooldown)}
                     </Badge>
                   )}
                   {/* Reload badge */}
@@ -126,8 +127,8 @@ export function LiveAbilitySelector({
                   )}
                   {isOnCooldown && (
                     <p className="text-sm text-yellow-500">
-                      {globalCooldown > 0 
-                        ? `Global cooldown: ${globalCooldown} turns`
+                      {weaponCooldown > 0 
+                        ? `Weapon cooldown: ${weaponCooldown} turns`
                         : `On cooldown: ${abilityCooldown} turns`
                       }
                     </p>
