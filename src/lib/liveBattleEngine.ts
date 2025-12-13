@@ -426,20 +426,20 @@ export function executeAttack(
     const target = allTargets.find(u => u.gridId === pos.gridId && !u.isDead);
     if (!target) continue;
     
-    // For non-splash attacks (single target), validate line of fire blocking
-    // Splash/AOE attacks only check blocking for the reticle center, not each splash position
-    if (ability.isSingleTarget) {
-      const blockCheck = checkLineOfFire(
-        attacker.gridId,
-        target.gridId,
-        ability.lineOfFire,
-        attacker.isEnemy,
-        blockingUnits
-      );
-      if (blockCheck.isBlocked) {
-        console.log(`[executeAttack] Target at grid ${target.gridId} blocked by unit ${blockCheck.blockedBy?.unitId}`);
-        continue; // Skip this target, it's blocked
-      }
+    // Validate line of fire blocking for all attacks (single target AND area attacks)
+    const blockCheck = checkLineOfFire(
+      attacker.gridId,
+      target.gridId,
+      ability.lineOfFire,
+      attacker.isEnemy,
+      blockingUnits
+    );
+    
+    console.log(`[executeAttack-blocking] Attacker grid ${attacker.gridId} -> Target grid ${target.gridId}, lineOfFire: ${ability.lineOfFire}, isSingleTarget: ${ability.isSingleTarget}, isBlocked: ${blockCheck.isBlocked}, reason: ${blockCheck.reason || 'none'}, blockedBy: ${blockCheck.blockedBy?.unitId || 'none'}`);
+    
+    if (blockCheck.isBlocked) {
+      console.log(`[executeAttack] Skipping target at grid ${target.gridId} - blocked by unit ${blockCheck.blockedBy?.unitId}`);
+      continue; // Skip this target, it's blocked
     }
     
     const targetUnit = getUnitById(target.unitId);
