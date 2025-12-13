@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Header } from "@/components/Header";
 import { LiveBattleGrid } from "@/components/battle/LiveBattleGrid";
+import { BattleGrid } from "@/components/battle/BattleGrid";
 import { LiveAbilitySelector } from "@/components/battle/LiveAbilitySelector";
 import { BattleLog } from "@/components/battle/BattleLog";
 import { UnitSelector } from "@/components/battle/UnitSelector";
@@ -185,7 +186,7 @@ const LiveBattleSimulator = () => {
 
         {/* Pre-battle setup */}
         {!battleState && (
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-3 gap-6">
             {/* Party setup */}
             <Card>
               <CardHeader>
@@ -230,28 +231,39 @@ const LiveBattleSimulator = () => {
               </CardContent>
             </Card>
 
-            {/* Preview */}
-            <Card>
+            {/* Battle Preview with Grids */}
+            <Card className="md:col-span-2">
               <CardHeader>
                 <CardTitle className="text-lg">Battle Preview</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Enemy Grid Preview */}
                 <div className="text-sm text-muted-foreground mb-2">
                   Enemy Units (Wave 1)
                 </div>
-                <div className="grid grid-cols-5 gap-1">
-                  {waves[0]?.slice(0, 15).map((unit, i) => {
-                    const unitData = getUnitById(unit.unit_id);
-                    return unitData ? (
-                      <UnitImage
-                        key={i}
-                        iconName={unitData.identity.icon}
-                        alt={t(unitData.identity.name)}
-                        className="w-full aspect-square rounded"
-                      />
-                    ) : null;
-                  })}
+                <BattleGrid
+                  isEnemy={true}
+                  units={waves[0] || []}
+                  selectedUnit={null}
+                  onUnitClick={() => {}}
+                  damagePreviews={[]}
+                />
+
+                <div className="border-t my-4" />
+
+                {/* Friendly Grid Preview */}
+                <div className="text-sm text-muted-foreground mb-2">
+                  Your Formation ({tempFormation.units.length} units)
                 </div>
+                <BattleGrid
+                  isEnemy={false}
+                  units={tempFormation.units}
+                  selectedUnit={null}
+                  onUnitClick={() => {}}
+                  damagePreviews={[]}
+                  onMoveUnit={tempFormation.moveUnit}
+                  onRemoveUnit={tempFormation.removeUnit}
+                />
 
                 <Button
                   className="w-full"
