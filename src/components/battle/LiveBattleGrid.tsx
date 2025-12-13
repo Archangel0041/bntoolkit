@@ -351,20 +351,29 @@ export function LiveBattleGrid({
         {!unit.isDead && hasValidDamagePreview && (() => {
           const { minHpRemaining, maxHpRemaining, minArmorRemaining, maxArmorRemaining } = getRemainingRange(damagePreview);
           
-          const minHpPercent = (minHpRemaining / unit.currentHp) * 100;
-          const maxHpPercent = (maxHpRemaining / unit.currentHp) * 100;
-          const minDamageHpPercent = 100 - maxHpPercent;
-          const rangeDamageHpPercent = maxHpPercent - minHpPercent;
+          // Calculate percentages relative to MAX HP/Armor so we can show "already lost" as empty/black
+          // Already lost HP (before this attack) = maxHp - currentHp
+          const alreadyLostHpPercent = ((unit.maxHp - unit.currentHp) / unit.maxHp) * 100;
+          // HP remaining after max damage (green)
+          const minHpPercent = (minHpRemaining / unit.maxHp) * 100;
+          // HP remaining after min damage (determines orange range)
+          const maxHpPercent = (maxHpRemaining / unit.maxHp) * 100;
+          // Min guaranteed damage this turn (red) = currentHp after attack if max damage dealt
+          const minDamageHpPercent = (Math.max(0, unit.currentHp - damagePreview.maxTotalDamage.hpDamage) / unit.maxHp) * 100;
+          // Range between min and max damage (orange) = difference between min damage remaining and after-attack remaining
+          const guaranteedDamagePercent = ((unit.currentHp - maxHpRemaining) / unit.maxHp) * 100;
+          const rangeDamagePercent = ((maxHpRemaining - minHpRemaining) / unit.maxHp) * 100;
           
-          let minArmorPercent = 0;
-          let maxArmorPercent = 0;
-          let minDamageArmorPercent = 0;
-          let rangeDamageArmorPercent = 0;
-          if (unit.maxArmor > 0 && unit.currentArmor > 0) {
-            minArmorPercent = (minArmorRemaining / unit.currentArmor) * 100;
-            maxArmorPercent = (maxArmorRemaining / unit.currentArmor) * 100;
-            minDamageArmorPercent = 100 - maxArmorPercent;
-            rangeDamageArmorPercent = maxArmorPercent - minArmorPercent;
+          // Same for armor
+          let alreadyLostArmorPercent = 0;
+          let minArmorRemainingPercent = 0;
+          let guaranteedArmorDamagePercent = 0;
+          let rangeArmorDamagePercent = 0;
+          if (unit.maxArmor > 0) {
+            alreadyLostArmorPercent = ((unit.maxArmor - unit.currentArmor) / unit.maxArmor) * 100;
+            minArmorRemainingPercent = (minArmorRemaining / unit.maxArmor) * 100;
+            guaranteedArmorDamagePercent = ((unit.currentArmor - maxArmorRemaining) / unit.maxArmor) * 100;
+            rangeArmorDamagePercent = ((maxArmorRemaining - minArmorRemaining) / unit.maxArmor) * 100;
           }
           
           return (
@@ -378,28 +387,30 @@ export function LiveBattleGrid({
               
               <div className="absolute bottom-0 left-0 right-0 p-0.5">
                 <div className="space-y-0.5">
-                  {/* Armor Bar with damage visualization */}
-                  {unit.maxArmor > 0 && unit.currentArmor > 0 && (
-                    <div className="h-1.5 w-full bg-gray-700/80 overflow-hidden flex">
-                      <div className="h-full bg-sky-500 transition-all" style={{ width: `${minArmorPercent}%` }} />
-                      {rangeDamageArmorPercent > 0 && (
-                        <div className="h-full bg-orange-500 transition-all" style={{ width: `${rangeDamageArmorPercent}%` }} />
+                  {/* Armor Bar with damage visualization - order: green (remaining), orange (range), red (guaranteed), black (already lost) */}
+                  {unit.maxArmor > 0 && (
+                    <div className="h-1.5 w-full bg-black/80 overflow-hidden flex">
+                      <div className="h-full bg-sky-500 transition-all" style={{ width: `${minArmorRemainingPercent}%` }} />
+                      {rangeArmorDamagePercent > 0 && (
+                        <div className="h-full bg-orange-500 transition-all" style={{ width: `${rangeArmorDamagePercent}%` }} />
                       )}
-                      {minDamageArmorPercent > 0 && (
-                        <div className="h-full bg-red-500 transition-all" style={{ width: `${minDamageArmorPercent}%` }} />
+                      {guaranteedArmorDamagePercent > 0 && (
+                        <div className="h-full bg-red-500 transition-all" style={{ width: `${guaranteedArmorDamagePercent}%` }} />
                       )}
+                      {/* Already lost armor is the remaining space - shown as black background */}
                     </div>
                   )}
                   
-                  {/* HP Bar with damage visualization */}
-                  <div className="h-1.5 w-full bg-gray-700/80 overflow-hidden flex">
+                  {/* HP Bar with damage visualization - order: green (remaining), orange (range), red (guaranteed), black (already lost) */}
+                  <div className="h-1.5 w-full bg-black/80 overflow-hidden flex">
                     <div className="h-full bg-emerald-500 transition-all" style={{ width: `${minHpPercent}%` }} />
-                    {rangeDamageHpPercent > 0 && (
-                      <div className="h-full bg-orange-500 transition-all" style={{ width: `${rangeDamageHpPercent}%` }} />
+                    {rangeDamagePercent > 0 && (
+                      <div className="h-full bg-orange-500 transition-all" style={{ width: `${rangeDamagePercent}%` }} />
                     )}
-                    {minDamageHpPercent > 0 && (
-                      <div className="h-full bg-red-500 transition-all" style={{ width: `${minDamageHpPercent}%` }} />
+                    {guaranteedDamagePercent > 0 && (
+                      <div className="h-full bg-red-500 transition-all" style={{ width: `${guaranteedDamagePercent}%` }} />
                     )}
+                    {/* Already lost HP is the remaining space - shown as black background */}
                   </div>
                 </div>
               </div>
@@ -484,9 +495,9 @@ export function LiveBattleGrid({
                   ))}
                 </div>
               )}
-              {unit.globalCooldown > 0 && (
+              {Object.entries(unit.weaponGlobalCooldown).some(([_, cd]) => cd > 0) && (
                 <p className="text-sm text-muted-foreground">
-                  Global Cooldown: {unit.globalCooldown} turns
+                  Weapon Cooldowns: {Object.entries(unit.weaponGlobalCooldown).filter(([_, cd]) => cd > 0).map(([name, cd]) => `${name}: ${cd}`).join(', ')}
                 </p>
               )}
             </div>
