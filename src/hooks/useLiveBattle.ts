@@ -522,8 +522,9 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       const endCheck = checkBattleEnd(clonedState);
 
       // Update collapsed rows after attack (units may have died)
-      clonedState.friendlyCollapsedRows = collapseGrid(clonedState.friendlyUnits);
-      clonedState.enemyCollapsedRows = collapseGrid(clonedState.enemyUnits);
+      // Pass previous collapsed rows to ensure only 1 row collapses per turn
+      clonedState.friendlyCollapsedRows = collapseGrid(clonedState.friendlyUnits, clonedState.friendlyCollapsedRows);
+      clonedState.enemyCollapsedRows = collapseGrid(clonedState.enemyUnits, clonedState.enemyCollapsedRows);
 
       // Reduce cooldowns for player units
       reduceCooldowns(clonedState.friendlyUnits);
@@ -594,8 +595,9 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     const actions: BattleAction[] = [];
 
     // 2. Detect collapsed rows and process status effects (with environmental mods for DOT damage)
-    newState.friendlyCollapsedRows = collapseGrid(newState.friendlyUnits);
-    newState.enemyCollapsedRows = collapseGrid(newState.enemyUnits);
+    // Pass previous collapsed rows to ensure only 1 row collapses per turn
+    newState.friendlyCollapsedRows = collapseGrid(newState.friendlyUnits, newState.friendlyCollapsedRows);
+    newState.enemyCollapsedRows = collapseGrid(newState.enemyUnits, newState.enemyCollapsedRows);
     actions.push(...processStatusEffects([...newState.friendlyUnits, ...newState.enemyUnits], environmentalDamageMods));
 
     // 3. Check if battle ended from status effects

@@ -350,20 +350,24 @@ export function getValidTargets(
 
 // Detect collapsed rows - rows where no alive units exist
 // Returns a Set of collapsed row indices (0=front, 1=middle, 2=back)
-// Rows collapse from front to back: if row 0 is empty, it collapses. 
+// Rows collapse from front to back: if row 0 is empty, it collapses.
 // Row 1 only collapses if row 0 is also empty or collapsed.
-export function detectCollapsedRows(units: LiveBattleUnit[]): Set<number> {
+// IMPORTANT: Only one new row can collapse per turn to prevent instant multi-row collapse
+export function detectCollapsedRows(units: LiveBattleUnit[], previousCollapsedRows: Set<number> = new Set()): Set<number> {
   const aliveUnits = units.filter(u => !u.isDead);
-  const collapsedRows = new Set<number>();
-  
+  const collapsedRows = new Set(previousCollapsedRows); // Start with previous collapsed rows
+
   // Check each row from front (0) to back (2)
   for (let row = 0; row <= 2; row++) {
+    // Skip if this row is already collapsed
+    if (collapsedRows.has(row)) continue;
+
     const unitsInRow = aliveUnits.filter(u => {
       const coords = GRID_ID_TO_COORDS[u.gridId];
       return coords?.y === row;
     });
-    
-    // A row is collapsed if:
+
+    // A row is eligible to collapse if:
     // 1. It has no alive units
     // 2. All rows in front of it are also collapsed (cascading collapse from front)
     if (unitsInRow.length === 0) {
@@ -375,20 +379,23 @@ export function detectCollapsedRows(units: LiveBattleUnit[]): Set<number> {
           break;
         }
       }
-      
+
       // Only collapse this row if it's the front row or all previous rows are collapsed
       if (row === 0 || allPreviousCollapsed) {
         collapsedRows.add(row);
+        // CRITICAL: Only collapse one new row per turn
+        // Return immediately after adding the first new collapsed row
+        break;
       }
     }
   }
-  
+
   return collapsedRows;
 }
 
 // Legacy function kept for backwards compatibility, now just updates collapsed rows state
-export function collapseGrid(units: LiveBattleUnit[]): Set<number> {
-  return detectCollapsedRows(units);
+export function collapseGrid(units: LiveBattleUnit[], previousCollapsedRows?: Set<number>): Set<number> {
+  return detectCollapsedRows(units, previousCollapsedRows);
 }
 
 // Execute an attack and return the actions
