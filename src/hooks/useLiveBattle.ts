@@ -168,10 +168,36 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       true
     );
 
+    // Check if this is a random attack
+    const isRandom = selectedAbility.targetArea?.random === true;
+    const targetAreaData = selectedAbility.targetArea?.data || [];
+    
+    // For random attacks, calculate expected hits per tile based on weights
+    let expectedHitsPerTile: Map<number, number> = new Map();
+    if (isRandom && targetAreaData.length > 0) {
+      const totalWeight = targetAreaData.reduce((sum, pos) => sum + (pos.weight || 1), 0);
+      const totalHits = targetAreaData.length; // Number of hits = number of entries in targetArea
+      
+      // All grid positions on enemy grid
+      const allGridPositions = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13];
+      
+      // Each hit has uniform probability to land on any of the 13 tiles
+      // But the weight affects which "slot" is selected from targetArea
+      // Since each slot can target any tile randomly, expected hits per tile = totalHits / numTiles
+      const expectedHitsUnweighted = totalHits / allGridPositions.length;
+      
+      for (const gridId of allGridPositions) {
+        expectedHitsPerTile.set(gridId, expectedHitsUnweighted);
+      }
+    }
+
     // Get affected positions based on ability type
     let affectedPositions: { gridId: number; damagePercent: number }[];
     
-    if (selectedAbility.isFixed && fixedAttackPositions.enemyGrid.length > 0) {
+    if (isRandom) {
+      // For random attacks, all enemy positions are potentially affected
+      affectedPositions = targets.map(u => ({ gridId: u.gridId, damagePercent: 100 }));
+    } else if (selectedAbility.isFixed && fixedAttackPositions.enemyGrid.length > 0) {
       affectedPositions = fixedAttackPositions.enemyGrid;
     } else if (!selectedAbility.isSingleTarget && selectedAbility.targetArea) {
       affectedPositions = getAffectedGridPositions(enemyReticleGridId, selectedAbility.targetArea, true, selectedAbility.damageArea);
@@ -204,18 +230,20 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           }
         }
         
-        // Check range
+        // Check range (not applicable for random attacks)
         const range = calculateRange(selectedUnit.gridId, target.gridId, false);
-        const inRange = range >= selectedAbility.minRange && range <= selectedAbility.maxRange;
+        const inRange = isRandom ? true : (range >= selectedAbility.minRange && range <= selectedAbility.maxRange);
         
-        // Check line of fire blocking
-        const blockCheck = checkLineOfFire(
-          selectedUnit.gridId,
-          target.gridId,
-          selectedAbility.lineOfFire,
-          false,
-          blockingUnits
-        );
+        // Check line of fire blocking (not applicable for random attacks)
+        const blockCheck = isRandom 
+          ? { isBlocked: false, blockedBy: undefined, reason: undefined }
+          : checkLineOfFire(
+              selectedUnit.gridId,
+              target.gridId,
+              selectedAbility.lineOfFire,
+              false,
+              blockingUnits
+            );
         
         // Calculate damage using current HP/armor values
         const adjustedMinDamage = Math.floor(selectedAbility.minDamage * (damagePercent / 100));
@@ -241,11 +269,18 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           environmentalDamageMods
         );
         
+        // Calculate effective shots for this tile
+        let effectiveShots = totalShots;
+        if (isRandom) {
+          // Use expected hits based on uniform random tile selection
+          effectiveShots = expectedHitsPerTile.get(target.gridId) ?? 0;
+        }
+        
         // Multiply by shots
         const multiplyResult = (result: DamageResult, shots: number): DamageResult => ({
-          rawDamage: result.rawDamage * shots,
-          armorDamage: result.armorDamage * shots,
-          hpDamage: result.hpDamage * shots,
+          rawDamage: Math.floor(result.rawDamage * shots),
+          armorDamage: Math.floor(result.armorDamage * shots),
+          hpDamage: Math.floor(result.hpDamage * shots),
           armorRemaining: result.armorRemaining,
           effectiveMultiplier: result.effectiveMultiplier,
         });
@@ -279,19 +314,22 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           });
         }
         
+        // For random attacks, show preview for all targetable units
         // For single target abilities, only show preview if in range and not blocked
-        const shouldShow = selectedAbility.isSingleTarget 
-          ? (canTarget && inRange && !blockCheck.isBlocked)
-          : isAffected;
+        const shouldShow = isRandom 
+          ? canTarget
+          : (selectedAbility.isSingleTarget 
+              ? (canTarget && inRange && !blockCheck.isBlocked)
+              : isAffected);
         
         return {
           targetGridId: target.gridId,
           targetUnitId: target.unitId,
           minDamage: minResult,
           maxDamage: maxResult,
-          totalShots,
-          minTotalDamage: multiplyResult(minResult, totalShots),
-          maxTotalDamage: multiplyResult(maxResult, totalShots),
+          totalShots: effectiveShots,
+          minTotalDamage: multiplyResult(minResult, effectiveShots),
+          maxTotalDamage: multiplyResult(maxResult, effectiveShots),
           dodgeChance,
           critChance,
           canTarget: shouldShow ? canTarget : false,
