@@ -184,7 +184,9 @@ function hasEnoughAmmo(unit: LiveBattleUnit, ability: AbilityInfo): boolean {
 export function getAvailableAbilities(
   unit: LiveBattleUnit,
   allEnemies: LiveBattleUnit[],
-  allFriendlies: LiveBattleUnit[]
+  allFriendlies: LiveBattleUnit[],
+  friendlyCollapsedRows?: Set<number>,
+  enemyCollapsedRows?: Set<number>
 ): AbilityInfo[] {
   const abilities = getUnitAbilities(unit.unitId, unit.rank);
   console.log(`[getAvailableAbilities] Unit ${unit.unitId} has ${abilities.length} total abilities`);
@@ -216,12 +218,16 @@ export function getAvailableAbilities(
     const targets = unit.isEnemy ? allFriendlies : allEnemies;
     const aliveTargets = targets.filter(t => !t.isDead);
     
+    // Determine which collapsed rows to use based on who is attacking
+    const attackerCollapsedRows = unit.isEnemy ? enemyCollapsedRows : friendlyCollapsedRows;
+    const targetCollapsedRows = unit.isEnemy ? friendlyCollapsedRows : enemyCollapsedRows;
+
     // For Contact line of fire, check if there's at least one valid target at the closest range
     if (ability.lineOfFire === 0) { // Contact
       // Find the minimum range that has valid targetable units
       let closestRange = Infinity;
       for (const target of aliveTargets) {
-        const range = calculateRange(unit.gridId, target.gridId, unit.isEnemy);
+        const range = calculateRange(unit.gridId, target.gridId, unit.isEnemy, attackerCollapsedRows, targetCollapsedRows);
         if (range >= ability.minRange && range <= ability.maxRange) {
           if (canTargetUnit(target.unitId, ability.targets)) {
             if (range < closestRange) {
@@ -237,16 +243,16 @@ export function getAvailableAbilities(
       console.log(`[getAvailableAbilities] Ability ${ability.abilityId} (Contact) has targets at range ${closestRange}`);
       return true;
     }
-    
+
     // For other line of fire types, check blocking
     const blockingUnits = getBlockingUnits(
       aliveTargets.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
       true
     );
-    
+
     for (const target of aliveTargets) {
       if (!canTargetUnit(target.unitId, ability.targets)) continue;
-      const range = calculateRange(unit.gridId, target.gridId, unit.isEnemy);
+      const range = calculateRange(unit.gridId, target.gridId, unit.isEnemy, attackerCollapsedRows, targetCollapsedRows);
       if (range < ability.minRange || range > ability.maxRange) continue;
       const blockCheck = checkLineOfFire(unit.gridId, target.gridId, ability.lineOfFire, unit.isEnemy, blockingUnits);
       if (!blockCheck.isBlocked) {
@@ -268,11 +274,17 @@ export function getValidTargets(
   attacker: LiveBattleUnit,
   ability: AbilityInfo,
   allEnemies: LiveBattleUnit[],
-  allFriendlies: LiveBattleUnit[]
+  allFriendlies: LiveBattleUnit[],
+  friendlyCollapsedRows?: Set<number>,
+  enemyCollapsedRows?: Set<number>
 ): LiveBattleUnit[] {
   const targets = attacker.isEnemy ? allFriendlies : allEnemies;
   const aliveTargets = targets.filter(t => !t.isDead);
-  
+
+  // Determine which collapsed rows to use based on who is attacking
+  const attackerCollapsedRows = attacker.isEnemy ? enemyCollapsedRows : friendlyCollapsedRows;
+  const targetCollapsedRows = attacker.isEnemy ? friendlyCollapsedRows : enemyCollapsedRows;
+
   // Only alive units can block
   // Use grid_id format for EncounterUnit-style mapping (isEnemy=true uses grid_id)
   const blockingUnits = getBlockingUnits(
@@ -283,39 +295,39 @@ export function getValidTargets(
   // For Contact line of fire, target the closest unit in EACH column (not overall closest)
   if (ability.lineOfFire === 0) { // Contact
     console.log(`[getValidTargets-Contact] Attacker grid ${attacker.gridId}, isEnemy=${attacker.isEnemy}, abilityId=${ability.abilityId}`);
-    
+
     // Group targets by column (x coordinate), find closest in each column
     const columnClosest: Map<number, { target: LiveBattleUnit; range: number }> = new Map();
-    
+
     for (const target of aliveTargets) {
-      const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy);
+      const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy, attackerCollapsedRows, targetCollapsedRows);
       if (range < ability.minRange || range > ability.maxRange) continue;
       if (!canTargetUnit(target.unitId, ability.targets)) continue;
-      
+
       const coords = GRID_ID_TO_COORDS[target.gridId];
       if (!coords) continue;
-      
+
       const column = coords.x;
       const existing = columnClosest.get(column);
-      
+
       // Keep the closest unit in this column (smallest range)
       if (!existing || range < existing.range) {
         columnClosest.set(column, { target, range });
       }
     }
-    
+
     const validTargets = Array.from(columnClosest.values()).map(v => v.target);
-    console.log(`[getValidTargets-Contact] Returning ${validTargets.length} valid targets (closest per column):`, 
-      validTargets.map(t => ({ gridId: t.gridId, range: calculateRange(attacker.gridId, t.gridId, attacker.isEnemy) })));
+    console.log(`[getValidTargets-Contact] Returning ${validTargets.length} valid targets (closest per column):`,
+      validTargets.map(t => ({ gridId: t.gridId, range: calculateRange(attacker.gridId, t.gridId, attacker.isEnemy, attackerCollapsedRows, targetCollapsedRows) })));
     return validTargets;
   }
 
   return aliveTargets.filter(target => {
     // Check tag targeting
     if (!canTargetUnit(target.unitId, ability.targets)) return false;
-    
+
     // Check range
-    const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy);
+    const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy, attackerCollapsedRows, targetCollapsedRows);
     if (range < ability.minRange || range > ability.maxRange) return false;
     
     // Check line of fire
@@ -1190,19 +1202,32 @@ export function aiSelectAction(
   console.log(`[AI] ${unitName} - Current ability cooldowns:`, unit.abilityCooldowns);
   console.log(`[AI] ${unitName} - Current weapon global cooldowns:`, unit.weaponGlobalCooldown);
   
-  const availableAbilities = getAvailableAbilities(unit, state.enemyUnits, state.friendlyUnits);
-  
+  const availableAbilities = getAvailableAbilities(
+    unit,
+    state.enemyUnits,
+    state.friendlyUnits,
+    state.friendlyCollapsedRows,
+    state.enemyCollapsedRows
+  );
+
   console.log(`[AI] ${unitName} (grid ${unit.gridId}): ${availableAbilities.length} available abilities after filtering`);
-  
+
   if (availableAbilities.length === 0) {
     console.log(`[AI] ${unitName}: No available abilities`);
     return null;
   }
-  
+
   const ability = availableAbilities[Math.floor(Math.random() * availableAbilities.length)];
   console.log(`[AI] ${unitName}: Selected ability ${ability.abilityId} (weapon: ${ability.weaponName})`);
-  
-  const validTargets = getValidTargets(unit, ability, state.enemyUnits, state.friendlyUnits);
+
+  const validTargets = getValidTargets(
+    unit,
+    ability,
+    state.enemyUnits,
+    state.friendlyUnits,
+    state.friendlyCollapsedRows,
+    state.enemyCollapsedRows
+  );
   console.log(`[AI] ${unitName}: ${validTargets.length} valid targets`);
   
   if (validTargets.length === 0) {

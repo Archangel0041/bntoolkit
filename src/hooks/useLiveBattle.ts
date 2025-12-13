@@ -78,7 +78,9 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     return getAvailableAbilities(
       selectedUnit,
       battleState.enemyUnits,
-      battleState.friendlyUnits
+      battleState.friendlyUnits,
+      battleState.friendlyCollapsedRows,
+      battleState.enemyCollapsedRows
     );
   }, [battleState, selectedUnit]);
 
@@ -402,7 +404,9 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       selectedUnit,
       selectedAbility,
       battleState.enemyUnits,
-      battleState.friendlyUnits
+      battleState.friendlyUnits,
+      battleState.friendlyCollapsedRows,
+      battleState.enemyCollapsedRows
     );
   }, [battleState, selectedUnit, selectedAbility]);
 
@@ -421,7 +425,9 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       selectedUnit,
       selectedAbility,
       battleState.enemyUnits,
-      battleState.friendlyUnits
+      battleState.friendlyUnits,
+      battleState.friendlyCollapsedRows,
+      battleState.enemyCollapsedRows
     );
     
     console.log(`[executePlayerAction] Fresh valid targets for ability ${selectedAbility.abilityId}:`, 
@@ -661,8 +667,8 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     // IMPORTANT: Pass only ALIVE units to ability/target checks
     const abilityPool: { enemy: LiveBattleUnit; ability: AbilityInfo; targets: LiveBattleUnit[] }[] = [];
     for (const enemy of activeEnemies) {
-      for (const ability of getAvailableAbilities(enemy, aliveEnemies, aliveFriendlies)) {
-        const targets = getValidTargets(enemy, ability, aliveEnemies, aliveFriendlies);
+      for (const ability of getAvailableAbilities(enemy, aliveEnemies, aliveFriendlies, battleState.friendlyCollapsedRows, battleState.enemyCollapsedRows)) {
+        const targets = getValidTargets(enemy, ability, aliveEnemies, aliveFriendlies, battleState.friendlyCollapsedRows, battleState.enemyCollapsedRows);
         if (targets.length > 0) {
           abilityPool.push({ enemy, ability, targets });
         }
