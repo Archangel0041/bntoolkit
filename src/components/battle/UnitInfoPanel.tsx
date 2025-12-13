@@ -7,12 +7,45 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { getUnitById } from "@/lib/units";
 import { getUnitAbilities } from "@/lib/battleCalculations";
 import { getAbilityById, getLineOfFireLabel } from "@/lib/abilities";
-import { DamageTypeLabels } from "@/data/gameEnums";
+import { DamageTypeLabels, UnitTagLabels } from "@/data/gameEnums";
 import { UnitBlocking, UnitBlockingLabels, UnitClassLabels } from "@/data/gameEnums";
 import { cn } from "@/lib/utils";
 import { getStatusEffectDisplayName, getStatusEffectIconUrl, getEffectDisplayNameTranslated, getEffectIconUrl, getStatusEffect } from "@/lib/statusEffects";
 import { getAbilityImageUrl } from "@/lib/abilityImages";
 import { getDamageTypeIconUrl } from "@/lib/damageImages";
+import { expandTargetTags } from "@/lib/tagHierarchy";
+
+// Main targeting categories
+const TARGETING_CATEGORIES = {
+  air: { tag: 39, label: "Air", color: "bg-sky-500/20 text-sky-700 dark:text-sky-300 border-sky-500/50" },
+  ground: { tag: 24, label: "Ground", color: "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/50" },
+  sea: { tag: 15, label: "Sea", color: "bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/50" },
+};
+
+function getTargetingCategories(targets: number[]): { canTarget: string[]; cannotTarget: string[] } {
+  if (targets.length === 0) {
+    return { canTarget: ["Air", "Ground", "Sea"], cannotTarget: [] };
+  }
+  
+  const expandedTargets = expandTargetTags(targets);
+  const canTarget: string[] = [];
+  const cannotTarget: string[] = [];
+  
+  // Check if targets Unit (51) which means everything
+  if (targets.includes(51) || expandedTargets.includes(51)) {
+    return { canTarget: ["Air", "Ground", "Sea"], cannotTarget: [] };
+  }
+  
+  for (const [key, { tag, label }] of Object.entries(TARGETING_CATEGORIES)) {
+    if (targets.includes(tag) || expandedTargets.includes(tag)) {
+      canTarget.push(label);
+    } else {
+      cannotTarget.push(label);
+    }
+  }
+  
+  return { canTarget, cannotTarget };
+}
 
 interface UnitInfoPanelProps {
   unitId: number;
@@ -238,6 +271,11 @@ export function UnitInfoPanel({
                   const critPercent = abilityData?.stats.critical_hit_percent ?? 0;
                   const armorPierce = abilityData?.stats.armor_piercing_percent ?? 0;
                   
+                  // Get targets and critical bonuses
+                  const targets = abilityData?.stats.targets || [];
+                  const { canTarget, cannotTarget } = getTargetingCategories(targets);
+                  const critBonuses = (abilityData?.stats as any)?.critical_bonuses as Record<string, number> | undefined;
+                  
                   // Get status effects from ability
                   const statusEffects = abilityData?.stats.status_effects 
                     ? Object.entries(abilityData.stats.status_effects) 
@@ -327,6 +365,55 @@ export function UnitInfoPanel({
                           </div>
                         )}
                       </div>
+
+                      {/* Targets */}
+                      {(canTarget.length > 0 || cannotTarget.length > 0) && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs text-muted-foreground">Targets:</span>
+                          {canTarget.map(cat => (
+                            <Badge 
+                              key={cat} 
+                              variant="outline" 
+                              className={cn(
+                                "text-xs h-5",
+                                cat === "Air" && TARGETING_CATEGORIES.air.color,
+                                cat === "Ground" && TARGETING_CATEGORIES.ground.color,
+                                cat === "Sea" && TARGETING_CATEGORIES.sea.color
+                              )}
+                            >
+                              ✓ {cat}
+                            </Badge>
+                          ))}
+                          {cannotTarget.map(cat => (
+                            <Badge 
+                              key={cat} 
+                              variant="outline" 
+                              className="text-xs h-5 bg-muted/50 text-muted-foreground line-through"
+                            >
+                              {cat}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Crit Bonuses */}
+                      {critBonuses && Object.keys(critBonuses).length > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-xs text-muted-foreground">Crit Bonus:</span>
+                          {Object.entries(critBonuses).map(([tagId, bonus]) => {
+                            const tagLabel = UnitTagLabels[parseInt(tagId)] || `Tag ${tagId}`;
+                            return (
+                              <Badge 
+                                key={tagId} 
+                                variant="outline" 
+                                className="text-xs h-5 bg-yellow-500/20 text-yellow-700 dark:text-yellow-300 border-yellow-500/50"
+                              >
+                                +{bonus}% vs {tagLabel}
+                              </Badge>
+                            );
+                          })}
+                        </div>
+                      )}
 
                       {/* Status Effects */}
                       {statusEffects.length > 0 && (
