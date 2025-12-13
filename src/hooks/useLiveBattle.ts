@@ -560,8 +560,37 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       return;
     }
 
+    // 3b. Check if wave should advance due to DoT kills
+    // If all non-ignorable enemies died from DoT, advance wave and continue with new enemies
+    const allNonIgnorableEnemiesDead = newState.enemyUnits.every(u => {
+      if (u.isDead) return true;
+      const unit = getUnitById(u.unitId);
+      const tags = unit?.identity?.tags || [];
+      const isIgnorable = tags.includes(UnitTag.Ignorable);
+      const isUnimportant = unit?.statsConfig?.unimportant === true;
+      return isIgnorable || isUnimportant;
+    });
+    
+    if (allNonIgnorableEnemiesDead && newState.currentWave < newState.totalWaves - 1) {
+      console.log('[executeEnemyTurn] All enemies dead from DoT, advancing wave inline');
+      const nextWave = newState.currentWave + 1;
+      const nextWaveUnits = waves[nextWave] || [];
+      const newEnemyUnits = nextWaveUnits
+        .filter(u => u.grid_id !== undefined)
+        .map(u => {
+          const unit = createLiveBattleUnit(u.unit_id, u.grid_id!, 1, true);
+          return unit;
+        })
+        .filter((u): u is LiveBattleUnit => u !== null);
+      
+      newState.enemyUnits = newEnemyUnits;
+      newState.currentWave = nextWave;
+      newState.currentEnemyIndex = 0;
+      actions.push({ type: "skip", message: `Wave ${nextWave + 1} begins! Enemies attack first.` });
+    }
+
     // 4. Get alive enemies, filter to non-stunned
-    // Filter AGAIN after DoT processing to exclude any enemies that died from DoT
+    // Filter AGAIN after DoT processing (and potential wave advance) to exclude any enemies that died from DoT
     const aliveEnemies = newState.enemyUnits.filter(e => !e.isDead);
     const activeEnemies = aliveEnemies.filter(e => !e.activeStatusEffects.some(s => s.isStun));
     
