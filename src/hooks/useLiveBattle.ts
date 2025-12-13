@@ -380,27 +380,51 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     setBattleState(prev => {
       if (!prev) return prev;
 
+      // Deep clone state to avoid mutation issues in StrictMode
+      const clonedState: LiveBattleState = {
+        ...prev,
+        friendlyUnits: prev.friendlyUnits.map(u => ({
+          ...u,
+          abilityCooldowns: { ...u.abilityCooldowns },
+          weaponAmmo: { ...u.weaponAmmo },
+          weaponReloadCooldown: { ...u.weaponReloadCooldown },
+          activeStatusEffects: u.activeStatusEffects.map(e => ({ ...e })),
+        })),
+        enemyUnits: prev.enemyUnits.map(u => ({
+          ...u,
+          abilityCooldowns: { ...u.abilityCooldowns },
+          weaponAmmo: { ...u.weaponAmmo },
+          weaponReloadCooldown: { ...u.weaponReloadCooldown },
+          activeStatusEffects: u.activeStatusEffects.map(e => ({ ...e })),
+        })),
+        battleLog: [...prev.battleLog],
+      };
+
+      // Find the attacker in cloned state
+      const clonedAttacker = clonedState.friendlyUnits.find(u => u.gridId === selectedUnit.gridId);
+      if (!clonedAttacker) return prev;
+
       // Get localized names
       const attackerUnit = getUnitById(selectedUnit.unitId);
       const attackerName = attackerUnit ? t(attackerUnit.identity.name) : `Unit ${selectedUnit.unitId}`;
       const abilityData = getAbilityById(selectedAbility.abilityId);
       const localizedAbilityName = abilityData ? t(abilityData.name) : `Ability ${selectedAbility.abilityId}`;
 
-      // Execute the attack (random or normal)
+      // Execute the attack (random or normal) on cloned state
       let actions: BattleAction[];
       if (isRandom) {
         actions = executeRandomAttack(
-          selectedUnit,
+          clonedAttacker,
           selectedAbility,
-          prev,
+          clonedState,
           environmentalDamageMods
         );
       } else {
         actions = executeAttack(
-          selectedUnit,
+          clonedAttacker,
           selectedAbility,
           targetGridId,
-          prev,
+          clonedState,
           environmentalDamageMods
         );
       }
@@ -414,23 +438,23 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
 
       // Add turn to log
       const turn: BattleTurn = {
-        turnNumber: prev.currentTurn,
+        turnNumber: clonedState.currentTurn,
         isPlayerTurn: true,
         actions,
       };
 
       // Check battle end
-      const endCheck = checkBattleEnd(prev);
+      const endCheck = checkBattleEnd(clonedState);
 
       // Reduce cooldowns for player units
-      reduceCooldowns(prev.friendlyUnits);
+      reduceCooldowns(clonedState.friendlyUnits);
 
       return {
-        ...prev,
-        battleLog: [...prev.battleLog, turn],
+        ...clonedState,
+        battleLog: [...clonedState.battleLog, turn],
         isBattleOver: endCheck.isOver,
         isPlayerVictory: endCheck.playerWon,
-        isPlayerTurn: !endCheck.isOver ? false : prev.isPlayerTurn,
+        isPlayerTurn: !endCheck.isOver ? false : clonedState.isPlayerTurn,
         currentEnemyIndex: 0, // Reset enemy index when transitioning to enemy turn
       };
     });
@@ -463,36 +487,56 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         return prev;
       }
 
+      // Deep clone state to avoid mutation issues in StrictMode
+      const clonedState: LiveBattleState = {
+        ...prev,
+        friendlyUnits: prev.friendlyUnits.map(u => ({
+          ...u,
+          abilityCooldowns: { ...u.abilityCooldowns },
+          weaponAmmo: { ...u.weaponAmmo },
+          weaponReloadCooldown: { ...u.weaponReloadCooldown },
+          activeStatusEffects: u.activeStatusEffects.map(e => ({ ...e })),
+        })),
+        enemyUnits: prev.enemyUnits.map(u => ({
+          ...u,
+          abilityCooldowns: { ...u.abilityCooldowns },
+          weaponAmmo: { ...u.weaponAmmo },
+          weaponReloadCooldown: { ...u.weaponReloadCooldown },
+          activeStatusEffects: u.activeStatusEffects.map(e => ({ ...e })),
+        })),
+        battleLog: [...prev.battleLog],
+      };
+
       const allActions: BattleAction[] = [];
 
       // Collapse grids - move units forward if front row is empty
-      collapseGrid(prev.friendlyUnits);
-      collapseGrid(prev.enemyUnits);
+      collapseGrid(clonedState.friendlyUnits);
+      collapseGrid(clonedState.enemyUnits);
 
       // Process status effects at start of enemy phase
-      const statusActions = processStatusEffects([...prev.friendlyUnits, ...prev.enemyUnits]);
+      const statusActions = processStatusEffects([...clonedState.friendlyUnits, ...clonedState.enemyUnits]);
       allActions.push(...statusActions);
 
       // Check for deaths from status effects
-      const endCheckAfterStatus = checkBattleEnd(prev);
+      const endCheckAfterStatus = checkBattleEnd(clonedState);
       if (endCheckAfterStatus.isOver) {
         const turn: BattleTurn = {
-          turnNumber: prev.currentTurn,
+          turnNumber: clonedState.currentTurn,
           isPlayerTurn: false,
           actions: allActions,
         };
         setTimeout(() => setIsProcessing(false), 0);
         return {
-          ...prev,
+          ...clonedState,
           currentEnemyIndex: 0,
-          battleLog: [...prev.battleLog, turn],
+          battleLog: [...clonedState.battleLog, turn],
           isBattleOver: true,
           isPlayerVictory: endCheckAfterStatus.playerWon,
         };
       }
 
       // Get all alive, non-stunned enemies
-      const aliveEnemies = prev.enemyUnits.filter(e => !e.isDead);
+      const aliveEnemies = clonedState.enemyUnits.filter(e => !e.isDead);
       const activeEnemies = aliveEnemies.filter(e => !e.activeStatusEffects.some(s => s.isStun));
       
       // Log stunned enemies
@@ -521,10 +565,10 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       
       for (const enemy of activeEnemies) {
         // Get abilities that are not on cooldown and have ammo
-        const abilities = getAvailableAbilities(enemy, prev.enemyUnits, prev.friendlyUnits);
+        const abilities = getAvailableAbilities(enemy, clonedState.enemyUnits, clonedState.friendlyUnits);
         
         for (const ability of abilities) {
-          const targets = getValidTargets(enemy, ability, prev.enemyUnits, prev.friendlyUnits);
+          const targets = getValidTargets(enemy, ability, clonedState.enemyUnits, clonedState.friendlyUnits);
           if (targets.length > 0) {
             abilityPool.push({ enemy, ability, validTargets: targets });
           }
@@ -547,23 +591,23 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           });
         }
 
-        reduceCooldowns(prev.enemyUnits);
+        reduceCooldowns(clonedState.enemyUnits);
         
         const turn: BattleTurn = {
-          turnNumber: prev.currentTurn,
+          turnNumber: clonedState.currentTurn,
           isPlayerTurn: false,
           actions: allActions,
         };
         
-        const endCheck = checkBattleEnd(prev);
+        const endCheck = checkBattleEnd(clonedState);
         setTimeout(() => setIsProcessing(false), 0);
         
         return {
-          ...prev,
-          currentTurn: prev.currentTurn + 1,
+          ...clonedState,
+          currentTurn: clonedState.currentTurn + 1,
           isPlayerTurn: true,
           currentEnemyIndex: 0,
-          battleLog: [...prev.battleLog, turn],
+          battleLog: [...clonedState.battleLog, turn],
           isBattleOver: endCheck.isOver,
           isPlayerVictory: endCheck.playerWon,
         };
@@ -586,9 +630,9 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       // Execute the attack
       let attackActions: BattleAction[];
       if (isRandomAttack(ability)) {
-        attackActions = executeRandomAttack(enemy, ability, prev, environmentalDamageMods);
+        attackActions = executeRandomAttack(enemy, ability, clonedState, environmentalDamageMods);
       } else {
-        attackActions = executeAttack(enemy, ability, target.gridId, prev, environmentalDamageMods);
+        attackActions = executeAttack(enemy, ability, target.gridId, clonedState, environmentalDamageMods);
       }
       
       // Add attacker name and localized ability name
@@ -601,13 +645,13 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       allActions.push(...attackActions);
 
       // Reduce cooldowns for all enemies after their phase
-      reduceCooldowns(prev.enemyUnits);
+      reduceCooldowns(clonedState.enemyUnits);
 
       // Check if battle ended
-      const endCheck = checkBattleEnd(prev);
+      const endCheck = checkBattleEnd(clonedState);
       
       const turn: BattleTurn = {
-        turnNumber: prev.currentTurn,
+        turnNumber: clonedState.currentTurn,
         isPlayerTurn: false,
         actions: allActions,
       };
@@ -615,11 +659,11 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       setTimeout(() => setIsProcessing(false), 0);
       
       return {
-        ...prev,
-        currentTurn: prev.currentTurn + 1,
+        ...clonedState,
+        currentTurn: clonedState.currentTurn + 1,
         isPlayerTurn: true,
         currentEnemyIndex: 0,
-        battleLog: [...prev.battleLog, turn],
+        battleLog: [...clonedState.battleLog, turn],
         isBattleOver: endCheck.isOver,
         isPlayerVictory: endCheck.playerWon,
       };
