@@ -334,6 +334,14 @@ const LiveBattleSimulator = () => {
                   }}
                   highlightedGridIds={battleState.isPlayerTurn && selectedAbility ? highlightedGridIds : undefined}
                   lastActionGridIds={lastActionGridIds}
+                  damagePreviews={damagePreviews}
+                  reticleGridId={enemyReticleGridId}
+                  onReticleMove={setEnemyReticleGridId}
+                  showReticle={!!selectedAbility && !selectedAbility.isSingleTarget && !selectedAbility.isFixed}
+                  targetArea={selectedAbility?.targetArea}
+                  damageArea={selectedAbility?.damageArea}
+                  fixedAttackPositions={fixedAttackPositions.enemyGrid}
+                  validReticlePositions={validReticlePositions}
                 />
 
                 {/* Unit info and ability selector */}
@@ -386,6 +394,7 @@ const LiveBattleSimulator = () => {
                     }
                   }}
                   lastActionGridIds={lastActionGridIds}
+                  damagePreviews={[]}
                 />
               </div>
 
