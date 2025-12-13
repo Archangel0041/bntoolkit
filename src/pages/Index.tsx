@@ -10,6 +10,7 @@ import { EncounterLookup } from "@/components/encounters/EncounterLookup";
 import { BossStrikeLookup } from "@/components/bossStrikes/BossStrikeLookup";
 import { Users, Crosshair, Trophy } from "lucide-react";
 import { UnitSide } from "@/data/gameEnums";
+import { filterUnitsByAdvancedCriteria } from "@/lib/unitAbilityFilters";
 
 const Index = () => {
   const { t } = useLanguage();
@@ -17,20 +18,36 @@ const Index = () => {
   const [selectedTags, setSelectedTags] = useState<number[]>([]);
   const [nanopodFilter, setNanopodFilter] = useState<"all" | "nanopod" | "non-nanopod">("all");
   const [mainTab, setMainTab] = useState("units");
+  
+  // Advanced filters
+  const [targetCategories, setTargetCategories] = useState<number[]>([]);
+  const [damageTypes, setDamageTypes] = useState<number[]>([]);
+  const [hasStatusEffects, setHasStatusEffects] = useState(false);
+  const [vulnerableTo, setVulnerableTo] = useState<number[]>([]);
 
   const allTags = useMemo(() => getAllTags(), []);
 
   const filteredUnits = useMemo(() => {
+    // Basic filters
     let units = filterUnits(allUnits, searchQuery, selectedTags, null, t);
     
+    // Nanopod filter
     if (nanopodFilter === "nanopod") {
       units = units.filter(u => u.requirements?.cost?.nanopods && u.requirements.cost.nanopods > 0);
     } else if (nanopodFilter === "non-nanopod") {
       units = units.filter(u => !u.requirements?.cost?.nanopods || u.requirements.cost.nanopods === 0);
     }
     
+    // Advanced ability-based filters
+    units = filterUnitsByAdvancedCriteria(units, {
+      targetCategories,
+      damageTypes,
+      hasStatusEffects: hasStatusEffects || undefined,
+      vulnerableTo,
+    });
+    
     return units;
-  }, [searchQuery, selectedTags, nanopodFilter, t]);
+  }, [searchQuery, selectedTags, nanopodFilter, targetCategories, damageTypes, hasStatusEffects, vulnerableTo, t]);
 
   const unitsBySide = useMemo(() => ({
     player: filteredUnits.filter(u => u.identity.side === UnitSide.Player),
@@ -77,6 +94,14 @@ const Index = () => {
               allTags={allTags}
               nanopodFilter={nanopodFilter}
               setNanopodFilter={setNanopodFilter}
+              targetCategories={targetCategories}
+              setTargetCategories={setTargetCategories}
+              damageTypes={damageTypes}
+              setDamageTypes={setDamageTypes}
+              hasStatusEffects={hasStatusEffects}
+              setHasStatusEffects={setHasStatusEffects}
+              vulnerableTo={vulnerableTo}
+              setVulnerableTo={setVulnerableTo}
             />
 
             <div className="text-sm text-muted-foreground">
