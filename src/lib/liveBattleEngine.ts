@@ -216,31 +216,25 @@ export function getAvailableAbilities(
     const targets = unit.isEnemy ? allFriendlies : allEnemies;
     const aliveTargets = targets.filter(t => !t.isDead);
     
-  // For Contact line of fire, only target units in the closest row
+    // For Contact line of fire, check if there's at least one valid target at the closest range
     if (ability.lineOfFire === 0) { // Contact
-      // For enemies attacking friendlies, "front" is highest y (row 2 is closest to enemy grid)
-      // For friendlies attacking enemies, "front" is lowest y (row 0 is closest to friendly grid)
-      let closestRow = unit.isEnemy ? -Infinity : Infinity;
+      // Find the minimum range that has valid targetable units
+      let closestRange = Infinity;
       for (const target of aliveTargets) {
         const range = calculateRange(unit.gridId, target.gridId, unit.isEnemy);
         if (range >= ability.minRange && range <= ability.maxRange) {
           if (canTargetUnit(target.unitId, ability.targets)) {
-            const coords = GRID_ID_TO_COORDS[target.gridId];
-            if (coords) {
-              if (unit.isEnemy && coords.y > closestRow) {
-                closestRow = coords.y;
-              } else if (!unit.isEnemy && coords.y < closestRow) {
-                closestRow = coords.y;
-              }
+            if (range < closestRange) {
+              closestRange = range;
             }
           }
         }
       }
-      if (closestRow === (unit.isEnemy ? -Infinity : Infinity)) {
+      if (closestRange === Infinity) {
         console.log(`[getAvailableAbilities] Ability ${ability.abilityId} (Contact) has no valid targets`);
         return false;
       }
-      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} (Contact) has targets in row ${closestRow}`);
+      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} (Contact) has targets at range ${closestRange}`);
       return true;
     }
     
@@ -286,48 +280,33 @@ export function getValidTargets(
     true // Always use EncounterUnit format (grid_id) since we're mapping with grid_id
   );
 
-  // For Contact line of fire, only target units in the closest row with valid targets
+  // For Contact line of fire, only target units at the closest range
   if (ability.lineOfFire === 0) { // Contact
-    // For enemies attacking friendlies, "front" is highest y (row 2 is closest to enemy grid)
-    // For friendlies attacking enemies, "front" is lowest y (row 0 is closest to friendly grid)
-    let closestRow = attacker.isEnemy ? -Infinity : Infinity;
-    
     console.log(`[getValidTargets-Contact] Attacker grid ${attacker.gridId}, isEnemy=${attacker.isEnemy}, abilityId=${ability.abilityId}`);
-    console.log(`[getValidTargets-Contact] Alive targets:`, aliveTargets.map(t => ({ gridId: t.gridId, unitId: t.unitId, coords: GRID_ID_TO_COORDS[t.gridId] })));
     
+    // Find the minimum range that has valid targetable units
+    let closestRange = Infinity;
     for (const target of aliveTargets) {
       const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy);
-      const canTarget = canTargetUnit(target.unitId, ability.targets);
-      const coords = GRID_ID_TO_COORDS[target.gridId];
-      console.log(`[getValidTargets-Contact] Target grid ${target.gridId}: range=${range} (min=${ability.minRange}, max=${ability.maxRange}), canTarget=${canTarget}, coords=${JSON.stringify(coords)}`);
-      
       if (range >= ability.minRange && range <= ability.maxRange) {
-        if (canTarget) {
-          if (coords) {
-            if (attacker.isEnemy && coords.y > closestRow) {
-              console.log(`[getValidTargets-Contact] Enemy attacker: updating closestRow from ${closestRow} to ${coords.y}`);
-              closestRow = coords.y;
-            } else if (!attacker.isEnemy && coords.y < closestRow) {
-              console.log(`[getValidTargets-Contact] Friendly attacker: updating closestRow from ${closestRow} to ${coords.y}`);
-              closestRow = coords.y;
-            }
+        if (canTargetUnit(target.unitId, ability.targets)) {
+          if (range < closestRange) {
+            closestRange = range;
           }
         }
       }
     }
     
-    console.log(`[getValidTargets-Contact] Final closestRow=${closestRow}`);
+    console.log(`[getValidTargets-Contact] Closest range with valid targets: ${closestRange}`);
     
-    // Only return targets in that closest row
-    if (closestRow !== (attacker.isEnemy ? -Infinity : Infinity)) {
+    // Return only targets at the closest range
+    if (closestRange !== Infinity) {
       const validTargets = aliveTargets.filter(target => {
-        const coords = GRID_ID_TO_COORDS[target.gridId];
-        if (!coords || coords.y !== closestRow) return false;
         if (!canTargetUnit(target.unitId, ability.targets)) return false;
         const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy);
-        return range >= ability.minRange && range <= ability.maxRange;
+        return range === closestRange;
       });
-      console.log(`[getValidTargets-Contact] Returning ${validTargets.length} valid targets:`, validTargets.map(t => t.gridId));
+      console.log(`[getValidTargets-Contact] Returning ${validTargets.length} valid targets at range ${closestRange}:`, validTargets.map(t => t.gridId));
       return validTargets;
     }
     console.log(`[getValidTargets-Contact] No valid targets found`);
