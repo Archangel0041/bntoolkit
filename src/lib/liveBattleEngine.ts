@@ -404,12 +404,21 @@ export function executeAttack(
   // Get affected positions (for AOE/fixed attacks)
   let affectedPositions: { gridId: number; damagePercent: number }[];
   
-  // Handle single-target abilities - they may still have damageArea for splash effects
+  // Check if this is a "single-selection with splash" ability:
+  // - Has damageArea with non-center positions (splash)
+  // - targetArea is either missing, or only has center position (no movable reticle)
+  const hasNonCenterSplash = ability.damageArea?.some(d => d.x !== 0 || d.y !== 0) ?? false;
+  const targetAreaHasOnlyCenter = !ability.targetArea || 
+    (ability.targetArea.data.length === 1 && 
+     ability.targetArea.data[0].x === 0 && 
+     ability.targetArea.data[0].y === 0);
+  const isSingleSelectionWithSplash = hasNonCenterSplash && targetAreaHasOnlyCenter;
+  
   if (ability.isSingleTarget && !ability.damageArea) {
     // Pure single-target: only the selected target gets hit
     affectedPositions = [{ gridId: targetGridId, damagePercent: 100 }];
-  } else if (ability.isSingleTarget && ability.damageArea) {
-    // Single-target selection with splash damage (like Legendary Sandworm's Maul)
+  } else if (isSingleSelectionWithSplash) {
+    // Single-selection with splash damage (like Legendary Sandworm's Maul)
     // Create a synthetic targetArea with just the center point, then apply damageArea
     const syntheticTargetArea: TargetArea = {
       targetType: 2,
