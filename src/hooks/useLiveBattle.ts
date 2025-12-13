@@ -482,8 +482,11 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   // 3. Execute it
   // 4. Return control to player
   const executeEnemyTurn = useCallback(() => {
+    // Guard: only execute if it's enemy turn and not already processing
     if (!battleState || battleState.isPlayerTurn || battleState.isBattleOver || isProcessing) return;
 
+    // Immediately mark as player turn to prevent re-entry
+    setBattleState(prev => prev ? { ...prev, isPlayerTurn: true } : prev);
     setIsProcessing(true);
 
     // 1. Clone state as working copy
