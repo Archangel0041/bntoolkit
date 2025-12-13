@@ -79,10 +79,19 @@ export function BattleLog({ turns, currentTurn, className }: BattleLogProps) {
                     >
                       <ActionIcon type={action.type} />
                       <span className="text-muted-foreground">
-                        {action.attackerName && (
+                        {action.attackerName && action.targetName && action.abilityName && (
                           <span className="font-medium text-foreground">
-                            {action.attackerName}
-                            {action.abilityName ? ` → ${action.abilityName}` : ""}:{" "}
+                            {action.attackerName} → {action.abilityName} → {action.targetName}:{" "}
+                          </span>
+                        )}
+                        {action.attackerName && !action.targetName && action.abilityName && (
+                          <span className="font-medium text-foreground">
+                            {action.attackerName} → {action.abilityName}:{" "}
+                          </span>
+                        )}
+                        {action.attackerName && !action.abilityName && (
+                          <span className="font-medium text-foreground">
+                            {action.attackerName}:{" "}
                           </span>
                         )}
                         {!action.attackerName && action.abilityName && (
