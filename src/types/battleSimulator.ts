@@ -330,8 +330,8 @@ export function getFixedAttackPositions(
         isOnEnemyGrid = false;
       } else {
         // Crossed to enemy grid
-        // Both grids are displayed with the same left-to-right orientation from the player's view,
-        // so NO x-mirroring is needed. A unit at x=1 fires at enemy x=1 (same visual column).
+        // From player's perspective, both grids have the same left-to-right orientation.
+        // A unit at x=1 should hit enemy x=1 (same visual column), no mirroring needed.
         const newX = attackerCoords.x + pos.x;
         
         const rowsIntoEnemyGrid = rowsTowardEnemy - rowsOnFriendlySide - 1; // -1 for the gap between grids
@@ -354,8 +354,7 @@ export function getFixedAttackPositions(
         targetGridId = COORDS_TO_GRID_ID[coordKey];
         isOnEnemyGrid = true;
       } else {
-        // Crossed to friendly grid
-        // Both grids use the same coordinate system, so no mirroring needed
+        // Crossed to friendly grid - same logic, no mirroring
         const newX = attackerCoords.x + pos.x;
         
         const rowsIntoFriendlyGrid = rowsTowardFriendly - rowsOnEnemySide - 1;
