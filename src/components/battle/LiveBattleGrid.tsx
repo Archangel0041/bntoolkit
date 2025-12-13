@@ -32,6 +32,8 @@ interface LiveBattleGridProps {
   validReticlePositions?: Set<number>;
   // Is this a random attack (all tiles are potential targets)
   isRandomAttack?: boolean;
+  // Animation trigger - increments when a new attack happens
+  attackAnimationTrigger?: number;
 }
 
 export function LiveBattleGrid({
@@ -51,12 +53,26 @@ export function LiveBattleGrid({
   fixedAttackPositions = [],
   validReticlePositions,
   isRandomAttack = false,
+  attackAnimationTrigger = 0,
 }: LiveBattleGridProps) {
   const { t } = useLanguage();
   const layout = isEnemy ? ENEMY_GRID_LAYOUT : FRIENDLY_GRID_LAYOUT;
   const gridRef = useRef<HTMLDivElement>(null);
   const [isDraggingReticle, setIsDraggingReticle] = useState(false);
   const [dragOverGridId, setDragOverGridId] = useState<number | null>(null);
+  const [animatingTargets, setAnimatingTargets] = useState<Set<number>>(new Set());
+
+  // Trigger attack animation when lastActionGridIds changes
+  useEffect(() => {
+    if (lastActionGridIds?.targets && lastActionGridIds.targets.length > 0) {
+      setAnimatingTargets(new Set(lastActionGridIds.targets));
+      // Clear animation after it completes
+      const timer = setTimeout(() => {
+        setAnimatingTargets(new Set());
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [attackAnimationTrigger]);
 
   // For movable reticles, calculate affected positions. For fixed attacks, use fixedAttackPositions
   const affectedPositions = fixedAttackPositions.length > 0
@@ -171,6 +187,7 @@ export function LiveBattleGrid({
     const isAttacker = lastActionGridIds?.attacker === gridId;
     const isTarget = lastActionGridIds?.targets?.includes(gridId);
     const isDragOver = dragOverGridId === gridId;
+    const isAnimatingAttack = animatingTargets.has(gridId);
     
     // Targeting pattern state
     const affectedPos = affectedPositions.find(p => p.gridId === gridId);
@@ -282,7 +299,8 @@ export function LiveBattleGrid({
           isSelected && "ring-2 ring-primary",
           isHighlighted && "ring-2 ring-yellow-500",
           isAttacker && "ring-2 ring-orange-500 animate-pulse",
-          isTarget && "ring-2 ring-red-500 animate-pulse",
+          isTarget && "ring-2 ring-red-500",
+          isAnimatingAttack && "animate-shake animate-flash-red",
           unit.isDead && "opacity-50",
           isReticleCenter && "ring-2 ring-yellow-500 ring-offset-1 cursor-grab",
           showReticle && isAffectedByPattern && !isReticleCenter && "ring-2 ring-orange-500/70",
@@ -291,6 +309,11 @@ export function LiveBattleGrid({
           isDraggingReticle && isReticleCenter && "opacity-50"
         )}
       >
+        {/* Attack flash overlay */}
+        {isAnimatingAttack && (
+          <div className="absolute inset-0 bg-red-500/40 animate-flash-red pointer-events-none z-20 rounded-md" />
+        )}
+        
         {/* Crosshair overlay for reticle center */}
         {isReticleCenter && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">

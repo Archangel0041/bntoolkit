@@ -147,6 +147,19 @@ const LiveBattleSimulator = () => {
     targets: lastTurn.actions.filter(a => a.targetGridId).map(a => a.targetGridId!),
   } : undefined;
 
+  // Get last attack info for summary display
+  const lastAttackAction = lastTurn?.actions.find(a => a.type === 'attack' || a.type === 'status_tick');
+  const lastAttackInfo = lastAttackAction ? {
+    attackerName: lastAttackAction.attackerName,
+    abilityName: lastAttackAction.abilityName,
+    isPlayerAttack: lastTurn?.isPlayerTurn,
+    targetCount: lastTurn?.actions.filter(a => a.type === 'attack').length || 0,
+    totalDamage: lastTurn?.summary?.totalDamage || 0,
+  } : null;
+
+  // Animation trigger - changes whenever battle log updates
+  const attackAnimationTrigger = battleState?.battleLog.length || 0;
+
   return (
     <div className="min-h-screen bg-background">
       <Header />
@@ -326,6 +339,25 @@ const LiveBattleSimulator = () => {
               </Card>
             )}
 
+            {/* Last attack summary */}
+            {lastAttackInfo && !battleState.isBattleOver && (
+              <div className={cn(
+                "flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium animate-fade-in",
+                lastAttackInfo.isPlayerAttack 
+                  ? "bg-green-500/20 text-green-600 border border-green-500/30" 
+                  : "bg-red-500/20 text-red-600 border border-red-500/30"
+              )}>
+                <Swords className="h-4 w-4" />
+                <span>
+                  {lastAttackInfo.attackerName ? t(lastAttackInfo.attackerName) : "Unit"} used{" "}
+                  <span className="font-bold">{lastAttackInfo.abilityName ? t(lastAttackInfo.abilityName) : "attack"}</span>
+                  {lastAttackInfo.totalDamage > 0 && (
+                    <span className="ml-1">— {lastAttackInfo.totalDamage} total damage</span>
+                  )}
+                </span>
+              </div>
+            )}
+
             {/* Battle grids and controls */}
             <div className="grid lg:grid-cols-3 gap-6">
               {/* Main battle area */}
@@ -359,6 +391,7 @@ const LiveBattleSimulator = () => {
                   fixedAttackPositions={fixedAttackPositions.enemyGrid}
                   validReticlePositions={validReticlePositions}
                   isRandomAttack={isRandomAttack}
+                  attackAnimationTrigger={attackAnimationTrigger}
                 />
 
                 {/* Unit info and ability selector */}
@@ -411,6 +444,7 @@ const LiveBattleSimulator = () => {
                   }}
                   lastActionGridIds={lastActionGridIds}
                   damagePreviews={[]}
+                  attackAnimationTrigger={attackAnimationTrigger}
                 />
               </div>
 
