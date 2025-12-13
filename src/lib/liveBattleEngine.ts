@@ -599,7 +599,9 @@ export function executeAttack(
         let dotDamage = 0;
         if (effect.dot_ability_damage_mult || effect.dot_bonus_damage) {
           const avgDamage = Math.floor((ability.minDamage + ability.maxDamage) / 2);
-          dotDamage = Math.floor(avgDamage * (effect.dot_ability_damage_mult || 0) + (effect.dot_bonus_damage || 0));
+          const baseDotDamage = Math.floor(avgDamage * (effect.dot_ability_damage_mult || 0) + (effect.dot_bonus_damage || 0));
+          // Scale DoT damage by damage percent (e.g., 25% splash = 25% DoT damage)
+          dotDamage = Math.floor(baseDotDamage * (pos.damagePercent / 100));
         }
         
         const isStun = effect.stun_block_action === true;

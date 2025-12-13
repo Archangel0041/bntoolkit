@@ -16,7 +16,7 @@ import {
 } from "@/lib/liveBattleEngine";
 import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTargetUnit } from "@/lib/battleCalculations";
 import { getBlockingUnits, checkLineOfFire, calculateRange, findFrontmostUnblockedPosition, getTargetingInfo } from "@/lib/battleTargeting";
-import { getStatusEffect, getStatusEffectDisplayName, getStatusEffectColor } from "@/lib/statusEffects";
+import { getStatusEffect, getStatusEffectDisplayName, getStatusEffectColor, getEffectDisplayNameTranslated } from "@/lib/statusEffects";
 import { getUnitById } from "@/lib/units";
 import { getAbilityById } from "@/lib/abilities";
 import { getFixedAttackPositions, getAffectedGridPositions } from "@/types/battleSimulator";
@@ -308,12 +308,14 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           
           let dotDamage = 0;
           if (effect.dot_ability_damage_mult || effect.dot_bonus_damage) {
-            dotDamage = Math.floor(avgDamage * (effect.dot_ability_damage_mult || 0) + (effect.dot_bonus_damage || 0));
+            const baseDotDamage = Math.floor(avgDamage * (effect.dot_ability_damage_mult || 0) + (effect.dot_bonus_damage || 0));
+            // Scale DoT damage by damage percent (e.g., 25% splash = 25% DoT damage)
+            dotDamage = Math.floor(baseDotDamage * (damagePercent / 100));
           }
           
           statusEffects.push({
             effectId,
-            name: getStatusEffectDisplayName(effectId),
+            name: getEffectDisplayNameTranslated(effectId),
             chance: adjustedChance,
             duration: effect.duration,
             damageType: effect.dot_damage_type || null,

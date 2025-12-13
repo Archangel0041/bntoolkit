@@ -141,10 +141,24 @@ const LiveBattleSimulator = () => {
   const highlightedGridIds = new Set(validTargets.map(t => t.gridId));
 
   // Get last action for visual feedback
+  // Track whether targets are on enemy or friendly side based on whose turn it was
   const lastTurn = battleState?.battleLog[battleState.battleLog.length - 1];
   const lastActionGridIds = lastTurn ? {
     attacker: lastTurn.actions.find(a => a.attackerGridId)?.attackerGridId,
     targets: lastTurn.actions.filter(a => a.targetGridId).map(a => a.targetGridId!),
+    // If it was player turn, targets are enemies. If enemy turn, targets are friendlies.
+    targetsAreEnemies: lastTurn.isPlayerTurn,
+  } : undefined;
+
+  // Separate grid IDs for enemy and friendly grids
+  const enemyLastActionGridIds = lastActionGridIds ? {
+    attacker: lastActionGridIds.targetsAreEnemies ? undefined : lastActionGridIds.attacker,
+    targets: lastActionGridIds.targetsAreEnemies ? lastActionGridIds.targets : [],
+  } : undefined;
+
+  const friendlyLastActionGridIds = lastActionGridIds ? {
+    attacker: lastActionGridIds.targetsAreEnemies ? lastActionGridIds.attacker : undefined,
+    targets: lastActionGridIds.targetsAreEnemies ? [] : lastActionGridIds.targets,
   } : undefined;
 
   // Get last attack info for summary display
@@ -375,7 +389,7 @@ const LiveBattleSimulator = () => {
                     }
                   }}
                   highlightedGridIds={battleState.isPlayerTurn && selectedAbility ? highlightedGridIds : undefined}
-                  lastActionGridIds={lastActionGridIds}
+                  lastActionGridIds={enemyLastActionGridIds}
                   damagePreviews={damagePreviews}
                   reticleGridId={enemyReticleGridId}
                   onReticleMove={setEnemyReticleGridId}
@@ -442,7 +456,7 @@ const LiveBattleSimulator = () => {
                       selectUnit(unit.gridId, false);
                     }
                   }}
-                  lastActionGridIds={lastActionGridIds}
+                  lastActionGridIds={friendlyLastActionGridIds}
                   damagePreviews={[]}
                   attackAnimationTrigger={attackAnimationTrigger}
                 />
