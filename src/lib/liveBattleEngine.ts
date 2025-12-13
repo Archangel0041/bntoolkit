@@ -575,10 +575,11 @@ export function executeAttack(
     attacker.abilityCooldowns[ability.abilityId] = ability.cooldown + 1;
     console.log(`[executeAttack] Set ability ${ability.abilityId} cooldown to ${ability.cooldown + 1}`);
   }
-  // Always set at least 1-turn weapon cooldown to prevent using same weapon again this turn
-  const weaponCooldown = Math.max(ability.globalCooldown, 1);
-  attacker.weaponGlobalCooldown[ability.weaponName] = weaponCooldown + 1;
-  console.log(`[executeAttack] Set weapon "${ability.weaponName}" cooldown to ${weaponCooldown + 1} for unit gridId ${attacker.gridId}`);
+  // Set weapon global cooldown based on ability's globalCooldown value
+  if (ability.globalCooldown > 0) {
+    attacker.weaponGlobalCooldown[ability.weaponName] = ability.globalCooldown + 1;
+    console.log(`[executeAttack] Set weapon "${ability.weaponName}" cooldown to ${ability.globalCooldown + 1} for unit gridId ${attacker.gridId}`);
+  }
   
   // Consume ammo
   if (ability.weaponMaxAmmo !== -1 && ability.ammoRequired > 0) {
@@ -736,8 +737,9 @@ export function executeRandomAttack(
   if (ability.cooldown > 0) {
     attacker.abilityCooldowns[ability.abilityId] = ability.cooldown + 1;
   }
-  const weaponCooldown = Math.max(ability.globalCooldown, 1);
-  attacker.weaponGlobalCooldown[ability.weaponName] = weaponCooldown + 1;
+  if (ability.globalCooldown > 0) {
+    attacker.weaponGlobalCooldown[ability.weaponName] = ability.globalCooldown + 1;
+  }
   
   if (ability.weaponMaxAmmo !== -1 && ability.ammoRequired > 0) {
     const currentAmmo = attacker.weaponAmmo[ability.weaponName] ?? 0;
