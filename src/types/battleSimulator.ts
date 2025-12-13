@@ -332,7 +332,8 @@ export function getFixedAttackPositions(
         // Crossed to enemy grid - mirror the x position!
         // Player's left (x=0) hits enemy's left (which is displayed as x=4 in mirrored coords)
         const mirroredX = 4 - attackerCoords.x; // Mirror: 0->4, 1->3, 2->2, 3->1, 4->0
-        const newX = mirroredX + pos.x; // Apply the x offset after mirroring
+        // IMPORTANT: Also negate the x offset since left/right are flipped from the enemy's perspective
+        const newX = mirroredX - pos.x; // Negate pos.x: attacker's left (-1) becomes +1 in enemy coords
         
         const rowsIntoEnemyGrid = rowsTowardEnemy - rowsOnFriendlySide - 1; // -1 for the gap between grids
         const enemyY = rowsIntoEnemyGrid; // 0 = enemy front row
@@ -356,7 +357,8 @@ export function getFixedAttackPositions(
       } else {
         // Crossed to friendly grid - mirror the x position!
         const mirroredX = 4 - attackerCoords.x;
-        const newX = mirroredX + pos.x;
+        // IMPORTANT: Also negate the x offset since left/right are flipped
+        const newX = mirroredX - pos.x; // Negate pos.x for mirrored grid
         
         const rowsIntoFriendlyGrid = rowsTowardFriendly - rowsOnEnemySide - 1;
         const friendlyY = rowsIntoFriendlyGrid;
