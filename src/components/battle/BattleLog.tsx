@@ -1,7 +1,7 @@
 import { useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sword, Shield, Skull, Zap, Wind, Target } from "lucide-react";
+import { Sword, Shield, Skull, Zap, Wind, Target, Flame, Droplets } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { BattleAction, BattleTurn } from "@/types/liveBattle";
 
@@ -11,7 +11,7 @@ interface BattleLogProps {
   className?: string;
 }
 
-function ActionIcon({ type }: { type: BattleAction["type"] }) {
+function ActionIcon({ type, statusEffectName }: { type: BattleAction["type"]; statusEffectName?: string }) {
   switch (type) {
     case "attack":
       return <Sword className="h-3 w-3 text-red-500" />;
@@ -22,8 +22,13 @@ function ActionIcon({ type }: { type: BattleAction["type"] }) {
     case "death":
       return <Skull className="h-3 w-3 text-red-600" />;
     case "status_applied":
-    case "status_tick":
       return <Zap className="h-3 w-3 text-purple-500" />;
+    case "status_tick":
+      // Use appropriate icon based on status effect type
+      if (statusEffectName?.toLowerCase().includes("poison") || statusEffectName?.toLowerCase().includes("fire")) {
+        return <Flame className="h-3 w-3 text-orange-500" />;
+      }
+      return <Droplets className="h-3 w-3 text-green-500" />;
     case "skip":
       return <Shield className="h-3 w-3 text-gray-400" />;
     default:
@@ -93,7 +98,7 @@ export function BattleLog({ turns, currentTurn, className }: BattleLogProps) {
                         key={actionIndex}
                         className="flex items-start gap-1.5 text-xs"
                       >
-                        <ActionIcon type={action.type} />
+                        <ActionIcon type={action.type} statusEffectName={action.statusEffectName} />
                         <span className="text-muted-foreground">
                           {attackerDisplay && targetDisplay && abilityDisplay && (
                             <span className="font-medium text-foreground">

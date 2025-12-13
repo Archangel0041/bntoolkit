@@ -2,7 +2,7 @@ import { getUnitById } from "@/lib/units";
 import { getAbilityById } from "@/lib/abilities";
 import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTargetUnit, getDamageModifier } from "@/lib/battleCalculations";
 import { getBlockingUnits, checkLineOfFire, calculateRange } from "@/lib/battleTargeting";
-import { getStatusEffect } from "@/lib/statusEffects";
+import { getStatusEffect, getEffectDisplayNameTranslated } from "@/lib/statusEffects";
 import { unitMatchesTargets } from "@/lib/tagHierarchy";
 import { getAffectedGridPositions, getFixedAttackPositions, GRID_ID_TO_COORDS, COORDS_TO_GRID_ID } from "@/types/battleSimulator";
 import type { AbilityInfo, PartyUnit, TargetArea, DamageAreaPosition } from "@/types/battleSimulator";
@@ -438,6 +438,12 @@ export function executeAttack(
     const target = allTargets.find(u => u.gridId === pos.gridId && !u.isDead);
     if (!target) continue;
     
+    // **CRITICAL**: Validate that target can be targeted by this ability (tag validation)
+    if (!canTargetUnit(target.unitId, ability.targets)) {
+      console.log(`[executeAttack] Skipping target at grid ${target.gridId} - unit ${target.unitId} cannot be targeted by ability (tag mismatch)`);
+      continue;
+    }
+    
     // Validate line of fire blocking for all attacks (single target AND area attacks)
     const blockCheck = checkLineOfFire(
       attacker.gridId,
@@ -611,11 +617,15 @@ export function executeAttack(
           });
         }
         
+        const effectName = getEffectDisplayNameTranslated(effectId);
+        
         actions.push({
           type: "status_applied",
           targetGridId: target.gridId,
+          targetName,
           statusEffectId: effectId,
-          message: `Status effect applied for ${effect.duration} turns`,
+          statusEffectName: effectName,
+          message: `${effectName} applied for ${effect.duration} turns`,
         });
       }
     }
@@ -681,6 +691,7 @@ export function executeRandomAttack(
   const totalWeight = targetArea.data.reduce((sum, pos) => sum + (pos.weight || 1), 0);
   
   const damagePerPosition: Record<number, { damage: number; hits: number }> = {};
+  const emptySpotHits: Record<number, number> = {}; // Track hits on empty spots
   
   for (let i = 0; i < totalHits; i++) {
     const roll = Math.random() * totalWeight;
@@ -705,18 +716,57 @@ export function executeRandomAttack(
       const targetGridId = COORDS_TO_GRID_ID[`${targetX},${targetY}`];
       
       if (targetGridId !== undefined) {
-        if (!damagePerPosition[targetGridId]) {
-          damagePerPosition[targetGridId] = { damage: 0, hits: 0 };
+        // Check if there's a target at this position
+        const target = allTargets.find(t => t.gridId === targetGridId && !t.isDead);
+        if (target) {
+          if (!damagePerPosition[targetGridId]) {
+            damagePerPosition[targetGridId] = { damage: 0, hits: 0 };
+          }
+          damagePerPosition[targetGridId].hits++;
+        } else {
+          // Hit landed on empty spot
+          emptySpotHits[targetGridId] = (emptySpotHits[targetGridId] || 0) + 1;
         }
-        damagePerPosition[targetGridId].hits++;
       }
     }
+  }
+  
+  // Log empty spot hits
+  for (const [gridIdStr, hits] of Object.entries(emptySpotHits)) {
+    const gridId = parseInt(gridIdStr);
+    actions.push({
+      type: "skip",
+      attackerGridId: attacker.gridId,
+      attackerName,
+      targetGridId: gridId,
+      abilityId: ability.abilityId,
+      abilityName,
+      hitCount: hits,
+      message: `${hits} hit${hits > 1 ? 's' : ''} landed on empty position (${gridId})`,
+    });
   }
   
   for (const [gridIdStr, { hits }] of Object.entries(damagePerPosition)) {
     const gridId = parseInt(gridIdStr);
     const target = allTargets.find(t => t.gridId === gridId && !t.isDead);
     if (!target) continue;
+    
+    // **CRITICAL**: Validate that target can be targeted by this ability (tag validation)
+    if (!canTargetUnit(target.unitId, ability.targets)) {
+      console.log(`[executeRandomAttack] Skipping target at grid ${target.gridId} - unit ${target.unitId} cannot be targeted by ability (tag mismatch)`);
+      // Add to empty hits since it missed due to targeting restrictions
+      actions.push({
+        type: "skip",
+        attackerGridId: attacker.gridId,
+        attackerName,
+        targetGridId: gridId,
+        abilityId: ability.abilityId,
+        abilityName,
+        hitCount: hits,
+        message: `${hits} hit${hits > 1 ? 's' : ''} missed - cannot target this unit type`,
+      });
+      continue;
+    }
     
     const targetUnit = getUnitById(target.unitId);
     const targetName = targetUnit?.identity?.name || `Unit ${target.unitId}`;
@@ -831,28 +881,53 @@ export function executeRandomAttack(
 }
 
 // Process status effect ticks at start of turn
-export function processStatusEffects(units: LiveBattleUnit[]): BattleAction[] {
+// environmentalDamageMods: Optional damage modifiers from environmental status effects (e.g., Firemod)
+export function processStatusEffects(
+  units: LiveBattleUnit[],
+  environmentalDamageMods?: Record<string, number>
+): BattleAction[] {
   const actions: BattleAction[] = [];
   
   for (const unit of units) {
     if (unit.isDead) continue;
     
+    const unitData = getUnitById(unit.unitId);
+    const unitName = unitData?.identity?.name || `Unit ${unit.unitId}`;
+    
     for (const effect of unit.activeStatusEffects) {
       if (effect.dotDamage > 0) {
-        const hpDamage = effect.dotDamage;
+        let hpDamage = effect.dotDamage;
+        
+        // Apply environmental damage mods to DOT damage (e.g., Firemod increases Fire/Poison damage)
+        if (environmentalDamageMods && effect.dotDamageType !== null) {
+          const envMod = environmentalDamageMods[effect.dotDamageType.toString()];
+          if (envMod !== undefined) {
+            hpDamage = Math.floor(hpDamage * envMod);
+          }
+        }
+        
         unit.currentHp = Math.max(0, unit.currentHp - hpDamage);
+        
+        const effectName = getEffectDisplayNameTranslated(effect.effectId);
         
         actions.push({
           type: "status_tick",
           targetGridId: unit.gridId,
+          targetName: unitName,
           statusEffectId: effect.effectId,
+          statusEffectName: effectName,
           hpDamage,
-          message: `Took ${hpDamage} damage from status effect`,
+          message: `${unitName} (${unit.gridId}) took ${hpDamage} ${effectName} damage (${effect.remainingDuration - 1}t left)`,
         });
         
         if (unit.currentHp <= 0) {
           unit.isDead = true;
-          actions.push({ type: "death", targetGridId: unit.gridId, message: "Unit defeated!" });
+          actions.push({ 
+            type: "death", 
+            targetGridId: unit.gridId, 
+            targetName: unitName,
+            message: `${unitName} defeated by ${effectName}!` 
+          });
         }
       }
     }
