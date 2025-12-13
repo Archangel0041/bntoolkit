@@ -38,7 +38,9 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
 
   // Start or restart battle
   const startBattle = useCallback(() => {
+    console.log("Starting battle with party:", friendlyParty.map(u => ({ unitId: u.unitId, gridId: u.gridId, rank: u.rank })));
     const state = initializeBattle(friendlyParty, waves, startingWave);
+    console.log("Battle initialized, friendly units:", state.friendlyUnits.map(u => ({ unitId: u.unitId, gridId: u.gridId })));
     setBattleState(state);
     setSelectedUnitGridId(null);
     setSelectedAbilityId(null);
