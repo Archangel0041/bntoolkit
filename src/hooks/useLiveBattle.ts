@@ -517,10 +517,10 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
 
     const actions: BattleAction[] = [];
 
-    // 2. Collapse grids and process status effects
+    // 2. Collapse grids and process status effects (with environmental mods for DOT damage)
     collapseGrid(newState.friendlyUnits);
     collapseGrid(newState.enemyUnits);
-    actions.push(...processStatusEffects([...newState.friendlyUnits, ...newState.enemyUnits]));
+    actions.push(...processStatusEffects([...newState.friendlyUnits, ...newState.enemyUnits], environmentalDamageMods));
 
     // 3. Check if battle ended from status effects
     let endCheck = checkBattleEnd(newState);
