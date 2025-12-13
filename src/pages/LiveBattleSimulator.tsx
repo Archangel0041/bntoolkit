@@ -555,6 +555,7 @@ const LiveBattleSimulator = () => {
                   isRandomAttack={isRandomAttack}
                   attackAnimationTrigger={attackAnimationTrigger}
                   recentlyDeadGridIds={recentlyDeadGridIds.enemy}
+                  collapsedRows={battleState.enemyCollapsedRows}
                 />
 
                 {/* Unit info and ability selector */}
@@ -609,6 +610,7 @@ const LiveBattleSimulator = () => {
                   damagePreviews={[]}
                   attackAnimationTrigger={attackAnimationTrigger}
                   recentlyDeadGridIds={recentlyDeadGridIds.friendly}
+                  collapsedRows={battleState.friendlyCollapsedRows}
                 />
               </div>
 

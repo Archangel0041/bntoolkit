@@ -131,6 +131,8 @@ export function initializeBattle(
   return {
     friendlyUnits,
     enemyUnits,
+    friendlyCollapsedRows: new Set<number>(),
+    enemyCollapsedRows: new Set<number>(),
     currentTurn: 1,
     isPlayerTurn: true, // Player always goes first
     currentEnemyIndex: 0, // Start from first enemy
@@ -344,45 +346,47 @@ export function getValidTargets(
   });
 }
 
-// Collapse grid - move units forward when front row is empty
-// Row 0 is front, row 1 is middle, row 2 is back
-export function collapseGrid(units: LiveBattleUnit[]): void {
+// Detect collapsed rows - rows where no alive units exist
+// Returns a Set of collapsed row indices (0=front, 1=middle, 2=back)
+// Rows collapse from front to back: if row 0 is empty, it collapses. 
+// Row 1 only collapses if row 0 is also empty or collapsed.
+export function detectCollapsedRows(units: LiveBattleUnit[]): Set<number> {
   const aliveUnits = units.filter(u => !u.isDead);
-  if (aliveUnits.length === 0) return;
+  const collapsedRows = new Set<number>();
   
-  // Check each row from front to back
-  // If a row is empty and there are units behind it, move them forward
-  for (let targetRow = 0; targetRow <= 1; targetRow++) {
+  // Check each row from front (0) to back (2)
+  for (let row = 0; row <= 2; row++) {
     const unitsInRow = aliveUnits.filter(u => {
       const coords = GRID_ID_TO_COORDS[u.gridId];
-      return coords?.y === targetRow;
+      return coords?.y === row;
     });
     
+    // A row is collapsed if:
+    // 1. It has no alive units
+    // 2. All rows in front of it are also collapsed (cascading collapse from front)
     if (unitsInRow.length === 0) {
-      // Row is empty, move units from next row forward
-      for (let sourceRow = targetRow + 1; sourceRow <= 2; sourceRow++) {
-        const unitsToMove = aliveUnits.filter(u => {
-          const coords = GRID_ID_TO_COORDS[u.gridId];
-          return coords?.y === sourceRow;
-        });
-        
-        if (unitsToMove.length > 0) {
-          // Move these units one row forward
-          for (const unit of unitsToMove) {
-            const coords = GRID_ID_TO_COORDS[unit.gridId];
-            if (coords) {
-              const newGridId = COORDS_TO_GRID_ID[`${coords.x},${targetRow}`];
-              if (newGridId !== undefined) {
-                console.log(`[collapseGrid] Moving unit ${unit.unitId} from grid ${unit.gridId} to ${newGridId}`);
-                unit.gridId = newGridId;
-              }
-            }
-          }
-          break; // Only move from the next occupied row
+      // Check if all previous rows are collapsed
+      let allPreviousCollapsed = true;
+      for (let prevRow = 0; prevRow < row; prevRow++) {
+        if (!collapsedRows.has(prevRow)) {
+          allPreviousCollapsed = false;
+          break;
         }
+      }
+      
+      // Only collapse this row if it's the front row or all previous rows are collapsed
+      if (row === 0 || allPreviousCollapsed) {
+        collapsedRows.add(row);
       }
     }
   }
+  
+  return collapsedRows;
+}
+
+// Legacy function kept for backwards compatibility, now just updates collapsed rows state
+export function collapseGrid(units: LiveBattleUnit[]): Set<number> {
+  return detectCollapsedRows(units);
 }
 
 // Execute an attack and return the actions

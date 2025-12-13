@@ -77,6 +77,10 @@ export interface LiveBattleState {
   // Unit states
   friendlyUnits: LiveBattleUnit[];
   enemyUnits: LiveBattleUnit[];
+  // Collapsed rows (rows with no alive units) - affects range calculation
+  // Row 0 = front, Row 1 = middle, Row 2 = back
+  friendlyCollapsedRows: Set<number>;
+  enemyCollapsedRows: Set<number>;
   // Turn tracking
   currentTurn: number;
   isPlayerTurn: boolean;
