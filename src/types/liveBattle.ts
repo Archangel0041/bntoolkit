@@ -51,6 +51,8 @@ export interface BattleAction {
   statusEffectId?: number;
   statusEffectName?: string;
   message: string;
+  // For multi-hit random attacks: how many times this position was hit
+  hitCount?: number;
 }
 
 export interface BattleTurn {
