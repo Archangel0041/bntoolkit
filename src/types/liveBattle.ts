@@ -34,6 +34,8 @@ export interface ActiveStatusEffect {
   originalDotDamage: number;
   originalDuration: number;
   currentTurn: number;
+  // Whether this DoT uses diminishing formula (d-t+1)/d
+  dotDiminishing: boolean;
 }
 
 // Battle action types

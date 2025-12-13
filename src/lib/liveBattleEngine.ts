@@ -603,13 +603,15 @@ export function executeAttack(
       const adjustedChance = Math.floor(chance * (pos.damagePercent / 100));
       
       if (rollStatusEffect(adjustedChance)) {
-        // Calculate base DoT damage: actualDamageDealt * envMod
-        // Resistance is NOT applied here - it's applied when DoT actually ticks
-        // based on target's current armor state at tick time
-        let dotDamage = totalHpDamage + totalArmorDamage;
+        // Calculate base DoT damage: (actualDamageDealt + dot_bonus_damage) * envMod * dot_ability_damage_mult
+        // Resistance is applied when DoT actually ticks based on target's armor state
+        const actualDamageDealt = totalHpDamage + totalArmorDamage;
+        const dotBonusDamage = effect.dot_bonus_damage ?? 0;
+        const dotAbilityDamageMult = effect.dot_ability_damage_mult ?? 1;
         
-        // Apply environmental damage mods AGAIN for the DoT's damage type
-        // e.g., 30 damage -> 66 with Firemod (2.2x) -> 145 base (66 * 2.2)
+        let dotDamage = actualDamageDealt + dotBonusDamage;
+        
+        // Apply environmental damage mods for the DoT's damage type
         if (environmentalDamageMods && effect.dot_damage_type !== undefined) {
           const envMod = environmentalDamageMods[effect.dot_damage_type.toString()];
           if (envMod !== undefined) {
@@ -617,7 +619,11 @@ export function executeAttack(
           }
         }
         
+        // Apply ability damage multiplier
+        dotDamage = Math.floor(dotDamage * dotAbilityDamageMult);
+        
         const isStun = effect.stun_block_action === true;
+        const dotDiminishing = effect.dot_diminishing ?? false;
         
         // Add or refresh status effect
         const existingEffect = target.activeStatusEffects.find(e => e.effectId === effectId);
@@ -628,6 +634,7 @@ export function executeAttack(
           existingEffect.originalDuration = effect.duration;
           existingEffect.dotDamage = dotDamage;
           existingEffect.currentTurn = 1;
+          existingEffect.dotDiminishing = dotDiminishing;
         } else {
           target.activeStatusEffects.push({
             effectId,
@@ -638,6 +645,7 @@ export function executeAttack(
             originalDotDamage: dotDamage,
             originalDuration: effect.duration,
             currentTurn: 1,
+            dotDiminishing,
           });
         }
         
@@ -922,23 +930,14 @@ export function processStatusEffects(
     
     for (const effect of unit.activeStatusEffects) {
       if (effect.dotDamage > 0 && effect.dotDamageType !== null) {
-        // Calculate DoT decay multiplier based on damage type and duration
-        // Poison: multiplier = (duration - turn + 1) / duration
-        // Fire (duration != 6): multiplier = (duration - turn + 1) / (2 * duration)
-        // Fire (duration == 6): multiplier = 0.5 (constant)
-        let decayMultiplier: number;
-        const d = effect.originalDuration;
-        const t = effect.currentTurn;
+        // Calculate DoT decay multiplier
+        // If dot_diminishing is true: use formula (d-t+1)/d
+        // Otherwise: no decay (multiplier = 1)
+        let decayMultiplier = 1;
         
-        if (effect.dotDamageType === DamageType.Fire) {
-          // Fire DoT decay
-          if (d === 6) {
-            decayMultiplier = 0.5;
-          } else {
-            decayMultiplier = (d - t + 1) / (2 * d);
-          }
-        } else {
-          // Poison and other DoTs: linear decay
+        if (effect.dotDiminishing) {
+          const d = effect.originalDuration;
+          const t = effect.currentTurn;
           decayMultiplier = (d - t + 1) / d;
         }
         
