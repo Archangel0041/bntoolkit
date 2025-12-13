@@ -4,10 +4,10 @@ import { getUnitById } from "@/lib/units";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { UnitImage } from "@/components/units/UnitImage";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Skull, Zap, Crosshair, Shuffle } from "lucide-react";
-import { getStatusEffectDisplayName, getStatusEffectColor } from "@/lib/statusEffects";
+import { Skull, Zap, Crosshair, Shuffle, ShieldOff } from "lucide-react";
+import { getStatusEffectDisplayName, getStatusEffectColor, getEffectIconUrl } from "@/lib/statusEffects";
 import type { LiveBattleUnit } from "@/types/liveBattle";
-import type { DamagePreview, TargetArea, DamageAreaPosition } from "@/types/battleSimulator";
+import type { DamagePreview, TargetArea, DamageAreaPosition, StatusEffectPreview } from "@/types/battleSimulator";
 import { ENEMY_GRID_LAYOUT, FRIENDLY_GRID_LAYOUT, GRID_ID_TO_COORDS, COORDS_TO_GRID_ID, getAffectedGridPositions } from "@/types/battleSimulator";
 
 interface LiveBattleGridProps {
@@ -459,16 +459,45 @@ export function LiveBattleGrid({
           <TooltipTrigger asChild>
             {slotContent}
           </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs">
-            <div className="space-y-1">
+          <TooltipContent side="top" className="max-w-sm">
+            <div className="space-y-1.5">
               <p className="font-semibold">{unitName}</p>
-              <p className="text-sm">
-                HP: {unit.currentHp}/{unit.maxHp}
-                {unit.maxArmor > 0 && ` | Armor: ${unit.currentArmor}/${unit.maxArmor}`}
-              </p>
+              
+              {/* Current HP/Armor */}
+              <div className="text-sm">
+                <span>HP: {unit.currentHp}/{unit.maxHp}</span>
+                {unit.maxArmor > 0 && <span> | Armor: {unit.currentArmor}/{unit.maxArmor}</span>}
+              </div>
+              
+              {/* Damage preview with detailed info */}
               {hasValidDamagePreview && (
-                <div className="text-sm border-t pt-1 space-y-0.5">
-                  <div className="flex justify-between">
+                <div className="text-sm border-t pt-1.5 space-y-1">
+                  {/* HP After Attack */}
+                  <div className="grid grid-cols-2 gap-x-4 text-xs">
+                    <span className="text-muted-foreground">Initial HP:</span>
+                    <span>{unit.currentHp}</span>
+                    <span className="text-muted-foreground">After Attack:</span>
+                    <span className="text-emerald-500">
+                      {Math.max(0, unit.currentHp - damagePreview.maxTotalDamage.hpDamage)}-
+                      {Math.max(0, unit.currentHp - damagePreview.minTotalDamage.hpDamage)}
+                    </span>
+                  </div>
+                  
+                  {/* Armor After Attack (if applicable) */}
+                  {damagePreview.targetHasArmor && (
+                    <div className="grid grid-cols-2 gap-x-4 text-xs">
+                      <span className="text-muted-foreground">Initial Armor:</span>
+                      <span>{unit.currentArmor}</span>
+                      <span className="text-muted-foreground">After Attack:</span>
+                      <span className="text-sky-400">
+                        {Math.max(0, unit.currentArmor - damagePreview.maxTotalDamage.armorDamage)}-
+                        {Math.max(0, unit.currentArmor - damagePreview.minTotalDamage.armorDamage)}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Damage breakdown */}
+                  <div className="grid grid-cols-2 gap-x-4 text-xs">
                     <span className="text-muted-foreground">
                       Damage{damagePreview.isRandomAttack 
                         ? ` (~${damagePreview.expectedHits?.toFixed(1)} hits)` 
@@ -479,24 +508,99 @@ export function LiveBattleGrid({
                     <span className="text-destructive font-medium">
                       {damagePreview.minTotalDamage.hpDamage}-{damagePreview.maxTotalDamage.hpDamage} HP
                     </span>
+                    {damagePreview.targetHasArmor && (
+                      <>
+                        <span className="text-muted-foreground">Armor Damage:</span>
+                        <span className="text-sky-400">
+                          {damagePreview.minTotalDamage.armorDamage}-{damagePreview.maxTotalDamage.armorDamage}
+                        </span>
+                      </>
+                    )}
                   </div>
+                  
+                  {/* Dodge/Crit */}
                   <div className="flex gap-4 text-xs">
                     <span>Dodge: <span className={cn(damagePreview.dodgeChance > 0 && "text-yellow-500")}>{damagePreview.dodgeChance}%</span></span>
                     <span>Crit: <span className={cn(damagePreview.critChance > 0 && "text-orange-500")}>{damagePreview.critChance}%</span></span>
                   </div>
+                  
+                  {/* Status Effects */}
+                  {damagePreview.statusEffects && damagePreview.statusEffects.length > 0 && (
+                    <div className="border-t pt-1 space-y-0.5">
+                      <span className="text-xs text-muted-foreground font-medium">Status Effects:</span>
+                      {damagePreview.statusEffects.map((effect, i) => {
+                        const iconUrl = getEffectIconUrl(effect.effectId);
+                        return (
+                          <div key={i} className="flex items-center gap-2 text-xs">
+                            {iconUrl && <img src={iconUrl} alt="" className="w-3 h-3" />}
+                            <span 
+                              className="font-medium"
+                              style={{ color: effect.color }}
+                            >
+                              {effect.name}
+                            </span>
+                            <span className="text-muted-foreground">
+                              {effect.chance}% | {effect.duration}t
+                              {effect.dotDamage > 0 && ` | ${effect.dotDamage} dmg/t`}
+                            </span>
+                            {effect.isImmune && (
+                              <span className="flex items-center gap-0.5 text-red-400">
+                                <ShieldOff className="h-3 w-3" /> Immune
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
+              
+              {/* Active Status Effects */}
               {unit.activeStatusEffects.length > 0 && (
-                <div className="text-sm">
-                  {unit.activeStatusEffects.map((effect, i) => (
-                    <span key={i} className="mr-2">
-                      {getStatusEffectDisplayName(effect.effectId)} ({effect.remainingDuration}t)
-                    </span>
-                  ))}
+                <div className="text-sm border-t pt-1">
+                  <span className="text-xs text-muted-foreground">Active Effects:</span>
+                  <div className="flex flex-wrap gap-1 mt-0.5">
+                    {unit.activeStatusEffects.map((effect, i) => (
+                      <span 
+                        key={i} 
+                        className="text-xs px-1.5 py-0.5 rounded"
+                        style={{ 
+                          backgroundColor: `${getStatusEffectColor(effect.effectId)}20`,
+                          color: getStatusEffectColor(effect.effectId)
+                        }}
+                      >
+                        {getStatusEffectDisplayName(effect.effectId)} ({effect.remainingDuration}t)
+                        {effect.dotDamage > 0 && ` - ${effect.dotDamage} dmg`}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
+              
+              {/* Status Effect Immunities */}
+              {unitData && unitData.statsConfig?.status_effect_immunities && unitData.statsConfig.status_effect_immunities.length > 0 && (
+                <div className="text-sm border-t pt-1">
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <ShieldOff className="h-3 w-3" /> Immunities:
+                  </span>
+                  <div className="flex flex-wrap gap-1 mt-0.5">
+                    {unitData.statsConfig.status_effect_immunities.map((immunity, i) => (
+                      <span 
+                        key={i} 
+                        className="text-xs px-1.5 py-0.5 rounded bg-muted"
+                        style={{ color: getStatusEffectColor(immunity) }}
+                      >
+                        {getStatusEffectDisplayName(immunity)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Weapon Cooldowns */}
               {Object.entries(unit.weaponGlobalCooldown).some(([_, cd]) => cd > 0) && (
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
                   Weapon Cooldowns: {Object.entries(unit.weaponGlobalCooldown).filter(([_, cd]) => cd > 0).map(([name, cd]) => `${name}: ${cd}`).join(', ')}
                 </p>
               )}

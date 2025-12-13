@@ -795,7 +795,8 @@ export function executeRandomAttack(
         damage: totalArmorDamage + totalHpDamage,
         armorDamage: totalArmorDamage,
         hpDamage: totalHpDamage,
-        message: `Dealt ${totalHpDamage} HP damage${totalArmorDamage > 0 ? ` and ${totalArmorDamage} armor damage` : ''}`,
+        hitCount: hits, // Show how many times this position was hit
+        message: `Dealt ${totalHpDamage} HP damage${totalArmorDamage > 0 ? ` and ${totalArmorDamage} armor damage` : ''} (${hits} hit${hits > 1 ? 's' : ''})`,
       });
     }
     

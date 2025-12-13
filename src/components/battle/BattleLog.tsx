@@ -115,6 +115,9 @@ export function BattleLog({ turns, currentTurn, className }: BattleLogProps) {
                               {abilityDisplay}:{" "}
                             </span>
                           )}
+                          {action.hitCount && action.hitCount > 1 && (
+                            <span className="text-purple-400 font-medium">[{action.hitCount}x] </span>
+                          )}
                           {action.message}
                         </span>
                       </div>
