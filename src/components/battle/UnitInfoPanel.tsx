@@ -15,32 +15,34 @@ import { getAbilityImageUrl } from "@/lib/abilityImages";
 import { getDamageTypeIconUrl } from "@/lib/damageImages";
 import { expandTargetTags } from "@/lib/tagHierarchy";
 
-// Main targeting categories
-const TARGETING_CATEGORIES = {
-  air: { tag: 39, label: "Air", color: "bg-sky-500/20 text-sky-700 dark:text-sky-300 border-sky-500/50" },
-  ground: { tag: 24, label: "Ground", color: "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/50" },
-  sea: { tag: 15, label: "Sea", color: "bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/50" },
-};
+// Detailed targeting categories - all unit class types
+const TARGETING_CATEGORIES: { tag: number; label: string; color: string }[] = [
+  { tag: 39, label: "Air", color: "bg-sky-500/20 text-sky-700 dark:text-sky-300 border-sky-500/50" },
+  { tag: 9, label: "LTA", color: "bg-sky-400/20 text-sky-600 dark:text-sky-400 border-sky-400/50" },
+  { tag: 15, label: "Sea", color: "bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/50" },
+  { tag: 29, label: "Ship", color: "bg-blue-400/20 text-blue-600 dark:text-blue-400 border-blue-400/50" },
+  { tag: 6, label: "Soldier", color: "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/50" },
+  { tag: 46, label: "Sniper", color: "bg-amber-400/20 text-amber-600 dark:text-amber-400 border-amber-400/50" },
+  { tag: 11, label: "Vehicle", color: "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/50" },
+  { tag: 20, label: "Tank", color: "bg-emerald-400/20 text-emerald-600 dark:text-emerald-400 border-emerald-400/50" },
+  { tag: 26, label: "Metal", color: "bg-slate-500/20 text-slate-700 dark:text-slate-300 border-slate-500/50" },
+  { tag: 38, label: "Critter", color: "bg-lime-500/20 text-lime-700 dark:text-lime-300 border-lime-500/50" },
+  { tag: 41, label: "Civilian", color: "bg-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/50" },
+];
 
-function getTargetingCategories(targets: number[]): { canTarget: string[]; cannotTarget: string[] } {
-  if (targets.length === 0) {
-    return { canTarget: ["Air", "Ground", "Sea"], cannotTarget: [] };
-  }
-  
+function getTargetingCategories(targets: number[]): { canTarget: { label: string; color: string }[]; cannotTarget: { label: string; color: string }[] } {
   const expandedTargets = expandTargetTags(targets);
-  const canTarget: string[] = [];
-  const cannotTarget: string[] = [];
+  const canTarget: { label: string; color: string }[] = [];
+  const cannotTarget: { label: string; color: string }[] = [];
   
   // Check if targets Unit (51) which means everything
-  if (targets.includes(51) || expandedTargets.includes(51)) {
-    return { canTarget: ["Air", "Ground", "Sea"], cannotTarget: [] };
-  }
+  const targetsAll = targets.length === 0 || targets.includes(51) || expandedTargets.includes(51);
   
-  for (const [key, { tag, label }] of Object.entries(TARGETING_CATEGORIES)) {
-    if (targets.includes(tag) || expandedTargets.includes(tag)) {
-      canTarget.push(label);
+  for (const { tag, label, color } of TARGETING_CATEGORIES) {
+    if (targetsAll || targets.includes(tag) || expandedTargets.includes(tag)) {
+      canTarget.push({ label, color });
     } else {
-      cannotTarget.push(label);
+      cannotTarget.push({ label, color });
     }
   }
   
@@ -359,7 +361,7 @@ export function UnitInfoPanel({
                           <span className="font-medium">{critPercent}%</span>
                         </div>
                         {armorPierce > 0 && (
-                          <div className="flex justify-between col-span-2">
+                          <div className="flex justify-between">
                             <span className="text-muted-foreground">Armor Pierce</span>
                             <span className="font-medium text-orange-500">{Math.round(armorPierce * 100)}%</span>
                           </div>
@@ -368,29 +370,24 @@ export function UnitInfoPanel({
 
                       {/* Targets */}
                       {(canTarget.length > 0 || cannotTarget.length > 0) && (
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="flex items-center gap-1 flex-wrap">
                           <span className="text-xs text-muted-foreground">Targets:</span>
                           {canTarget.map(cat => (
                             <Badge 
-                              key={cat} 
+                              key={cat.label} 
                               variant="outline" 
-                              className={cn(
-                                "text-xs h-5",
-                                cat === "Air" && TARGETING_CATEGORIES.air.color,
-                                cat === "Ground" && TARGETING_CATEGORIES.ground.color,
-                                cat === "Sea" && TARGETING_CATEGORIES.sea.color
-                              )}
+                              className={cn("text-xs h-5", cat.color)}
                             >
-                              ✓ {cat}
+                              ✓ {cat.label}
                             </Badge>
                           ))}
                           {cannotTarget.map(cat => (
                             <Badge 
-                              key={cat} 
+                              key={cat.label} 
                               variant="outline" 
                               className="text-xs h-5 bg-muted/50 text-muted-foreground line-through"
                             >
-                              {cat}
+                              {cat.label}
                             </Badge>
                           ))}
                         </div>
