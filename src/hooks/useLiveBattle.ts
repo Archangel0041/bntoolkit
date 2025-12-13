@@ -16,7 +16,9 @@ import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTa
 import { getBlockingUnits, checkLineOfFire, calculateRange, findFrontmostUnblockedPosition, getTargetingInfo } from "@/lib/battleTargeting";
 import { getStatusEffect, getStatusEffectDisplayName, getStatusEffectColor } from "@/lib/statusEffects";
 import { getUnitById } from "@/lib/units";
+import { getAbilityById } from "@/lib/abilities";
 import { getFixedAttackPositions, getAffectedGridPositions } from "@/types/battleSimulator";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { PartyUnit, AbilityInfo, DamagePreview, DamageResult, StatusEffectPreview } from "@/types/battleSimulator";
 import type { EncounterUnit, Encounter } from "@/types/encounters";
 import type { LiveBattleState, LiveBattleUnit, BattleAction, BattleTurn } from "@/types/liveBattle";
@@ -29,6 +31,7 @@ interface UseLiveBattleOptions {
 }
 
 export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 0 }: UseLiveBattleOptions) {
+  const { t } = useLanguage();
   const [battleState, setBattleState] = useState<LiveBattleState | null>(null);
   const [selectedUnitGridId, setSelectedUnitGridId] = useState<number | null>(null);
   const [selectedAbilityId, setSelectedAbilityId] = useState<number | null>(null);
@@ -376,6 +379,12 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     setBattleState(prev => {
       if (!prev) return prev;
 
+      // Get localized names
+      const attackerUnit = getUnitById(selectedUnit.unitId);
+      const attackerName = attackerUnit ? t(attackerUnit.identity.name) : `Unit ${selectedUnit.unitId}`;
+      const abilityData = getAbilityById(selectedAbility.abilityId);
+      const localizedAbilityName = abilityData ? t(abilityData.name) : `Ability ${selectedAbility.abilityId}`;
+
       // Execute the attack (random or normal)
       let actions: BattleAction[];
       if (isRandom) {
@@ -394,6 +403,13 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           environmentalDamageMods
         );
       }
+
+      // Add attacker name and localized ability name to actions
+      actions = actions.map(a => ({
+        ...a,
+        attackerName,
+        abilityName: a.abilityName ? localizedAbilityName : a.abilityName,
+      }));
 
       // Add turn to log
       const turn: BattleTurn = {
@@ -420,10 +436,10 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     setSelectedUnitGridId(null);
     setSelectedAbilityId(null);
     setIsProcessing(false);
-  }, [battleState, selectedUnit, selectedAbility, validTargets, isProcessing, environmentalDamageMods]);
+  }, [battleState, selectedUnit, selectedAbility, validTargets, isProcessing, environmentalDamageMods, t]);
 
 
-  // Execute one enemy action at a time
+  // Execute one enemy's turn - 1 enemy, 1 ability, 1 action per call
   const executeEnemyTurn = useCallback(() => {
     if (!battleState || battleState.isPlayerTurn || battleState.isBattleOver || isProcessing) return;
 
@@ -434,7 +450,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
 
       const allActions: BattleAction[] = [];
 
-      // Process status effects only at the start of enemy phase (first enemy)
+      // Process status effects only at the start of enemy phase (first enemy of the turn)
       if (currentEnemyIndex === 0) {
         const statusActions = processStatusEffects([...prev.friendlyUnits, ...prev.enemyUnits]);
         allActions.push(...statusActions);
@@ -461,16 +477,20 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       // Get alive enemies
       const aliveEnemies = prev.enemyUnits.filter(e => !e.isDead);
       
-      if (aliveEnemies.length === 0) {
-        // No enemies alive, end enemy turn
-        const endCheck = checkBattleEnd(prev);
+      if (aliveEnemies.length === 0 || currentEnemyIndex >= aliveEnemies.length) {
+        // All enemies have acted or none alive - reduce cooldowns and switch to player turn
+        reduceCooldowns(prev.enemyUnits);
+        
         const turn: BattleTurn = {
           turnNumber: prev.currentTurn,
           isPlayerTurn: false,
           actions: allActions,
         };
+        
+        const endCheck = checkBattleEnd(prev);
         setCurrentEnemyIndex(0);
         setIsProcessing(false);
+        
         return {
           ...prev,
           currentTurn: prev.currentTurn + 1,
@@ -481,155 +501,117 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         };
       }
 
-      // Find the next enemy that can act
-      let enemyToAct: { enemy: LiveBattleUnit; action: ReturnType<typeof aiSelectAction> } | null = null;
-      let newEnemyIndex = currentEnemyIndex;
+      // Get the current enemy to act
+      const enemy = aliveEnemies[currentEnemyIndex];
+      const enemyUnit = getUnitById(enemy.unitId);
+      const enemyName = enemyUnit ? t(enemyUnit.identity.name) : `Enemy ${enemy.unitId}`;
       
-      for (let i = currentEnemyIndex; i < aliveEnemies.length; i++) {
-        const enemy = aliveEnemies[i];
-        if (enemy.activeStatusEffects.some(e => e.isStun)) {
-          allActions.push({
-            type: "skip",
-            targetGridId: enemy.gridId,
-            message: "Stunned, cannot act",
-          });
-          newEnemyIndex = i + 1;
-          continue;
-        }
+      // Check if stunned
+      if (enemy.activeStatusEffects.some(e => e.isStun)) {
+        allActions.push({
+          type: "skip",
+          attackerGridId: enemy.gridId,
+          attackerName: enemyName,
+          message: `${enemyName} is stunned and cannot act`,
+        });
         
-        const action = aiSelectAction(enemy, prev);
-        if (action) {
-          enemyToAct = { enemy, action };
-          newEnemyIndex = i + 1;
-          break;
-        } else {
-          // No valid action, this enemy passes
-          allActions.push({
-            type: "skip",
-            targetGridId: enemy.gridId,
-            message: "No valid targets, passing",
-          });
-          newEnemyIndex = i + 1;
-        }
-      }
-
-      if (enemyToAct && enemyToAct.action) {
-        const { enemy, action } = enemyToAct;
+        // Move to next enemy
+        setCurrentEnemyIndex(currentEnemyIndex + 1);
+        setIsProcessing(false);
         
-        // Check if this is a random attack
-        let attackActions: BattleAction[];
-        if (isRandomAttack(action.ability)) {
-          attackActions = executeRandomAttack(
-            enemy,
-            action.ability,
-            prev,
-            environmentalDamageMods
-          );
-        } else {
-          attackActions = executeAttack(
-            enemy,
-            action.ability,
-            action.targetGridId,
-            prev,
-            environmentalDamageMods
-          );
-        }
-        allActions.push(...attackActions);
-
-        // Check if battle ended
-        const midTurnCheck = checkBattleEnd(prev);
-        if (midTurnCheck.isOver) {
-          const turn: BattleTurn = {
-            turnNumber: prev.currentTurn,
-            isPlayerTurn: false,
-            actions: allActions,
-          };
-          setCurrentEnemyIndex(0);
-          setIsProcessing(false);
-          return {
-            ...prev,
-            battleLog: [...prev.battleLog, turn],
-            isBattleOver: true,
-            isPlayerVictory: midTurnCheck.playerWon,
-          };
-        }
-
-        // Check if more enemies need to act
-        if (newEnemyIndex < aliveEnemies.length) {
-          // More enemies to go - update index and DON'T add to log yet
-          // Actions will be accumulated across multiple executeEnemyTurn calls
-          setCurrentEnemyIndex(newEnemyIndex);
-          setIsProcessing(false);
-          
-          // Append actions to existing current turn in log, or create new one if first enemy
-          const existingTurnIndex = prev.battleLog.findIndex(
-            t => t.turnNumber === prev.currentTurn && !t.isPlayerTurn
-          );
-          
-          if (existingTurnIndex >= 0) {
-            // Append to existing turn
-            const updatedLog = [...prev.battleLog];
-            updatedLog[existingTurnIndex] = {
-              ...updatedLog[existingTurnIndex],
-              actions: [...updatedLog[existingTurnIndex].actions, ...allActions],
-            };
-            return {
-              ...prev,
-              battleLog: updatedLog,
-            };
-          } else {
-            // Create new turn entry
-            const turn: BattleTurn = {
-              turnNumber: prev.currentTurn,
-              isPlayerTurn: false,
-              actions: allActions,
-            };
-            return {
-              ...prev,
-              battleLog: [...prev.battleLog, turn],
-            };
-          }
-        }
-      }
-
-      // All enemies have acted - reduce cooldowns and switch to player turn
-      reduceCooldowns(prev.enemyUnits);
-
-      // Append final actions to existing turn or create new one
-      const existingTurnIndex = prev.battleLog.findIndex(
-        t => t.turnNumber === prev.currentTurn && !t.isPlayerTurn
-      );
-      
-      let finalLog: BattleTurn[];
-      if (existingTurnIndex >= 0) {
-        finalLog = [...prev.battleLog];
-        finalLog[existingTurnIndex] = {
-          ...finalLog[existingTurnIndex],
-          actions: [...finalLog[existingTurnIndex].actions, ...allActions],
-        };
-      } else {
         const turn: BattleTurn = {
           turnNumber: prev.currentTurn,
           isPlayerTurn: false,
           actions: allActions,
         };
-        finalLog = [...prev.battleLog, turn];
+        
+        return {
+          ...prev,
+          battleLog: [...prev.battleLog, turn],
+        };
       }
+      
+      // Get available abilities and pick one randomly
+      const action = aiSelectAction(enemy, prev);
+      
+      if (!action) {
+        // No valid action, this enemy passes
+        allActions.push({
+          type: "skip",
+          attackerGridId: enemy.gridId,
+          attackerName: enemyName,
+          message: `${enemyName} has no valid targets`,
+        });
+        
+        // Move to next enemy
+        setCurrentEnemyIndex(currentEnemyIndex + 1);
+        setIsProcessing(false);
+        
+        const turn: BattleTurn = {
+          turnNumber: prev.currentTurn,
+          isPlayerTurn: false,
+          actions: allActions,
+        };
+        
+        return {
+          ...prev,
+          battleLog: [...prev.battleLog, turn],
+        };
+      }
+      
+      // Get localized ability name
+      const abilityData = getAbilityById(action.ability.abilityId);
+      const localizedAbilityName = abilityData ? t(abilityData.name) : `Ability ${action.ability.abilityId}`;
+      
+      // Execute the attack
+      let attackActions: BattleAction[];
+      if (isRandomAttack(action.ability)) {
+        attackActions = executeRandomAttack(
+          enemy,
+          action.ability,
+          prev,
+          environmentalDamageMods
+        );
+      } else {
+        attackActions = executeAttack(
+          enemy,
+          action.ability,
+          action.targetGridId,
+          prev,
+          environmentalDamageMods
+        );
+      }
+      
+      // Add attacker name to all attack actions and localize ability name
+      attackActions = attackActions.map(a => ({
+        ...a,
+        attackerName: enemyName,
+        abilityName: a.abilityName ? localizedAbilityName : a.abilityName,
+      }));
+      
+      allActions.push(...attackActions);
 
+      // Check if battle ended
       const endCheck = checkBattleEnd(prev);
-      setCurrentEnemyIndex(0);
+      
+      // Move to next enemy
+      setCurrentEnemyIndex(currentEnemyIndex + 1);
       setIsProcessing(false);
-
+      
+      const turn: BattleTurn = {
+        turnNumber: prev.currentTurn,
+        isPlayerTurn: false,
+        actions: allActions,
+      };
+      
       return {
         ...prev,
-        currentTurn: prev.currentTurn + 1,
-        isPlayerTurn: true,
-        battleLog: finalLog,
+        battleLog: [...prev.battleLog, turn],
         isBattleOver: endCheck.isOver,
         isPlayerVictory: endCheck.playerWon,
       };
     });
-  }, [battleState, isProcessing, environmentalDamageMods, currentEnemyIndex]);
+  }, [battleState, isProcessing, environmentalDamageMods, currentEnemyIndex, t]);
 
   // Check if all enemies are dead and auto-advance wave
   const checkWaveAdvance = useCallback(() => {

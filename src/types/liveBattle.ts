@@ -38,7 +38,9 @@ export type BattleActionType = "attack" | "skip" | "dodge" | "crit" | "status_ap
 export interface BattleAction {
   type: BattleActionType;
   attackerGridId?: number;
+  attackerName?: string;
   targetGridId?: number;
+  targetName?: string;
   abilityId?: number;
   abilityName?: string;
   damage?: number;
