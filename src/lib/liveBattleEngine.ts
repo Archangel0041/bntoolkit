@@ -956,15 +956,9 @@ export function processStatusEffects(
           decayMultiplier = (d - t + 1) / d;
         }
         
-        let rawDotDamage = Math.floor(effect.originalDotDamage * decayMultiplier);
-        
-        // Apply environmental damage mods to DOT damage (e.g., Firemod increases Fire/Poison damage)
-        if (environmentalDamageMods) {
-          const envMod = environmentalDamageMods[effect.dotDamageType.toString()];
-          if (envMod !== undefined) {
-            rawDotDamage = Math.floor(rawDotDamage * envMod);
-          }
-        }
+        // Environmental mods are already baked into originalDotDamage when the effect was applied
+        // Only apply the decay multiplier here, no environmental mods
+        const rawDotDamage = Math.floor(effect.originalDotDamage * decayMultiplier);
         
         // Get status effect damage mods from other active effects (like freeze/shatter)
         const statusDamageMods = getStatusEffectDamageMods(unit);
@@ -973,7 +967,8 @@ export function processStatusEffects(
         // Check if armor should be bypassed (active armor units when stunned)
         const bypassArmor = hasArmorBypassingStun(unit, unitStats?.armor_def_style === 1 ? 'active' : 'passive');
         
-        // Calculate damage with armor, resistances, and all modifiers
+        // Calculate damage with armor and resistances, but NO environmental mods
+        // Environmental mods were already applied when calculating the initial DoT base damage
         const damageResult = calculateDamageWithArmor(
           rawDotDamage,
           unit.currentArmor,
@@ -981,7 +976,7 @@ export function processStatusEffects(
           unitStats?.damage_mods,
           effect.dotDamageType,
           0, // DOT has no armor piercing
-          environmentalDamageMods,
+          undefined, // No environmental mods - already baked into originalDotDamage
           statusDamageMods,
           statusArmorDamageMods,
           bypassArmor
