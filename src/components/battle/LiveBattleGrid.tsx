@@ -209,8 +209,8 @@ export function LiveBattleGrid({
       return `${affectedPos.damagePercent}%`;
     };
 
-    // Empty slot
-    if (!unit) {
+    // Empty slot (or dead unit - treat as empty)
+    if (!unit || unit.isDead) {
       const handleEmptySlotClick = () => {
         // If clicking on reticle center, execute the attack
         if (isReticleCenter && onReticleConfirm) {

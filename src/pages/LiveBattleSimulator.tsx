@@ -166,6 +166,7 @@ const LiveBattleSimulator = () => {
   const lastAttackInfo = lastAttackAction ? {
     attackerName: lastAttackAction.attackerName,
     abilityName: lastAttackAction.abilityName,
+    targetName: lastAttackAction.targetName,
     isPlayerAttack: lastTurn?.isPlayerTurn,
     targetCount: lastTurn?.actions.filter(a => a.type === 'attack').length || 0,
     totalDamage: lastTurn?.summary?.totalDamage || 0,
@@ -363,10 +364,17 @@ const LiveBattleSimulator = () => {
               )}>
                 <Swords className="h-4 w-4" />
                 <span>
-                  {lastAttackInfo.attackerName ? t(lastAttackInfo.attackerName) : "Unit"} used{" "}
+                  <span className="font-bold">{lastAttackInfo.attackerName ? t(lastAttackInfo.attackerName) : "Unit"}</span>
+                  {" "}used{" "}
                   <span className="font-bold">{lastAttackInfo.abilityName ? t(lastAttackInfo.abilityName) : "attack"}</span>
+                  {lastAttackInfo.targetCount === 1 && lastAttackInfo.targetName && (
+                    <span> on <span className="font-bold">{t(lastAttackInfo.targetName)}</span></span>
+                  )}
+                  {lastAttackInfo.targetCount > 1 && (
+                    <span> on {lastAttackInfo.targetCount} targets</span>
+                  )}
                   {lastAttackInfo.totalDamage > 0 && (
-                    <span className="ml-1">— {lastAttackInfo.totalDamage} total damage</span>
+                    <span className="ml-1">— {lastAttackInfo.totalDamage} damage</span>
                   )}
                 </span>
               </div>
