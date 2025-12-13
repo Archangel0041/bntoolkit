@@ -223,7 +223,18 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     setIsProcessing(false);
   }, [battleState, isProcessing, environmentalDamageMods]);
 
-  // Advance to next wave
+  // Check if all enemies are dead and auto-advance wave
+  const checkWaveAdvance = useCallback(() => {
+    if (!battleState) return false;
+    
+    const allEnemiesDead = battleState.enemyUnits.every(u => u.isDead);
+    if (allEnemiesDead && battleState.currentWave < battleState.totalWaves - 1) {
+      return true;
+    }
+    return false;
+  }, [battleState]);
+
+  // Advance to next wave (enemies go first on subsequent waves)
   const advanceWave = useCallback(() => {
     if (!battleState || battleState.currentWave >= battleState.totalWaves - 1) return;
 
@@ -240,11 +251,17 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         })
         .filter((u): u is LiveBattleUnit => u !== null);
 
+      // On subsequent waves, enemies go first
       return {
         ...prev,
         enemyUnits,
         currentWave: nextWave,
-        isPlayerTurn: true,
+        isPlayerTurn: false, // Enemy goes first on wave 2+
+        battleLog: [...prev.battleLog, {
+          turnNumber: prev.currentTurn,
+          isPlayerTurn: true,
+          actions: [{ type: "skip", message: `Wave ${nextWave + 1} begins! Enemies attack first.` }],
+        }],
       };
     });
   }, [battleState, waves]);
@@ -288,5 +305,6 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     executeEnemyTurn,
     advanceWave,
     skipTurn,
+    checkWaveAdvance,
   };
 }

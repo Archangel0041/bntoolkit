@@ -281,11 +281,16 @@ const BattleSimulator = () => {
             </div>
           </div>
           <Button 
-            onClick={() => navigate(`/live-battle/${encounterId}`, { state: { from: location.pathname } })}
+            onClick={() => navigate(`/live-battle/${encounterId}`, { 
+              state: { 
+                from: location.pathname,
+                formation: tempFormation.units,
+              } 
+            })}
             className="gap-2"
           >
             <Swords className="h-4 w-4" />
-            Live Battle
+            Play Battle
           </Button>
         </div>
 

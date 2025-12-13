@@ -42,6 +42,15 @@ const LiveBattleSimulator = () => {
   } = useParties();
 
   const tempFormation = useTempFormation({ encounter });
+  
+  // Load formation from battle simulator if passed via state
+  const initialFormation = (location.state as any)?.formation;
+  
+  useEffect(() => {
+    if (initialFormation && initialFormation.length > 0) {
+      tempFormation.loadFromParty(initialFormation);
+    }
+  }, []); // Only run once on mount
 
   const {
     battleState,
@@ -59,6 +68,7 @@ const LiveBattleSimulator = () => {
     executeEnemyTurn,
     advanceWave,
     skipTurn,
+    checkWaveAdvance,
   } = useLiveBattle({
     encounter,
     waves,
@@ -66,6 +76,17 @@ const LiveBattleSimulator = () => {
   });
 
   const backPath = (location.state as any)?.from || `/battle/${encounterId}`;
+
+  // Auto-advance wave when all enemies are dead
+  useEffect(() => {
+    if (battleState && checkWaveAdvance() && !isProcessing) {
+      const timer = setTimeout(() => {
+        advanceWave();
+        toast.success(`Wave ${battleState.currentWave + 2} begins!`);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [battleState?.enemyUnits, checkWaveAdvance, advanceWave, isProcessing]);
 
   // Auto-execute enemy turn when it's their turn
   useEffect(() => {
