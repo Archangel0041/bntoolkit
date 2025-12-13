@@ -257,6 +257,7 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
         // Single target = no target_area OR only center position with 100% damage
         // AOE (target_type 2) = has splash pattern, needs reticle
         // Fixed (target_type 1 with offsets) = no reticle but shows pattern
+        // If there's a damage_area (splash damage), it's NOT single target
         isSingleTarget = !rawTargetArea || (
           rawTargetArea.target_type === 1 && 
           !targetArea.data.some((d: any) => d.x !== 0 || d.y !== 0)
@@ -272,6 +273,17 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
             damagePercent: d.damage_percent || 100,
           }))
         : undefined;
+      
+      // IMPORTANT: If there's damage_area (splash damage), it's NOT a single target ability
+      // The splash pattern applies around the center impact point
+      if (damageArea && damageArea.length > 0) {
+        // Only mark as non-single-target if there are actual splash positions (non-center)
+        const hasNonCenterSplash = damageArea.some((d: any) => d.x !== 0 || d.y !== 0);
+        if (hasNonCenterSplash) {
+          isSingleTarget = false;
+        }
+      }
+
 
       const attackDirection = ability.stats.attack_direction || 1;
       const lineOfFire = ability.stats.line_of_fire ?? 1; // Default to Direct
