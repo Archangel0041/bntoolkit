@@ -5,6 +5,8 @@ import { Separator } from "@/components/ui/separator";
 import { UnitImage } from "@/components/units/UnitImage";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { getUnitById } from "@/lib/units";
+import { getUnitAbilities } from "@/lib/battleCalculations";
+import { getAbilityById, getLineOfFireLabel } from "@/lib/abilities";
 import { UnitBlocking, UnitBlockingLabels, UnitClass, UnitClassLabels } from "@/data/gameEnums";
 import { cn } from "@/lib/utils";
 import type { LiveBattleUnit } from "@/types/liveBattle";
@@ -18,6 +20,9 @@ interface UnitInfoPanelProps {
   currentHp?: number;
   currentArmor?: number;
   weaponAmmo?: Record<string, number>;
+  // Cooldown tracking for live battle
+  abilityCooldowns?: Record<number, number>;
+  weaponGlobalCooldowns?: Record<string, number>;
   className?: string;
 }
 
@@ -29,11 +34,14 @@ export function UnitInfoPanel({
   currentHp,
   currentArmor,
   weaponAmmo,
+  abilityCooldowns,
+  weaponGlobalCooldowns,
   className,
 }: UnitInfoPanelProps) {
   const { t } = useLanguage();
 
   const unit = useMemo(() => getUnitById(unitId), [unitId]);
+  const abilities = useMemo(() => getUnitAbilities(unitId, rank), [unitId, rank]);
   
   if (!unit) return null;
 
@@ -172,6 +180,55 @@ export function UnitInfoPanel({
           </div>
         </div>
 
+        {/* Abilities Section */}
+        {abilities.length > 0 && (
+          <>
+            <Separator />
+            <div>
+              <div className="text-xs font-medium text-muted-foreground mb-1">Abilities</div>
+              <div className="space-y-1.5">
+                {abilities.map((ability) => {
+                  const abilityData = getAbilityById(ability.abilityId);
+                  const abilityName = abilityData ? t(abilityData.name) : `Ability ${ability.abilityId}`;
+                  const abilityCooldown = abilityCooldowns?.[ability.abilityId] ?? 0;
+                  const weaponCooldown = weaponGlobalCooldowns?.[ability.weaponName] ?? 0;
+                  const lofLabel = getLineOfFireLabel(ability.lineOfFire);
+                  
+                  return (
+                    <div key={ability.abilityId} className="text-sm border rounded p-2 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium truncate" title={abilityName}>
+                          {abilityName}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {abilityCooldown > 0 && (
+                            <Badge variant="destructive" className="text-xs h-5">
+                              CD: {abilityCooldown}
+                            </Badge>
+                          )}
+                          {weaponCooldown > 0 && (
+                            <Badge variant="secondary" className="text-xs h-5">
+                              WCD: {weaponCooldown}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-2 text-xs text-muted-foreground">
+                        <span>Dmg: {ability.minDamage}-{ability.maxDamage}</span>
+                        <span>Offense: {ability.offense}</span>
+                        <span>Range: {ability.minRange}-{ability.maxRange}</span>
+                        {lofLabel && <span>LoF: {lofLabel}</span>}
+                        <span>CD: {ability.cooldown}t</span>
+                        <span>GCD: {ability.globalCooldown}t</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
+
         {/* Weapons & Ammo */}
         {weaponList.length > 0 && (
           <>
@@ -184,6 +241,7 @@ export function UnitInfoPanel({
                   const maxAmmo = weapon.stats.ammo;
                   const hasInfiniteAmmo = maxAmmo === -1;
                   const reloadTime = weapon.stats.reload_time;
+                  const weaponCooldown = weaponGlobalCooldowns?.[name] ?? 0;
 
                   return (
                     <div key={name} className="flex items-center justify-between text-sm">
@@ -191,6 +249,11 @@ export function UnitInfoPanel({
                         {t(weapon.name)}
                       </span>
                       <div className="flex items-center gap-2">
+                        {weaponCooldown > 0 && (
+                          <Badge variant="secondary" className="text-xs h-5">
+                            CD: {weaponCooldown}
+                          </Badge>
+                        )}
                         <span className={cn(
                           "font-medium",
                           currentAmmo !== undefined && currentAmmo === 0 && "text-red-500"

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Play, SkipForward, RotateCcw, Swords, Trophy, Skull } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -91,15 +91,26 @@ const LiveBattleSimulator = () => {
     }
   }, [battleState?.enemyUnits, checkWaveAdvance, advanceWave, isProcessing]);
 
+  // Track if we've already scheduled an enemy turn to prevent double execution
+  const enemyTurnScheduledRef = useRef(false);
+
   // Auto-execute enemy turn when it's their turn
   useEffect(() => {
     if (battleState && !battleState.isPlayerTurn && !battleState.isBattleOver && !isProcessing) {
+      // Prevent scheduling multiple enemy turns
+      if (enemyTurnScheduledRef.current) return;
+      enemyTurnScheduledRef.current = true;
+      
       const timer = setTimeout(() => {
         executeEnemyTurn();
+        enemyTurnScheduledRef.current = false;
       }, 1000); // 1 second delay for visual feedback
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        enemyTurnScheduledRef.current = false;
+      };
     }
-  }, [battleState?.isPlayerTurn, battleState?.isBattleOver, isProcessing, executeEnemyTurn]);
+  }, [battleState?.isPlayerTurn, battleState?.isBattleOver, isProcessing]);
 
   const handleLoadParty = () => {
     if (selectedParty) {
@@ -418,6 +429,8 @@ const LiveBattleSimulator = () => {
                     currentHp={selectedUnit.currentHp}
                     currentArmor={selectedUnit.currentArmor}
                     weaponAmmo={selectedUnit.weaponAmmo}
+                    abilityCooldowns={selectedUnit.abilityCooldowns}
+                    weaponGlobalCooldowns={selectedUnit.weaponGlobalCooldown}
                   />
                 )}
 
