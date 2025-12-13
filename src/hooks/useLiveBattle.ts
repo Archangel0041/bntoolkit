@@ -384,6 +384,17 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     // For AOE attacks (not single target, not fixed), validate against valid reticle positions
     const isAOE = !selectedAbility.isSingleTarget && !selectedAbility.isFixed;
     
+    // Recalculate valid targets fresh to ensure we're using current state
+    const freshValidTargets = getValidTargets(
+      selectedUnit,
+      selectedAbility,
+      battleState.enemyUnits,
+      battleState.friendlyUnits
+    );
+    
+    console.log(`[executePlayerAction] Fresh valid targets for ability ${selectedAbility.abilityId}:`, 
+      freshValidTargets.map(t => t.gridId));
+    
     // Validate target based on attack type
     if (isRandom) {
       // Random attacks don't need target validation
@@ -392,7 +403,10 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       if (!validReticlePositions.has(targetGridId)) return;
     } else {
       // Single target and fixed attacks need a valid target unit
-      if (!validTargets.some(t => t.gridId === targetGridId)) return;
+      if (!freshValidTargets.some(t => t.gridId === targetGridId)) {
+        console.log(`[executePlayerAction] Target grid ${targetGridId} not in fresh valid targets, rejecting`);
+        return;
+      }
     }
 
     setIsProcessing(true);
