@@ -421,6 +421,7 @@ export function executeAttack(
   const abilityName = abilityData?.name || `Ability ${ability.abilityId}`;
   
   const totalShots = ability.shotsPerAttack * ability.attacksPerUse;
+  console.log(`[executeAttack] Ability ${ability.abilityId}: shotsPerAttack=${ability.shotsPerAttack}, attacksPerUse=${ability.attacksPerUse}, totalShots=${totalShots}, isFixed=${ability.isFixed}, isSingleTarget=${ability.isSingleTarget}, lineOfFire=${ability.lineOfFire}, affectedPositions=${affectedPositions.length}`);
   
   for (const pos of affectedPositions) {
     const target = allTargets.find(u => u.gridId === pos.gridId && !u.isDead);
