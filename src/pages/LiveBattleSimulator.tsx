@@ -31,6 +31,8 @@ interface KillFeedEntry {
   victimIcon: string;
   isPlayerKill: boolean;
   timestamp: number;
+  isDoTKill?: boolean; // True if killed by status effect
+  statusEffectName?: string; // Name of the status effect that killed
 }
 
 const LiveBattleSimulator = () => {
@@ -223,13 +225,18 @@ const LiveBattleSimulator = () => {
           
           const victimData = victimUnit ? getUnitById(victimUnit.unitId) : null;
           
+          // Check if this was a DoT kill (has statusEffectName but no attackerName)
+          const isDoTKill = !!action.statusEffectName && !action.attackerName;
+          
           newKillEntries.push({
             id: killFeedIdRef.current++,
-            killerName: action.attackerName || "Unknown",
+            killerName: action.attackerName || "",
             victimName: action.targetName || "Unknown",
             victimIcon: victimData?.identity.icon || "",
             isPlayerKill: lastTurnData.isPlayerTurn,
             timestamp: Date.now(),
+            isDoTKill,
+            statusEffectName: action.statusEffectName,
           });
         }
       }
@@ -481,16 +488,33 @@ const LiveBattleSimulator = () => {
                     )}
                   >
                     <Skull className="h-4 w-4" />
-                    <span className="font-bold">{t(kill.killerName)}</span>
-                    <span className="opacity-70">killed</span>
-                    {kill.victimIcon && (
-                      <UnitImage
-                        iconName={kill.victimIcon}
-                        alt=""
-                        className="h-5 w-5 rounded-sm"
-                      />
+                    {kill.isDoTKill ? (
+                      <>
+                        {kill.victimIcon && (
+                          <UnitImage
+                            iconName={kill.victimIcon}
+                            alt=""
+                            className="h-5 w-5 rounded-sm"
+                          />
+                        )}
+                        <span className="font-bold">{t(kill.victimName)}</span>
+                        <span className="opacity-70">died to</span>
+                        <span className="font-bold">{kill.statusEffectName}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-bold">{t(kill.killerName)}</span>
+                        <span className="opacity-70">killed</span>
+                        {kill.victimIcon && (
+                          <UnitImage
+                            iconName={kill.victimIcon}
+                            alt=""
+                            className="h-5 w-5 rounded-sm"
+                          />
+                        )}
+                        <span className="font-bold">{t(kill.victimName)}</span>
+                      </>
                     )}
-                    <span className="font-bold">{t(kill.victimName)}</span>
                   </div>
                 ))}
               </div>
