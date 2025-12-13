@@ -51,7 +51,8 @@ const LiveBattleSimulator = () => {
     battleState,
     selectedUnit,
     selectedUnitGridId,
-    setSelectedUnitGridId,
+    selectedUnitIsEnemy,
+    selectUnit,
     selectedAbilityId,
     setSelectedAbilityId,
     availableAbilities,
@@ -324,13 +325,12 @@ const LiveBattleSimulator = () => {
                 <LiveBattleGrid
                   isEnemy={true}
                   units={battleState.enemyUnits}
-                  selectedUnitGridId={selectedUnitGridId}
+                  selectedUnitGridId={selectedUnitIsEnemy ? selectedUnitGridId : null}
                   onUnitClick={(unit) => {
                     if (battleState.isPlayerTurn && selectedAbility) {
                       handleTargetClick(unit);
                     } else {
-                      setSelectedUnitGridId(unit.gridId);
-                      setSelectedAbilityId(null);
+                      selectUnit(unit.gridId, true);
                     }
                   }}
                   highlightedGridIds={battleState.isPlayerTurn && selectedAbility ? highlightedGridIds : undefined}
@@ -388,11 +388,10 @@ const LiveBattleSimulator = () => {
                 <LiveBattleGrid
                   isEnemy={false}
                   units={battleState.friendlyUnits}
-                  selectedUnitGridId={selectedUnitGridId}
+                  selectedUnitGridId={!selectedUnitIsEnemy ? selectedUnitGridId : null}
                   onUnitClick={(unit) => {
                     if (battleState.isPlayerTurn) {
-                      setSelectedUnitGridId(unit.gridId);
-                      setSelectedAbilityId(null);
+                      selectUnit(unit.gridId, false);
                     }
                   }}
                   lastActionGridIds={lastActionGridIds}
