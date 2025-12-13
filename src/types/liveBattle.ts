@@ -66,6 +66,8 @@ export interface LiveBattleState {
   // Turn tracking
   currentTurn: number;
   isPlayerTurn: boolean;
+  // Enemy phase tracking - which enemy is currently acting
+  currentEnemyIndex: number;
   // Battle log
   battleLog: BattleTurn[];
   // Battle status

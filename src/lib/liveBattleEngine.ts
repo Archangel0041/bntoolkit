@@ -131,6 +131,7 @@ export function initializeBattle(
     enemyUnits,
     currentTurn: 1,
     isPlayerTurn: true, // Player always goes first
+    currentEnemyIndex: 0, // Start from first enemy
     battleLog: [],
     isBattleOver: false,
     isPlayerVictory: null,
@@ -181,34 +182,51 @@ export function getAvailableAbilities(
   allEnemies: LiveBattleUnit[],
   allFriendlies: LiveBattleUnit[]
 ): AbilityInfo[] {
-  if (unit.globalCooldown > 0) return [];
+  if (unit.globalCooldown > 0) {
+    console.log(`[getAvailableAbilities] Unit ${unit.unitId} has global cooldown ${unit.globalCooldown}`);
+    return [];
+  }
 
   const abilities = getUnitAbilities(unit.unitId, unit.rank);
+  console.log(`[getAvailableAbilities] Unit ${unit.unitId} has ${abilities.length} total abilities`);
   
-  return abilities.filter(ability => {
+  const available = abilities.filter(ability => {
     // Check cooldown
-    if (unit.abilityCooldowns[ability.abilityId] > 0) return false;
+    if (unit.abilityCooldowns[ability.abilityId] > 0) {
+      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} is on cooldown`);
+      return false;
+    }
     
     // Check ammo
-    if (!hasEnoughAmmo(unit, ability)) return false;
+    if (!hasEnoughAmmo(unit, ability)) {
+      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} has no ammo`);
+      return false;
+    }
 
     // Check if there's at least one valid target
     const targets = unit.isEnemy ? allFriendlies : allEnemies;
+    const aliveTargets = targets.filter(t => !t.isDead);
+    console.log(`[getAvailableAbilities] Ability ${ability.abilityId}: ${aliveTargets.length} alive targets to check`);
+    
     const blockingUnits = getBlockingUnits(
-      targets.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
+      aliveTargets.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
       !unit.isEnemy
     );
 
     // For single target abilities, check if any target is valid
-    for (const target of targets) {
-      if (target.isDead) continue;
-      
+    for (const target of aliveTargets) {
       // Check tag targeting
-      if (!canTargetUnit(target.unitId, ability.targets)) continue;
+      if (!canTargetUnit(target.unitId, ability.targets)) {
+        console.log(`[getAvailableAbilities] Target ${target.unitId} not valid for ability tags`);
+        continue;
+      }
       
       // Check range
       const range = calculateRange(unit.gridId, target.gridId, unit.isEnemy);
-      if (range < ability.minRange || range > ability.maxRange) continue;
+      if (range < ability.minRange || range > ability.maxRange) {
+        console.log(`[getAvailableAbilities] Target ${target.unitId} out of range (range=${range}, min=${ability.minRange}, max=${ability.maxRange})`);
+        continue;
+      }
       
       // Check line of fire
       const blockCheck = checkLineOfFire(
@@ -218,13 +236,21 @@ export function getAvailableAbilities(
         unit.isEnemy,
         blockingUnits
       );
-      if (blockCheck.isBlocked) continue;
+      if (blockCheck.isBlocked) {
+        console.log(`[getAvailableAbilities] Target ${target.unitId} is blocked`);
+        continue;
+      }
       
+      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} has valid target ${target.unitId}`);
       return true; // At least one valid target
     }
     
+    console.log(`[getAvailableAbilities] Ability ${ability.abilityId} has no valid targets`);
     return false;
   });
+  
+  console.log(`[getAvailableAbilities] Unit ${unit.unitId} has ${available.length} available abilities`);
+  return available;
 }
 
 // Get valid targets for an ability
@@ -583,24 +609,38 @@ export function aiSelectAction(
   unit: LiveBattleUnit,
   state: LiveBattleState
 ): { ability: AbilityInfo; targetGridId: number } | null {
+  const unitData = getUnitById(unit.unitId);
+  const unitName = unitData?.identity?.name || `Unit ${unit.unitId}`;
+  
   const availableAbilities = getAvailableAbilities(
     unit,
     state.enemyUnits,
     state.friendlyUnits
   );
   
-  if (availableAbilities.length === 0) return null;
+  console.log(`[AI] ${unitName} (grid ${unit.gridId}): ${availableAbilities.length} available abilities`);
+  
+  if (availableAbilities.length === 0) {
+    console.log(`[AI] ${unitName}: No available abilities (all on cooldown, no ammo, or no valid targets)`);
+    return null;
+  }
   
   // Pick random ability
   const ability = availableAbilities[Math.floor(Math.random() * availableAbilities.length)];
+  console.log(`[AI] ${unitName}: Selected ability ${ability.abilityId}`);
   
   // Get valid targets
   const validTargets = getValidTargets(unit, ability, state.enemyUnits, state.friendlyUnits);
+  console.log(`[AI] ${unitName}: ${validTargets.length} valid targets for ability ${ability.abilityId}`);
   
-  if (validTargets.length === 0) return null;
+  if (validTargets.length === 0) {
+    console.log(`[AI] ${unitName}: No valid targets for selected ability`);
+    return null;
+  }
   
   // Pick random target
   const target = validTargets[Math.floor(Math.random() * validTargets.length)];
+  console.log(`[AI] ${unitName}: Targeting grid ${target.gridId}`);
   
   return { ability, targetGridId: target.gridId };
 }
