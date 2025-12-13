@@ -598,6 +598,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         .filter((u): u is LiveBattleUnit => u !== null);
       
       newState.enemyUnits = newEnemyUnits;
+      newState.enemyCollapsedRows = new Set<number>(); // Reset enemy grid layout for new wave
       newState.currentWave = nextWave;
       newState.currentEnemyIndex = 0;
       actions.push({ type: "skip", message: `Wave ${nextWave + 1} begins! Enemies attack first.` });
