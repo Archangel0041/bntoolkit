@@ -2,6 +2,7 @@ import { useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sword, Shield, Skull, Zap, Wind, Target } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 import type { BattleAction, BattleTurn } from "@/types/liveBattle";
 
 interface BattleLogProps {
@@ -30,8 +31,18 @@ function ActionIcon({ type }: { type: BattleAction["type"] }) {
   }
 }
 
+function formatUnitWithGrid(name: string | undefined, gridId: number | undefined, t: (key: string) => string): string {
+  if (!name) return "";
+  const localizedName = t(name);
+  if (gridId !== undefined) {
+    return `${localizedName} (${gridId})`;
+  }
+  return localizedName;
+}
+
 export function BattleLog({ turns, currentTurn, className }: BattleLogProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { t } = useLanguage();
 
   // Auto-scroll to bottom when new turns are added
   useEffect(() => {
@@ -72,37 +83,43 @@ export function BattleLog({ turns, currentTurn, className }: BattleLogProps) {
                   </span>
                 </div>
                 <div className="space-y-0.5 ml-2">
-                  {turn.actions.map((action, actionIndex) => (
-                    <div
-                      key={actionIndex}
-                      className="flex items-start gap-1.5 text-xs"
-                    >
-                      <ActionIcon type={action.type} />
-                      <span className="text-muted-foreground">
-                        {action.attackerName && action.targetName && action.abilityName && (
-                          <span className="font-medium text-foreground">
-                            {action.attackerName} → {action.abilityName} → {action.targetName}:{" "}
-                          </span>
-                        )}
-                        {action.attackerName && !action.targetName && action.abilityName && (
-                          <span className="font-medium text-foreground">
-                            {action.attackerName} → {action.abilityName}:{" "}
-                          </span>
-                        )}
-                        {action.attackerName && !action.abilityName && (
-                          <span className="font-medium text-foreground">
-                            {action.attackerName}:{" "}
-                          </span>
-                        )}
-                        {!action.attackerName && action.abilityName && (
-                          <span className="font-medium text-foreground">
-                            {action.abilityName}:{" "}
-                          </span>
-                        )}
-                        {action.message}
-                      </span>
-                    </div>
-                  ))}
+                  {turn.actions.map((action, actionIndex) => {
+                    const attackerDisplay = formatUnitWithGrid(action.attackerName, action.attackerGridId, t);
+                    const targetDisplay = formatUnitWithGrid(action.targetName, action.targetGridId, t);
+                    const abilityDisplay = action.abilityName ? t(action.abilityName) : "";
+                    
+                    return (
+                      <div
+                        key={actionIndex}
+                        className="flex items-start gap-1.5 text-xs"
+                      >
+                        <ActionIcon type={action.type} />
+                        <span className="text-muted-foreground">
+                          {attackerDisplay && targetDisplay && abilityDisplay && (
+                            <span className="font-medium text-foreground">
+                              {attackerDisplay} → {abilityDisplay} → {targetDisplay}:{" "}
+                            </span>
+                          )}
+                          {attackerDisplay && !targetDisplay && abilityDisplay && (
+                            <span className="font-medium text-foreground">
+                              {attackerDisplay} → {abilityDisplay}:{" "}
+                            </span>
+                          )}
+                          {attackerDisplay && !abilityDisplay && (
+                            <span className="font-medium text-foreground">
+                              {attackerDisplay}:{" "}
+                            </span>
+                          )}
+                          {!attackerDisplay && abilityDisplay && (
+                            <span className="font-medium text-foreground">
+                              {abilityDisplay}:{" "}
+                            </span>
+                          )}
+                          {action.message}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             ))
