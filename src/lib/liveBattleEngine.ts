@@ -690,7 +690,8 @@ export function executeRandomAttack(
   const abilityName = abilityData?.name || `Ability ${ability.abilityId}`;
   
   const allGridPositions = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13];
-  const totalHits = targetArea.data.length;
+  // Total shots comes from the ability's attack configuration, not targetArea.data.length
+  const totalHits = ability.shotsPerAttack * ability.attacksPerUse;
   const totalWeight = targetArea.data.reduce((sum, pos) => sum + (pos.weight || 1), 0);
   
   const damagePerPosition: Record<number, { damage: number; hits: number }> = {};

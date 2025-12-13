@@ -182,22 +182,19 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     const isRandom = selectedAbility.targetArea?.random === true;
     const targetAreaData = selectedAbility.targetArea?.data || [];
     
-    // For random attacks, calculate expected hits per tile based on weights
+    // For random attacks, calculate expected hits per tile
+    // The number of shots comes from shotsPerAttack * attacksPerUse, not targetArea.data.length
     let expectedHitsPerTile: Map<number, number> = new Map();
-    if (isRandom && targetAreaData.length > 0) {
-      const totalWeight = targetAreaData.reduce((sum, pos) => sum + (pos.weight || 1), 0);
-      const totalHits = targetAreaData.length; // Number of hits = number of entries in targetArea
-      
+    if (isRandom) {
       // All grid positions on enemy grid
       const allGridPositions = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13];
       
-      // Each hit has uniform probability to land on any of the 13 tiles
-      // But the weight affects which "slot" is selected from targetArea
-      // Since each slot can target any tile randomly, expected hits per tile = totalHits / numTiles
-      const expectedHitsUnweighted = totalHits / allGridPositions.length;
+      // Each shot independently targets a random tile
+      // Expected hits per tile = totalShots / numTiles
+      const expectedHitsPerPosition = totalShots / allGridPositions.length;
       
       for (const gridId of allGridPositions) {
-        expectedHitsPerTile.set(gridId, expectedHitsUnweighted);
+        expectedHitsPerTile.set(gridId, expectedHitsPerPosition);
       }
     }
 
