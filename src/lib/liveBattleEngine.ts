@@ -523,12 +523,12 @@ export function executeAttack(
     }
   }
   
-  // Set cooldowns
+  // Set cooldowns (add +1 because cooldowns are reduced at end of turn, so we need to account for that)
   if (ability.cooldown > 0) {
-    attacker.abilityCooldowns[ability.abilityId] = ability.cooldown;
+    attacker.abilityCooldowns[ability.abilityId] = ability.cooldown + 1;
   }
   if (ability.globalCooldown > 0) {
-    attacker.globalCooldown = ability.globalCooldown;
+    attacker.globalCooldown = ability.globalCooldown + 1;
   }
   
   // Consume ammo (if not infinite)
@@ -934,12 +934,12 @@ export function executeRandomAttack(
     }
   }
   
-  // Set cooldowns
+  // Set cooldowns (add +1 because cooldowns are reduced at end of turn, so we need to account for that)
   if (ability.cooldown > 0) {
-    attacker.abilityCooldowns[ability.abilityId] = ability.cooldown;
+    attacker.abilityCooldowns[ability.abilityId] = ability.cooldown + 1;
   }
   if (ability.globalCooldown > 0) {
-    attacker.globalCooldown = ability.globalCooldown;
+    attacker.globalCooldown = ability.globalCooldown + 1;
   }
   
   // Consume ammo
