@@ -493,6 +493,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
             targetGridId: enemy.gridId,
             message: "Stunned, cannot act",
           });
+          newEnemyIndex = i + 1;
           continue;
         }
         
@@ -508,6 +509,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
             targetGridId: enemy.gridId,
             message: "No valid targets, passing",
           });
+          newEnemyIndex = i + 1;
         }
       }
 
@@ -554,29 +556,65 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
 
         // Check if more enemies need to act
         if (newEnemyIndex < aliveEnemies.length) {
-          // More enemies to go - log this action and stay on enemy turn
-          const turn: BattleTurn = {
-            turnNumber: prev.currentTurn,
-            isPlayerTurn: false,
-            actions: allActions,
-          };
+          // More enemies to go - update index and DON'T add to log yet
+          // Actions will be accumulated across multiple executeEnemyTurn calls
           setCurrentEnemyIndex(newEnemyIndex);
           setIsProcessing(false);
-          return {
-            ...prev,
-            battleLog: [...prev.battleLog, turn],
-          };
+          
+          // Append actions to existing current turn in log, or create new one if first enemy
+          const existingTurnIndex = prev.battleLog.findIndex(
+            t => t.turnNumber === prev.currentTurn && !t.isPlayerTurn
+          );
+          
+          if (existingTurnIndex >= 0) {
+            // Append to existing turn
+            const updatedLog = [...prev.battleLog];
+            updatedLog[existingTurnIndex] = {
+              ...updatedLog[existingTurnIndex],
+              actions: [...updatedLog[existingTurnIndex].actions, ...allActions],
+            };
+            return {
+              ...prev,
+              battleLog: updatedLog,
+            };
+          } else {
+            // Create new turn entry
+            const turn: BattleTurn = {
+              turnNumber: prev.currentTurn,
+              isPlayerTurn: false,
+              actions: allActions,
+            };
+            return {
+              ...prev,
+              battleLog: [...prev.battleLog, turn],
+            };
+          }
         }
       }
 
       // All enemies have acted - reduce cooldowns and switch to player turn
       reduceCooldowns(prev.enemyUnits);
 
-      const turn: BattleTurn = {
-        turnNumber: prev.currentTurn,
-        isPlayerTurn: false,
-        actions: allActions,
-      };
+      // Append final actions to existing turn or create new one
+      const existingTurnIndex = prev.battleLog.findIndex(
+        t => t.turnNumber === prev.currentTurn && !t.isPlayerTurn
+      );
+      
+      let finalLog: BattleTurn[];
+      if (existingTurnIndex >= 0) {
+        finalLog = [...prev.battleLog];
+        finalLog[existingTurnIndex] = {
+          ...finalLog[existingTurnIndex],
+          actions: [...finalLog[existingTurnIndex].actions, ...allActions],
+        };
+      } else {
+        const turn: BattleTurn = {
+          turnNumber: prev.currentTurn,
+          isPlayerTurn: false,
+          actions: allActions,
+        };
+        finalLog = [...prev.battleLog, turn];
+      }
 
       const endCheck = checkBattleEnd(prev);
       setCurrentEnemyIndex(0);
@@ -586,7 +624,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         ...prev,
         currentTurn: prev.currentTurn + 1,
         isPlayerTurn: true,
-        battleLog: [...prev.battleLog, turn],
+        battleLog: finalLog,
         isBattleOver: endCheck.isOver,
         isPlayerVictory: endCheck.playerWon,
       };
