@@ -209,8 +209,13 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       affectedPositions = fixedAttackPositions.enemyGrid;
     } else if (!selectedAbility.isSingleTarget && selectedAbility.targetArea) {
       affectedPositions = getAffectedGridPositions(enemyReticleGridId, selectedAbility.targetArea, true, selectedAbility.damageArea);
+    } else if (selectedAbility.isSingleTarget && selectedAbility.damageArea) {
+      // Single-target with splash (like Legendary Sandworm's Maul)
+      // For preview, we need to calculate for each potential target as the center
+      // This is handled per-target below since each click location creates different splash
+      affectedPositions = targets.map(u => ({ gridId: u.gridId, damagePercent: 100 }));
     } else {
-      // Single target - calculate for all valid targets
+      // Pure single target - calculate for all valid targets
       affectedPositions = targets.map(u => ({ gridId: u.gridId, damagePercent: 100 }));
     }
 

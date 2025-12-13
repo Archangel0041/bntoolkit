@@ -404,11 +404,18 @@ export function executeAttack(
   // Get affected positions (for AOE/fixed attacks)
   let affectedPositions: { gridId: number; damagePercent: number }[];
   
-  // IMPORTANT: Single-target abilities should ONLY hit the selected target
-  // even if they have targetArea data (which just defines range/offset constraints)
-  if (ability.isSingleTarget) {
-    // Single-target: only the selected target gets hit
+  // Handle single-target abilities - they may still have damageArea for splash effects
+  if (ability.isSingleTarget && !ability.damageArea) {
+    // Pure single-target: only the selected target gets hit
     affectedPositions = [{ gridId: targetGridId, damagePercent: 100 }];
+  } else if (ability.isSingleTarget && ability.damageArea) {
+    // Single-target selection with splash damage (like Legendary Sandworm's Maul)
+    // Create a synthetic targetArea with just the center point, then apply damageArea
+    const syntheticTargetArea: TargetArea = {
+      targetType: 2,
+      data: [{ x: 0, y: 0, damagePercent: 100 }],
+    };
+    affectedPositions = getAffectedGridPositions(targetGridId, syntheticTargetArea, !attacker.isEnemy, ability.damageArea);
   } else if (ability.isFixed && ability.targetArea) {
     // Fixed AOE pattern (like Heavy Chem Tank cone) - hits all positions in pattern
     const fixedPos = getFixedAttackPositions(attacker.gridId, ability.targetArea, !attacker.isEnemy);
