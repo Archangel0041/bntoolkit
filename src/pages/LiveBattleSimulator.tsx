@@ -91,26 +91,29 @@ const LiveBattleSimulator = () => {
     }
   }, [battleState?.enemyUnits, checkWaveAdvance, advanceWave, isProcessing]);
 
-  // Track if we've already scheduled an enemy turn to prevent double execution
-  const enemyTurnScheduledRef = useRef(false);
+  // Track the current turn number to prevent duplicate enemy turn execution
+  const lastEnemyTurnProcessedRef = useRef<number>(-1);
 
   // Auto-execute enemy turn when it's their turn
   useEffect(() => {
     if (battleState && !battleState.isPlayerTurn && !battleState.isBattleOver && !isProcessing) {
-      // Prevent scheduling multiple enemy turns
-      if (enemyTurnScheduledRef.current) return;
-      enemyTurnScheduledRef.current = true;
+      // Only execute if we haven't already processed this turn
+      if (lastEnemyTurnProcessedRef.current >= battleState.currentTurn) {
+        return;
+      }
+      
+      // Mark this turn as being processed
+      lastEnemyTurnProcessedRef.current = battleState.currentTurn;
       
       const timer = setTimeout(() => {
         executeEnemyTurn();
-        enemyTurnScheduledRef.current = false;
-      }, 1000); // 1 second delay for visual feedback
+      }, 1000);
+      
       return () => {
         clearTimeout(timer);
-        enemyTurnScheduledRef.current = false;
       };
     }
-  }, [battleState?.isPlayerTurn, battleState?.isBattleOver, isProcessing]);
+  }, [battleState?.isPlayerTurn, battleState?.isBattleOver, battleState?.currentTurn, isProcessing, executeEnemyTurn]);
 
   const handleLoadParty = () => {
     if (selectedParty) {
