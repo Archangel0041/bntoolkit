@@ -24,6 +24,7 @@ interface LiveBattleGridProps {
   damageArea?: DamageAreaPosition[];
   reticleGridId?: number;
   onReticleMove?: (gridId: number) => void;
+  onReticleConfirm?: () => void; // Called when clicking on reticle center to execute attack
   showReticle?: boolean;
   // Fixed attack pattern positions
   fixedAttackPositions?: { gridId: number; damagePercent: number }[];
@@ -45,6 +46,7 @@ export function LiveBattleGrid({
   damageArea,
   reticleGridId,
   onReticleMove,
+  onReticleConfirm,
   showReticle = false,
   fixedAttackPositions = [],
   validReticlePositions,
@@ -193,6 +195,11 @@ export function LiveBattleGrid({
     // Empty slot
     if (!unit) {
       const handleEmptySlotClick = () => {
+        // If clicking on reticle center, execute the attack
+        if (isReticleCenter && onReticleConfirm) {
+          onReticleConfirm();
+          return;
+        }
         if (showReticle && onReticleMove) {
           onReticleMove(gridId);
         }
@@ -242,6 +249,11 @@ export function LiveBattleGrid({
     const armorPercent = unit.maxArmor > 0 ? (unit.currentArmor / unit.maxArmor) * 100 : 0;
 
     const handleClick = () => {
+      // If clicking on reticle center, execute the attack
+      if (isReticleCenter && onReticleConfirm) {
+        onReticleConfirm();
+        return;
+      }
       if (showReticle && onReticleMove) {
         onReticleMove(gridId);
         return;

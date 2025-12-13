@@ -11,6 +11,7 @@ import {
   checkBattleEnd,
   aiSelectAction,
   createLiveBattleUnit,
+  collapseGrid,
 } from "@/lib/liveBattleEngine";
 import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTargetUnit } from "@/lib/battleCalculations";
 import { getBlockingUnits, checkLineOfFire, calculateRange, findFrontmostUnblockedPosition, getTargetingInfo } from "@/lib/battleTargeting";
@@ -463,6 +464,10 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       }
 
       const allActions: BattleAction[] = [];
+
+      // Collapse grids - move units forward if front row is empty
+      collapseGrid(prev.friendlyUnits);
+      collapseGrid(prev.enemyUnits);
 
       // Process status effects at start of enemy phase
       const statusActions = processStatusEffects([...prev.friendlyUnits, ...prev.enemyUnits]);
