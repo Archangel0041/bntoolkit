@@ -192,9 +192,9 @@ export function getAvailableAbilities(
       return false;
     }
     
-    // Check weapon global cooldown
+    // Check weapon global cooldown - blocks ALL abilities on this weapon
     if (unit.weaponGlobalCooldown[ability.weaponName] > 0) {
-      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} blocked by weapon global cooldown`);
+      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} blocked by weapon global cooldown (weapon: ${ability.weaponName})`);
       return false;
     }
     
@@ -574,9 +574,10 @@ export function executeAttack(
   if (ability.cooldown > 0) {
     attacker.abilityCooldowns[ability.abilityId] = ability.cooldown + 1;
   }
-  if (ability.globalCooldown > 0) {
-    attacker.weaponGlobalCooldown[ability.weaponName] = ability.globalCooldown + 1;
-  }
+  // Always set at least 1-turn weapon cooldown to prevent using same weapon again this turn
+  // Use the max of globalCooldown and 1 to ensure weapon is blocked
+  const weaponCooldown = Math.max(ability.globalCooldown, 1);
+  attacker.weaponGlobalCooldown[ability.weaponName] = weaponCooldown + 1;
   
   // Consume ammo (if not infinite)
   if (ability.weaponMaxAmmo !== -1 && ability.ammoRequired > 0) {
@@ -999,9 +1000,9 @@ export function executeRandomAttack(
   if (ability.cooldown > 0) {
     attacker.abilityCooldowns[ability.abilityId] = ability.cooldown + 1;
   }
-  if (ability.globalCooldown > 0) {
-    attacker.weaponGlobalCooldown[ability.weaponName] = ability.globalCooldown + 1;
-  }
+  // Always set at least 1-turn weapon cooldown to prevent using same weapon again this turn
+  const weaponCooldown = Math.max(ability.globalCooldown, 1);
+  attacker.weaponGlobalCooldown[ability.weaponName] = weaponCooldown + 1;
   
   // Consume ammo
   if (ability.weaponMaxAmmo !== -1 && ability.ammoRequired > 0) {
