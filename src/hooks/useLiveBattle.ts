@@ -294,7 +294,10 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         });
         
         // Calculate status effect previews
-        const avgDamage = Math.floor((selectedAbility.minDamage + selectedAbility.maxDamage) / 2);
+        // Use average expected damage (HP + armor combined) for DoT preview
+        const avgTotalDamage = Math.floor(
+          (minResult.hpDamage + minResult.armorDamage + maxResult.hpDamage + maxResult.armorDamage) / 2
+        );
         const statusEffects: StatusEffectPreview[] = [];
         for (const [effectIdStr, chance] of Object.entries(selectedAbility.statusEffects)) {
           const effectId = parseInt(effectIdStr);
@@ -306,9 +309,9 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           
           let dotDamage = 0;
           if (effect.dot_ability_damage_mult || effect.dot_bonus_damage) {
-            const baseDotDamage = Math.floor(avgDamage * (effect.dot_ability_damage_mult || 0) + (effect.dot_bonus_damage || 0));
-            // Scale DoT damage by damage percent (e.g., 25% splash = 25% DoT damage)
-            dotDamage = Math.floor(baseDotDamage * (damagePercent / 100));
+            // DoT is based on actual damage dealt (scaled by multiplier and bonus)
+            const baseDotDamage = Math.floor(avgTotalDamage * (effect.dot_ability_damage_mult || 0) + (effect.dot_bonus_damage || 0));
+            dotDamage = baseDotDamage;
           }
           
           statusEffects.push({
