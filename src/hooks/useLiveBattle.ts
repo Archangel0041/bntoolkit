@@ -378,8 +378,19 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     // For random attacks, we don't need a specific target validation
     const isRandom = isRandomAttack(selectedAbility);
     
-    // Validate target only for non-random attacks
-    if (!isRandom && !validTargets.some(t => t.gridId === targetGridId)) return;
+    // For AOE attacks (not single target, not fixed), validate against valid reticle positions
+    const isAOE = !selectedAbility.isSingleTarget && !selectedAbility.isFixed;
+    
+    // Validate target based on attack type
+    if (isRandom) {
+      // Random attacks don't need target validation
+    } else if (isAOE && validReticlePositions) {
+      // AOE attacks can target any valid reticle position (including empty tiles)
+      if (!validReticlePositions.has(targetGridId)) return;
+    } else {
+      // Single target and fixed attacks need a valid target unit
+      if (!validTargets.some(t => t.gridId === targetGridId)) return;
+    }
 
     setIsProcessing(true);
 
@@ -469,7 +480,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     setSelectedUnitGridId(null);
     setSelectedAbilityId(null);
     setIsProcessing(false);
-  }, [battleState, selectedUnit, selectedAbility, validTargets, isProcessing, environmentalDamageMods, t]);
+  }, [battleState, selectedUnit, selectedAbility, validTargets, validReticlePositions, isProcessing, environmentalDamageMods, t]);
 
   // Helper to select a unit by grid and enemy flag
   const selectUnit = useCallback((gridId: number, isEnemy: boolean) => {
