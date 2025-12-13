@@ -143,6 +143,9 @@ export interface DamagePreview {
   blockedByUnitName?: string;
   blockedByBlockingLevel?: number;
   blockReason?: string;
+  // Random attack info
+  isRandomAttack?: boolean;
+  expectedHits?: number;
 }
 
 // Row mapping: preferred_row 1 = front (row 1), 2 = middle (row 2), 3 = back (row 3)
