@@ -9,6 +9,7 @@ import { AbilitySelector } from "@/components/battle/AbilitySelector";
 import { UnitSelector } from "@/components/battle/UnitSelector";
 import { PartyManager } from "@/components/battle/PartyManager";
 import { TargetingPatternDiagram } from "@/components/battle/TargetingPatternDiagram";
+import { UnitInfoPanel } from "@/components/battle/UnitInfoPanel";
 import { useParties } from "@/hooks/useParties";
 import { useTempFormation } from "@/hooks/useTempFormation";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -364,43 +365,37 @@ const BattleSimulator = () => {
           {/* Divider with selected unit info */}
           <div className="border-y py-4">
             {selectedUnit && selectedUnitData ? (
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <UnitImage
-                    iconName={selectedUnitData.identity.icon}
-                    alt={selectedUnitName}
-                    className="w-12 h-12 rounded"
-                  />
-                  <div>
-                    <p className="font-semibold">{selectedUnitName}</p>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <span>{selectedUnit.isEnemy ? "Enemy" : "Friendly"}</span>
-                      <span>•</span>
-                      <span>Rank {selectedUnit.rank}/{selectedUnitMaxRank}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Ability selector */}
-                <AbilitySelector
-                  abilities={selectedUnitAbilities}
-                  selectedAbilityId={selectedAbilityId}
-                  onSelectAbility={setSelectedAbilityId}
-                  className="flex-1 max-w-xl"
+              <div className="grid lg:grid-cols-3 gap-4">
+                {/* Unit Info Panel */}
+                <UnitInfoPanel
+                  unitId={selectedUnit.unitId}
+                  rank={selectedUnit.rank}
+                  gridId={selectedUnit.gridId}
+                  isEnemy={selectedUnit.isEnemy}
                 />
                 
-                {/* Pattern diagram for abilities */}
-                {selectedAbility && (
-                  <TargetingPatternDiagram 
-                    targetArea={selectedAbility.targetArea}
-                    lineOfFire={selectedAbility.lineOfFire}
-                    attackDirection={selectedAbility.attackDirection}
-                    minRange={selectedAbility.minRange}
-                    maxRange={selectedAbility.maxRange}
-                    isFixed={selectedAbility.isFixed}
-                    className="ml-4"
+                {/* Ability selector */}
+                <div className="lg:col-span-2 flex items-center gap-4">
+                  <AbilitySelector
+                    abilities={selectedUnitAbilities}
+                    selectedAbilityId={selectedAbilityId}
+                    onSelectAbility={setSelectedAbilityId}
+                    className="flex-1"
                   />
-                )}
+                  
+                  {/* Pattern diagram for abilities */}
+                  {selectedAbility && (
+                    <TargetingPatternDiagram 
+                      targetArea={selectedAbility.targetArea}
+                      lineOfFire={selectedAbility.lineOfFire}
+                      attackDirection={selectedAbility.attackDirection}
+                      minRange={selectedAbility.minRange}
+                      maxRange={selectedAbility.maxRange}
+                      isFixed={selectedAbility.isFixed}
+                      className="ml-4"
+                    />
+                  )}
+                </div>
               </div>
             ) : (
               <p className="text-center text-muted-foreground">

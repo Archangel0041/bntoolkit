@@ -30,6 +30,18 @@ export function createLiveBattleUnit(
   const hp = stats?.hp || 100;
   const armor = stats?.armor_hp || 0;
 
+  // Initialize weapon ammo
+  const weaponAmmo: Record<string, number> = {};
+  const weaponReloadCooldown: Record<string, number> = {};
+  
+  if (unit.weapons?.weapons) {
+    for (const [weaponName, weapon] of Object.entries(unit.weapons.weapons)) {
+      // -1 means infinite ammo
+      weaponAmmo[weaponName] = weapon.stats.ammo === -1 ? -1 : weapon.stats.ammo;
+      weaponReloadCooldown[weaponName] = 0;
+    }
+  }
+
   return {
     unitId,
     gridId,
@@ -42,6 +54,8 @@ export function createLiveBattleUnit(
     isDead: false,
     abilityCooldowns: {},
     globalCooldown: 0,
+    weaponAmmo,
+    weaponReloadCooldown,
     activeStatusEffects: [],
   };
 }
@@ -102,7 +116,20 @@ export function rollStatusEffect(chance: number): boolean {
   return Math.random() * 100 < chance;
 }
 
-// Get available abilities for a unit (respecting cooldowns)
+// Check if a weapon has enough ammo for an ability
+function hasEnoughAmmo(unit: LiveBattleUnit, ability: AbilityInfo): boolean {
+  // -1 means infinite ammo
+  if (ability.weaponMaxAmmo === -1) return true;
+  
+  // Check if weapon is reloading
+  if (unit.weaponReloadCooldown[ability.weaponName] > 0) return false;
+  
+  // Check if enough ammo
+  const currentAmmo = unit.weaponAmmo[ability.weaponName] ?? 0;
+  return currentAmmo >= ability.ammoRequired;
+}
+
+// Get available abilities for a unit (respecting cooldowns and ammo)
 export function getAvailableAbilities(
   unit: LiveBattleUnit,
   allEnemies: LiveBattleUnit[],
@@ -115,6 +142,9 @@ export function getAvailableAbilities(
   return abilities.filter(ability => {
     // Check cooldown
     if (unit.abilityCooldowns[ability.abilityId] > 0) return false;
+    
+    // Check ammo
+    if (!hasEnoughAmmo(unit, ability)) return false;
 
     // Check if there's at least one valid target
     const targets = unit.isEnemy ? allFriendlies : allEnemies;
@@ -370,6 +400,17 @@ export function executeAttack(
     attacker.globalCooldown = ability.globalCooldown;
   }
   
+  // Consume ammo (if not infinite)
+  if (ability.weaponMaxAmmo !== -1 && ability.ammoRequired > 0) {
+    const currentAmmo = attacker.weaponAmmo[ability.weaponName] ?? 0;
+    attacker.weaponAmmo[ability.weaponName] = Math.max(0, currentAmmo - ability.ammoRequired);
+    
+    // If out of ammo, start reload
+    if (attacker.weaponAmmo[ability.weaponName] === 0 && ability.weaponReloadTime > 0) {
+      attacker.weaponReloadCooldown[ability.weaponName] = ability.weaponReloadTime;
+    }
+  }
+  
   return actions;
 }
 
@@ -419,7 +460,7 @@ export function processStatusEffects(units: LiveBattleUnit[]): BattleAction[] {
   return actions;
 }
 
-// Reduce cooldowns at end of turn
+// Reduce cooldowns at end of turn and handle weapon reloading
 export function reduceCooldowns(units: LiveBattleUnit[]): void {
   for (const unit of units) {
     if (unit.isDead) continue;
@@ -435,6 +476,22 @@ export function reduceCooldowns(units: LiveBattleUnit[]): void {
     // Reduce global cooldown
     if (unit.globalCooldown > 0) {
       unit.globalCooldown--;
+    }
+    
+    // Handle weapon reload cooldowns
+    const unitData = getUnitById(unit.unitId);
+    for (const weaponName of Object.keys(unit.weaponReloadCooldown)) {
+      if (unit.weaponReloadCooldown[weaponName] > 0) {
+        unit.weaponReloadCooldown[weaponName]--;
+        
+        // If reload complete, restore ammo
+        if (unit.weaponReloadCooldown[weaponName] === 0) {
+          const weapon = unitData?.weapons?.weapons?.[weaponName];
+          if (weapon) {
+            unit.weaponAmmo[weaponName] = weapon.stats.ammo;
+          }
+        }
+      }
     }
   }
 }

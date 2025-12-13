@@ -90,6 +90,10 @@ export interface AbilityInfo {
   damageArea?: DamageAreaPosition[]; // Splash damage pattern around each impact point
   isFixed: boolean; // True if attack pattern is fixed (can't be aimed)
   isSingleTarget: boolean; // True if ability is single-target (no AOE pattern)
+  // Ammo system
+  ammoRequired: number; // Ammo consumed per use
+  weaponMaxAmmo: number; // Max ammo for this weapon (-1 = infinite)
+  weaponReloadTime: number; // Turns to reload when empty
 }
 
 export interface StatusEffectPreview {
