@@ -4,7 +4,7 @@ import { getUnitById } from "@/lib/units";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { UnitImage } from "@/components/units/UnitImage";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Skull, Zap, Crosshair } from "lucide-react";
+import { Skull, Zap, Crosshair, Shuffle } from "lucide-react";
 import { getStatusEffectDisplayName, getStatusEffectColor } from "@/lib/statusEffects";
 import type { LiveBattleUnit } from "@/types/liveBattle";
 import type { DamagePreview, TargetArea, DamageAreaPosition } from "@/types/battleSimulator";
@@ -29,6 +29,8 @@ interface LiveBattleGridProps {
   fixedAttackPositions?: { gridId: number; damagePercent: number }[];
   // Valid reticle positions based on range/line of fire
   validReticlePositions?: Set<number>;
+  // Is this a random attack (all tiles are potential targets)
+  isRandomAttack?: boolean;
 }
 
 export function LiveBattleGrid({
@@ -46,6 +48,7 @@ export function LiveBattleGrid({
   showReticle = false,
   fixedAttackPositions = [],
   validReticlePositions,
+  isRandomAttack = false,
 }: LiveBattleGridProps) {
   const { t } = useLanguage();
   const layout = isEnemy ? ENEMY_GRID_LAYOUT : FRIENDLY_GRID_LAYOUT;
@@ -444,7 +447,11 @@ export function LiveBattleGrid({
                 <div className="text-sm border-t pt-1 space-y-0.5">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">
-                      Damage{damagePreview.totalShots > 1 && ` (${damagePreview.totalShots} hits)`}:
+                      Damage{damagePreview.isRandomAttack 
+                        ? ` (~${damagePreview.expectedHits?.toFixed(1)} hits)` 
+                        : damagePreview.totalShots > 1 
+                          ? ` (${damagePreview.totalShots} hits)` 
+                          : ''}:
                     </span>
                     <span className="text-destructive font-medium">
                       {damagePreview.minTotalDamage.hpDamage}-{damagePreview.maxTotalDamage.hpDamage} HP
@@ -485,11 +492,18 @@ export function LiveBattleGrid({
         className={cn(
           "flex flex-col items-center gap-2 p-4 rounded-lg outline-none",
           isEnemy ? "bg-destructive/5" : "bg-primary/5",
-          showReticle && "focus:ring-2 focus:ring-yellow-500/50"
+          showReticle && "focus:ring-2 focus:ring-yellow-500/50",
+          isRandomAttack && isEnemy && "ring-2 ring-purple-500/50 ring-inset"
         )}
       >
-        <div className="text-sm font-medium text-muted-foreground mb-2">
+        <div className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
           {isEnemy ? "Enemy Formation" : "Your Formation"}
+          {isRandomAttack && isEnemy && (
+            <span className="flex items-center gap-1 text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded-full">
+              <Shuffle className="h-3 w-3" />
+              Random Target
+            </span>
+          )}
         </div>
         
         {isEnemy ? (

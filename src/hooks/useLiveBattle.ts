@@ -344,6 +344,8 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           isBlocked: blockCheck.isBlocked,
           blockedByUnitId: blockCheck.blockedBy?.unitId,
           blockReason: blockCheck.reason,
+          isRandomAttack: isRandom,
+          expectedHits: isRandom ? effectiveShots : undefined,
         };
       });
   }, [battleState, selectedUnit, selectedAbility, fixedAttackPositions, enemyReticleGridId, environmentalDamageMods]);
@@ -682,5 +684,6 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     setEnemyReticleGridId,
     fixedAttackPositions,
     validReticlePositions,
+    isRandomAttack: selectedAbility?.targetArea?.random === true,
   };
 }

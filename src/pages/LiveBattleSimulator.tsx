@@ -69,6 +69,7 @@ const LiveBattleSimulator = () => {
     setEnemyReticleGridId,
     fixedAttackPositions,
     validReticlePositions,
+    isRandomAttack,
   } = useLiveBattle({
     encounter,
     waves,
@@ -337,11 +338,12 @@ const LiveBattleSimulator = () => {
                   damagePreviews={damagePreviews}
                   reticleGridId={enemyReticleGridId}
                   onReticleMove={setEnemyReticleGridId}
-                  showReticle={!!selectedAbility && !selectedAbility.isSingleTarget && !selectedAbility.isFixed}
+                  showReticle={!!selectedAbility && !selectedAbility.isSingleTarget && !selectedAbility.isFixed && !isRandomAttack}
                   targetArea={selectedAbility?.targetArea}
                   damageArea={selectedAbility?.damageArea}
                   fixedAttackPositions={fixedAttackPositions.enemyGrid}
                   validReticlePositions={validReticlePositions}
+                  isRandomAttack={isRandomAttack}
                 />
 
                 {/* Unit info and ability selector */}
