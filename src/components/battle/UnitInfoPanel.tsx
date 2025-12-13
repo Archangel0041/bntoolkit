@@ -222,7 +222,7 @@ export function UnitInfoPanel({
               </div>
 
               {/* Abilities for this weapon */}
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {weaponAbilities.map((ability) => {
                   const abilityData = getAbilityById(ability.abilityId);
                   const abilityName = abilityData ? t(abilityData.name) : `Ability ${ability.abilityId}`;
@@ -235,6 +235,8 @@ export function UnitInfoPanel({
                   const shotsPerAttack = abilityData?.stats.shots_per_attack ?? 1;
                   const attacksPerUse = ability.attacksPerUse ?? 1;
                   const totalShots = shotsPerAttack * attacksPerUse;
+                  const critPercent = abilityData?.stats.critical_hit_percent ?? 0;
+                  const armorPierce = abilityData?.stats.armor_piercing_percent ?? 0;
                   
                   // Get status effects from ability
                   const statusEffects = abilityData?.stats.status_effects 
@@ -242,48 +244,110 @@ export function UnitInfoPanel({
                     : [];
                   
                   return (
-                    <div key={ability.abilityId} className="text-sm border rounded p-2 space-y-1">
-                      <div className="flex items-center gap-2">
+                    <div key={ability.abilityId} className="bg-muted/50 rounded-lg p-3 space-y-2">
+                      {/* Ability Header with Icon and Name */}
+                      <div className="flex items-start gap-3">
                         {abilityIcon && (
-                          <img src={abilityIcon} alt="" className="w-6 h-6 rounded" />
+                          <img 
+                            src={abilityIcon} 
+                            alt="" 
+                            className="w-10 h-10 rounded object-cover flex-shrink-0"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                          />
                         )}
-                        <span className="font-medium truncate flex-1" title={abilityName}>
-                          {abilityName}
-                        </span>
-                        {abilityCooldown > 0 && (
-                          <Badge variant="destructive" className="text-xs h-5">CD: {abilityCooldown}</Badge>
-                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium truncate" title={abilityName}>
+                              {abilityName}
+                            </span>
+                            {abilityCooldown > 0 && (
+                              <Badge variant="destructive" className="text-xs h-5 flex-shrink-0">
+                                CD: {abilityCooldown}
+                              </Badge>
+                            )}
+                          </div>
+                          {/* Damage Type Description Line */}
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                            {damageTypeIcon && (
+                              <img 
+                                src={damageTypeIcon} 
+                                alt="" 
+                                className="w-4 h-4 object-contain"
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            )}
+                            <span>{damageTypeLabel} Damage</span>
+                          </div>
+                        </div>
                       </div>
                       
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          {damageTypeIcon && <img src={damageTypeIcon} alt="" className="w-3 h-3" />}
-                          {damageTypeLabel}: {ability.minDamage}-{ability.maxDamage}{totalShots > 1 && ` x${totalShots}`}
-                        </span>
-                        <span>Offense: {ability.offense}</span>
-                        <span>Range: {ability.minRange}-{ability.maxRange}</span>
-                        {lofLabel && <span>LoF: {lofLabel}</span>}
-                        <span>CD: {ability.cooldown}t / GCD: {ability.globalCooldown}t</span>
-                        <span>Ammo: {ammoRequired}</span>
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Damage</span>
+                          <span className="font-medium">
+                            {ability.minDamage}-{ability.maxDamage}
+                            {totalShots > 1 && <span className="text-muted-foreground"> (x{totalShots})</span>}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Offense</span>
+                          <span className="font-medium">{ability.offense}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Range</span>
+                          <span className="font-medium">{ability.minRange}-{ability.maxRange}</span>
+                        </div>
+                        {lofLabel && (
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Line of Fire</span>
+                            <span className="font-medium">{lofLabel}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Cooldown</span>
+                          <span className="font-medium">{ability.cooldown}t</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Global CD</span>
+                          <span className="font-medium">{ability.globalCooldown}t</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Ammo</span>
+                          <span className="font-medium">{ammoRequired}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Crit %</span>
+                          <span className="font-medium">{critPercent}%</span>
+                        </div>
+                        {armorPierce > 0 && (
+                          <div className="flex justify-between col-span-2">
+                            <span className="text-muted-foreground">Armor Pierce</span>
+                            <span className="font-medium text-orange-500">{Math.round(armorPierce * 100)}%</span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Status Effects */}
                       {statusEffects.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {statusEffects.map(([effectId, chance]) => {
-                            const effectIdNum = parseInt(effectId);
-                            const effectName = getEffectDisplayNameTranslated(effectIdNum);
-                            const effectIcon = getEffectIconUrl(effectIdNum);
-                            const effect = getStatusEffect(effectIdNum);
-                            const duration = effect?.duration ?? 0;
-                            
-                            return (
-                              <Badge key={effectId} variant="outline" className="text-xs gap-1">
-                                {effectIcon && <img src={effectIcon} alt="" className="w-3 h-3" />}
-                                {effectName} ({chance}%{duration > 0 && `, ${duration}t`})
-                              </Badge>
-                            );
-                          })}
+                        <div className="pt-1 border-t border-border/50">
+                          <div className="text-xs text-muted-foreground mb-1">Inflicts:</div>
+                          <div className="flex flex-wrap gap-1">
+                            {statusEffects.map(([effectId, chance]) => {
+                              const effectIdNum = parseInt(effectId);
+                              const effectName = getEffectDisplayNameTranslated(effectIdNum);
+                              const effectIcon = getEffectIconUrl(effectIdNum);
+                              const effect = getStatusEffect(effectIdNum);
+                              const duration = effect?.duration ?? 0;
+                              
+                              return (
+                                <Badge key={effectId} variant="outline" className="text-xs gap-1">
+                                  {effectIcon && <img src={effectIcon} alt="" className="w-3 h-3" />}
+                                  {effectName} ({chance}%{duration > 0 && `, ${duration}t`})
+                                </Badge>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
                     </div>
