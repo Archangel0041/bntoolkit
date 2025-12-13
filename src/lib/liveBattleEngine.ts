@@ -628,6 +628,10 @@ export function executeAttack(
         const existingEffect = target.activeStatusEffects.find(e => e.effectId === effectId);
         if (existingEffect) {
           existingEffect.remainingDuration = effect.duration;
+          // Reset DoT tracking on refresh
+          existingEffect.originalDotDamage = dotDamage;
+          existingEffect.dotDamage = dotDamage;
+          existingEffect.currentTurn = 1;
         } else {
           target.activeStatusEffects.push({
             effectId,
@@ -635,6 +639,8 @@ export function executeAttack(
             dotDamage,
             dotDamageType: effect.dot_damage_type || null,
             isStun,
+            originalDotDamage: dotDamage,
+            currentTurn: 1,
           });
         }
         
@@ -919,7 +925,9 @@ export function processStatusEffects(
     
     for (const effect of unit.activeStatusEffects) {
       if (effect.dotDamage > 0 && effect.dotDamageType !== null) {
-        let rawDotDamage = effect.dotDamage;
+        // Calculate current turn's damage using decay formula: damage = originalDamage / currentTurn
+        // Fire and Poison both use this decay pattern (Turn 1 = 1x, Turn 2 = 1/2, Turn 3 = 1/3, etc.)
+        let rawDotDamage = Math.floor(effect.originalDotDamage / effect.currentTurn);
         
         // Apply environmental damage mods to DOT damage (e.g., Firemod increases Fire/Poison damage)
         if (environmentalDamageMods) {
@@ -991,15 +999,10 @@ export function processStatusEffects(
       }
     }
     
-    // Reduce durations, halve Fire DoT, and remove expired effects
+    // Reduce durations, increment turn counter for decay, and remove expired effects
     unit.activeStatusEffects = unit.activeStatusEffects.filter(e => {
       e.remainingDuration--;
-      
-      // Fire DoT (damage type 5) halves each turn
-      if (e.dotDamageType === DamageType.Fire && e.dotDamage > 0) {
-        e.dotDamage = Math.floor(e.dotDamage / 2);
-      }
-      // Poison and other DoTs remain the same
+      e.currentTurn++; // Increment turn for next tick's decay calculation
       
       return e.remainingDuration > 0;
     });
