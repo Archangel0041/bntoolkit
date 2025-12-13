@@ -637,13 +637,15 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   const checkWaveAdvance = useCallback(() => {
     if (!battleState) return false;
     
-    // Check if all non-ignorable enemies are dead
-    // Units with the Ignorable tag (like Stone Slab) don't count for wave completion
+    // Check if all non-ignorable/non-unimportant enemies are dead
+    // Units with the Ignorable tag (like Stone Slab) or unimportant flag don't count for wave completion
     const allNonIgnorableEnemiesDead = battleState.enemyUnits.every(u => {
       if (u.isDead) return true;
       const unit = getUnitById(u.unitId);
       const tags = unit?.identity?.tags || [];
-      return tags.includes(UnitTag.Ignorable);
+      const isIgnorable = tags.includes(UnitTag.Ignorable);
+      const isUnimportant = unit?.statsConfig?.unimportant === true;
+      return isIgnorable || isUnimportant;
     });
     
     if (allNonIgnorableEnemiesDead && battleState.currentWave < battleState.totalWaves - 1) {

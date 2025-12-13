@@ -34,6 +34,8 @@ interface LiveBattleGridProps {
   isRandomAttack?: boolean;
   // Animation trigger - increments when a new attack happens
   attackAnimationTrigger?: number;
+  // Recently dead unit grid IDs for death animation
+  recentlyDeadGridIds?: Set<number>;
 }
 
 export function LiveBattleGrid({
@@ -54,6 +56,7 @@ export function LiveBattleGrid({
   validReticlePositions,
   isRandomAttack = false,
   attackAnimationTrigger = 0,
+  recentlyDeadGridIds = new Set(),
 }: LiveBattleGridProps) {
   const { t } = useLanguage();
   const layout = isEnemy ? ENEMY_GRID_LAYOUT : FRIENDLY_GRID_LAYOUT;
@@ -209,8 +212,11 @@ export function LiveBattleGrid({
       return `${affectedPos.damagePercent}%`;
     };
 
-    // Empty slot (or dead unit - treat as empty)
-    if (!unit || unit.isDead) {
+    // Check if this unit just died (show death animation)
+    const isRecentlyDead = unit?.isDead && recentlyDeadGridIds.has(gridId);
+
+    // Empty slot (or dead unit that finished animating - treat as empty)
+    if (!unit || (unit.isDead && !isRecentlyDead)) {
       const handleEmptySlotClick = () => {
         // If clicking on reticle center, execute the attack
         if (isReticleCenter && onReticleConfirm) {
@@ -257,6 +263,30 @@ export function LiveBattleGrid({
               {getDamageLabel()}
             </span>
           )}
+        </div>
+      );
+    }
+
+    // Recently dead unit - show death animation
+    if (isRecentlyDead && unitData) {
+      const unitName = t(unitData.identity.name);
+      return (
+        <div
+          key={gridId}
+          className={cn(
+            slotSize,
+            "relative border rounded-md flex items-center justify-center overflow-hidden",
+            "bg-muted/20 animate-death-fade"
+          )}
+        >
+          <UnitImage
+            iconName={unitData.identity.icon}
+            alt={unitName}
+            className="w-full h-full object-cover rounded-md grayscale"
+          />
+          <div className="absolute inset-0 flex items-center justify-center bg-red-900/60 rounded-md">
+            <Skull className="h-8 w-8 text-red-400" />
+          </div>
         </div>
       );
     }
