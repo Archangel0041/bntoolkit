@@ -1,6 +1,6 @@
 import { getUnitById } from "@/lib/units";
 import { getAbilityById } from "@/lib/abilities";
-import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTargetUnit } from "@/lib/battleCalculations";
+import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTargetUnit, getDamageModifier } from "@/lib/battleCalculations";
 import { getBlockingUnits, checkLineOfFire, calculateRange } from "@/lib/battleTargeting";
 import { getStatusEffect } from "@/lib/statusEffects";
 import { unitMatchesTargets } from "@/lib/tagHierarchy";
@@ -15,6 +15,52 @@ import type {
   DamageRoll,
   ActiveStatusEffect 
 } from "@/types/liveBattle";
+
+// Get combined damage modifiers from a unit's active status effects
+// Returns modifiers keyed by damage type
+export function getStatusEffectDamageMods(unit: LiveBattleUnit): Record<string, number> {
+  const mods: Record<string, number> = {};
+  
+  for (const activeEffect of unit.activeStatusEffects) {
+    const effect = getStatusEffect(activeEffect.effectId);
+    if (!effect?.stun_damage_mods) continue;
+    
+    // Merge damage modifiers (take the highest modifier for each damage type)
+    for (const [damageType, modifier] of Object.entries(effect.stun_damage_mods)) {
+      if (!mods[damageType] || modifier > mods[damageType]) {
+        mods[damageType] = modifier;
+      }
+    }
+  }
+  
+  return mods;
+}
+
+// Get combined armor damage modifiers from a unit's active status effects
+export function getStatusEffectArmorDamageMods(unit: LiveBattleUnit): Record<string, number> {
+  const mods: Record<string, number> = {};
+  
+  for (const activeEffect of unit.activeStatusEffects) {
+    const effect = getStatusEffect(activeEffect.effectId);
+    if (!effect?.stun_armor_damage_mods) continue;
+    
+    for (const [damageType, modifier] of Object.entries(effect.stun_armor_damage_mods)) {
+      if (!mods[damageType] || modifier > mods[damageType]) {
+        mods[damageType] = modifier;
+      }
+    }
+  }
+  
+  return mods;
+}
+
+// Check if unit has a stun/freeze effect that bypasses armor (for Active armor units)
+export function hasArmorBypassingStun(unit: LiveBattleUnit, unitArmorDefenseStyle?: string): boolean {
+  // Only Riot Trooper and Armadillo (Active armor style) bypass armor when stunned
+  if (unitArmorDefenseStyle !== 'active') return false;
+  
+  return unit.activeStatusEffects.some(e => e.isStun);
+}
 
 // Initialize a live battle unit from party/encounter unit
 export function createLiveBattleUnit(
@@ -252,7 +298,11 @@ export function executeAttack(
     const targetUnit = getUnitById(target.unitId);
     const targetStats = targetUnit?.statsConfig?.stats?.[target.rank - 1];
     const defense = targetStats?.defense || 0;
-    const dodgeChance = calculateDodgeChance(defense, ability.offense);
+    
+    // Reduce dodge chance if target is stunned/frozen
+    const isStunned = target.activeStatusEffects.some(e => e.isStun);
+    const stunDodgePenalty = isStunned ? 20 : 0; // Stunned units have reduced dodge
+    const effectiveDodgeChance = Math.max(0, calculateDodgeChance(defense, ability.offense) - stunDodgePenalty);
     
     // Calculate crit chance with bonuses
     let critChance = ability.critPercent;
@@ -264,7 +314,7 @@ export function executeAttack(
     }
     
     // Roll dodge
-    if (rollDodge(dodgeChance)) {
+    if (rollDodge(effectiveDodgeChance)) {
       actions.push({
         type: "dodge",
         attackerGridId: attacker.gridId,
@@ -276,6 +326,15 @@ export function executeAttack(
       });
       continue;
     }
+    
+    // Get status effect damage modifiers from target
+    const statusDamageMods = getStatusEffectDamageMods(target);
+    const statusArmorDamageMods = getStatusEffectArmorDamageMods(target);
+    
+    // Check if armor is bypassed due to stun (Active armor units only)
+    // armor_def_style: 1 = Passive, 2 = Active
+    const armorDefStyle = targetStats?.armor_def_style;
+    const bypassArmor = armorDefStyle === 2 && isStunned;
     
     // Roll damage for all shots
     let totalArmorDamage = 0;
@@ -293,7 +352,7 @@ export function executeAttack(
       const critMultiplier = isCrit ? 2 : 1;
       const finalBaseDamage = Math.floor(adjustedDamage * critMultiplier);
       
-      // Calculate damage with armor
+      // Calculate damage with armor and status effect modifiers
       const result = calculateDamageWithArmor(
         finalBaseDamage,
         target.currentArmor,
@@ -301,7 +360,10 @@ export function executeAttack(
         targetStats?.damage_mods,
         ability.damageType,
         ability.armorPiercing,
-        environmentalDamageMods
+        environmentalDamageMods,
+        Object.keys(statusDamageMods).length > 0 ? statusDamageMods : undefined,
+        Object.keys(statusArmorDamageMods).length > 0 ? statusArmorDamageMods : undefined,
+        bypassArmor
       );
       
       // Apply damage
@@ -617,7 +679,11 @@ export function executeRandomAttack(
     const targetUnit = getUnitById(target.unitId);
     const targetStats = targetUnit?.statsConfig?.stats?.[target.rank - 1];
     const defense = targetStats?.defense || 0;
-    const dodgeChance = calculateDodgeChance(defense, ability.offense);
+    
+    // Reduce dodge chance if target is stunned/frozen
+    const isStunned = target.activeStatusEffects.some(e => e.isStun);
+    const stunDodgePenalty = isStunned ? 20 : 0;
+    const effectiveDodgeChance = Math.max(0, calculateDodgeChance(defense, ability.offense) - stunDodgePenalty);
     
     // Calculate crit chance with bonuses
     let critChance = ability.critPercent;
@@ -629,7 +695,7 @@ export function executeRandomAttack(
     }
     
     // Roll dodge
-    if (rollDodge(dodgeChance)) {
+    if (rollDodge(effectiveDodgeChance)) {
       actions.push({
         type: "dodge",
         attackerGridId: attacker.gridId,
@@ -642,6 +708,14 @@ export function executeRandomAttack(
       continue;
     }
     
+    // Get status effect damage modifiers from target
+    const statusDamageMods = getStatusEffectDamageMods(target);
+    const statusArmorDamageMods = getStatusEffectArmorDamageMods(target);
+    
+    // Check if armor is bypassed due to stun (Active armor units only)
+    const armorDefStyle = targetStats?.armor_def_style;
+    const bypassArmor = armorDefStyle === 2 && isStunned;
+    
     // Roll base damage (1 hit per iteration)
     const baseDamage = rollDamage(ability.minDamage, ability.maxDamage);
     
@@ -653,7 +727,7 @@ export function executeRandomAttack(
     const critMultiplier = isCrit ? 2 : 1;
     const finalBaseDamage = Math.floor(adjustedDamage * critMultiplier);
     
-    // Calculate damage with armor
+    // Calculate damage with armor and status effect modifiers
     const result = calculateDamageWithArmor(
       finalBaseDamage,
       target.currentArmor,
@@ -661,7 +735,10 @@ export function executeRandomAttack(
       targetStats?.damage_mods,
       ability.damageType,
       ability.armorPiercing,
-      environmentalDamageMods
+      environmentalDamageMods,
+      Object.keys(statusDamageMods).length > 0 ? statusDamageMods : undefined,
+      Object.keys(statusArmorDamageMods).length > 0 ? statusArmorDamageMods : undefined,
+      bypassArmor
     );
     
     // Apply damage immediately
