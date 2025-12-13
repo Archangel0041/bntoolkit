@@ -414,12 +414,20 @@ export function executeAttack(
   // Get affected positions (for AOE/fixed attacks)
   let affectedPositions: { gridId: number; damagePercent: number }[];
   
-  if (ability.isFixed && ability.targetArea) {
+  // IMPORTANT: Single-target abilities should ONLY hit the selected target
+  // even if they have targetArea data (which just defines range/offset constraints)
+  if (ability.isSingleTarget) {
+    // Single-target: only the selected target gets hit
+    affectedPositions = [{ gridId: targetGridId, damagePercent: 100 }];
+  } else if (ability.isFixed && ability.targetArea) {
+    // Fixed AOE pattern (like Heavy Chem Tank cone) - hits all positions in pattern
     const fixedPos = getFixedAttackPositions(attacker.gridId, ability.targetArea, !attacker.isEnemy);
     affectedPositions = fixedPos.map(p => ({ gridId: p.gridId, damagePercent: p.damagePercent }));
-  } else if (ability.targetArea && !ability.isSingleTarget) {
+  } else if (ability.targetArea) {
+    // AOE with movable reticle - hits positions around selected target
     affectedPositions = getAffectedGridPositions(targetGridId, ability.targetArea, !attacker.isEnemy, ability.damageArea);
   } else {
+    // Fallback: just the target
     affectedPositions = [{ gridId: targetGridId, damagePercent: 100 }];
   }
   
