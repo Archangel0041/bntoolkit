@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight, Save, Upload } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Save, Upload, Swords } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Header } from "@/components/Header";
@@ -263,20 +263,29 @@ const BattleSimulator = () => {
       <Header />
       <main className="container mx-auto px-4 py-6 space-y-6">
         {/* Back navigation and title */}
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(backPath)}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Battle Simulator</h1>
-            {encounter && (
-              <p className="text-muted-foreground">
-                {t(encounter.name || `Encounter ${encounterId}`)}
-                <Badge variant="outline" className="ml-2">ID: {encounterId}</Badge>
-                {encounter.level && <Badge variant="secondary" className="ml-2">Lv. {encounter.level}</Badge>}
-              </p>
-            )}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate(backPath)}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold">Battle Simulator</h1>
+              {encounter && (
+                <p className="text-muted-foreground">
+                  {t(encounter.name || `Encounter ${encounterId}`)}
+                  <Badge variant="outline" className="ml-2">ID: {encounterId}</Badge>
+                  {encounter.level && <Badge variant="secondary" className="ml-2">Lv. {encounter.level}</Badge>}
+                </p>
+              )}
+            </div>
           </div>
+          <Button 
+            onClick={() => navigate(`/live-battle/${encounterId}`, { state: { from: location.pathname } })}
+            className="gap-2"
+          >
+            <Swords className="h-4 w-4" />
+            Live Battle
+          </Button>
         </div>
 
         {/* Wave selector */}
