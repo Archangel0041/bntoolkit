@@ -8,37 +8,56 @@ import { Badge } from "@/components/ui/badge";
 import { expandTargetTags } from "@/lib/tagHierarchy";
 import type { AbilityInfo } from "@/types/battleSimulator";
 import { LineOfFireLabels } from "@/types/battleSimulator";
-import { AttackDirection } from "@/data/gameEnums";
+import { AttackDirection, UnitTag } from "@/data/gameEnums";
+import { Check, X } from "lucide-react";
 
-// Main targeting categories
-const TARGETING_CATEGORIES = {
-  air: { tag: 39, label: "Air", color: "bg-sky-500/20 text-sky-700 dark:text-sky-300 border-sky-500/50" },
-  ground: { tag: 24, label: "Ground", color: "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/50" },
-  sea: { tag: 15, label: "Sea", color: "bg-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/50" },
-};
+// Detailed targeting categories matching what users care about
+// Order matters - displayed in this order
+const TARGETING_TYPES = [
+  { tag: UnitTag.Air, label: "Air", key: "air" },
+  { tag: UnitTag.Lta, label: "LTA", key: "lta" },
+  { tag: UnitTag.Soldier, label: "Soldier", key: "soldier" },
+  { tag: UnitTag.Sniper, label: "Sniper", key: "sniper" },
+  { tag: UnitTag.Vehicle, label: "Vehicle", key: "vehicle" },
+  { tag: UnitTag.Tank, label: "Tank", key: "tank" },
+  { tag: UnitTag.Metal, label: "Metal", key: "metal" },
+  { tag: UnitTag.Critter, label: "Critter", key: "critter" },
+  { tag: UnitTag.Civilian, label: "Civilian", key: "civilian" },
+  { tag: UnitTag.Sea, label: "Sea", key: "sea" },
+  { tag: UnitTag.Ship, label: "Ship", key: "ship" },
+] as const;
 
-function getTargetingCategories(targets: number[]): { canTarget: string[]; cannotTarget: string[] } {
+// Check if a specific tag can be targeted by ability
+function canTargetTag(abilityTargets: number[], tagToCheck: number, expandedTargets: Set<number>): boolean {
+  // If no targets specified, can target everything
+  if (abilityTargets.length === 0) return true;
+  
+  // If targets Unit (51), can target everything
+  if (abilityTargets.includes(UnitTag.Unit) || expandedTargets.has(UnitTag.Unit)) return true;
+  
+  // Check if the tag or any of its parents are in the targets
+  if (abilityTargets.includes(tagToCheck) || expandedTargets.has(tagToCheck)) return true;
+  
+  return false;
+}
+
+function getTargetingDetails(targets: number[]): { tag: number; label: string; canHit: boolean }[] {
+  // If no targets, can hit everything
   if (targets.length === 0) {
-    return { canTarget: ["Air", "Ground", "Sea"], cannotTarget: [] };
+    return TARGETING_TYPES.map(t => ({ tag: t.tag, label: t.label, canHit: true }));
   }
   
-  const expandedTargets = expandTargetTags(targets);
-  const canTarget: string[] = [];
-  const cannotTarget: string[] = [];
+  // Expand all target tags through hierarchy
+  const expandedTargets = new Set(expandTargetTags(targets));
   
-  if (targets.includes(51) || expandedTargets.includes(51)) {
-    return { canTarget: ["Air", "Ground", "Sea"], cannotTarget: [] };
-  }
+  // Also add the original targets
+  targets.forEach(t => expandedTargets.add(t));
   
-  for (const [key, { tag, label }] of Object.entries(TARGETING_CATEGORIES)) {
-    if (targets.includes(tag) || expandedTargets.includes(tag)) {
-      canTarget.push(label);
-    } else {
-      cannotTarget.push(label);
-    }
-  }
-  
-  return { canTarget, cannotTarget };
+  return TARGETING_TYPES.map(t => ({
+    tag: t.tag,
+    label: t.label,
+    canHit: canTargetTag(targets, t.tag, expandedTargets),
+  }));
 }
 
 interface AbilitySelectorProps {
@@ -156,38 +175,27 @@ export function AbilitySelector({
                     )}
                   </div>
                   
-                  {/* Targeting categories */}
-                  {(() => {
-                    const { canTarget, cannotTarget } = getTargetingCategories(info.targets);
-                    return (
-                      <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t">
-                        <span className="text-muted-foreground">Targets:</span>
-                        {canTarget.map(cat => (
-                          <Badge 
-                            key={cat} 
-                            variant="outline" 
-                            className={cn(
-                              "text-[10px] px-1.5 py-0",
-                              cat === "Air" && TARGETING_CATEGORIES.air.color,
-                              cat === "Ground" && TARGETING_CATEGORIES.ground.color,
-                              cat === "Sea" && TARGETING_CATEGORIES.sea.color
-                            )}
-                          >
-                            ✓ {cat}
-                          </Badge>
-                        ))}
-                        {cannotTarget.map(cat => (
-                          <Badge 
-                            key={cat} 
-                            variant="outline" 
-                            className="text-[10px] px-1.5 py-0 bg-muted/50 text-muted-foreground line-through"
-                          >
-                            {cat}
-                          </Badge>
-                        ))}
-                      </div>
-                    );
-                  })()}
+                  {/* Detailed targeting breakdown */}
+                  <div className="pt-1 border-t space-y-1">
+                    <span className="text-muted-foreground font-medium">Targetable Unit Types:</span>
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                      {getTargetingDetails(info.targets).map(({ tag, label, canHit }) => (
+                        <div key={tag} className="flex items-center gap-1.5">
+                          {canHit ? (
+                            <Check className="h-3 w-3 text-green-500" />
+                          ) : (
+                            <X className="h-3 w-3 text-red-500" />
+                          )}
+                          <span className={cn(
+                            "text-[10px]",
+                            canHit ? "text-foreground" : "text-muted-foreground line-through"
+                          )}>
+                            {label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </TooltipContent>
             </Tooltip>
