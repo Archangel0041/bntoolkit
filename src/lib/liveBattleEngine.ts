@@ -630,6 +630,7 @@ export function executeAttack(
           existingEffect.remainingDuration = effect.duration;
           // Reset DoT tracking on refresh
           existingEffect.originalDotDamage = dotDamage;
+          existingEffect.originalDuration = effect.duration;
           existingEffect.dotDamage = dotDamage;
           existingEffect.currentTurn = 1;
         } else {
@@ -640,6 +641,7 @@ export function executeAttack(
             dotDamageType: effect.dot_damage_type || null,
             isStun,
             originalDotDamage: dotDamage,
+            originalDuration: effect.duration,
             currentTurn: 1,
           });
         }
@@ -925,9 +927,27 @@ export function processStatusEffects(
     
     for (const effect of unit.activeStatusEffects) {
       if (effect.dotDamage > 0 && effect.dotDamageType !== null) {
-        // Calculate current turn's damage using decay formula: damage = originalDamage / currentTurn
-        // Fire and Poison both use this decay pattern (Turn 1 = 1x, Turn 2 = 1/2, Turn 3 = 1/3, etc.)
-        let rawDotDamage = Math.floor(effect.originalDotDamage / effect.currentTurn);
+        // Calculate DoT decay multiplier based on damage type and duration
+        // Poison: multiplier = (duration - turn + 1) / duration
+        // Fire (duration != 6): multiplier = (duration - turn + 1) / (2 * duration)
+        // Fire (duration == 6): multiplier = 0.5 (constant)
+        let decayMultiplier: number;
+        const d = effect.originalDuration;
+        const t = effect.currentTurn;
+        
+        if (effect.dotDamageType === DamageType.Fire) {
+          // Fire DoT decay
+          if (d === 6) {
+            decayMultiplier = 0.5;
+          } else {
+            decayMultiplier = (d - t + 1) / (2 * d);
+          }
+        } else {
+          // Poison and other DoTs: linear decay
+          decayMultiplier = (d - t + 1) / d;
+        }
+        
+        let rawDotDamage = Math.floor(effect.originalDotDamage * decayMultiplier);
         
         // Apply environmental damage mods to DOT damage (e.g., Firemod increases Fire/Poison damage)
         if (environmentalDamageMods) {

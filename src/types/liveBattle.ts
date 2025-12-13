@@ -30,8 +30,9 @@ export interface ActiveStatusEffect {
   dotDamage: number;
   dotDamageType: number | null;
   isStun: boolean;
-  // For DoT decay calculation (Fire/Poison): damage on turn N = originalDotDamage / currentTurn
+  // For DoT decay calculation: stores original values to calculate multiplier each turn
   originalDotDamage: number;
+  originalDuration: number;
   currentTurn: number;
 }
 
