@@ -422,7 +422,12 @@ export function executeAttack(
   } else if (ability.isFixed && ability.targetArea) {
     // Fixed AOE pattern (like Heavy Chem Tank cone) - hits all positions in pattern
     const fixedPos = getFixedAttackPositions(attacker.gridId, ability.targetArea, !attacker.isEnemy);
-    affectedPositions = fixedPos.map(p => ({ gridId: p.gridId, damagePercent: p.damagePercent }));
+    console.log(`[executeAttack-fixed] Attacker gridId=${attacker.gridId}, isEnemy=${attacker.isEnemy}, isAttackerFriendly=${!attacker.isEnemy}`);
+    console.log(`[executeAttack-fixed] Raw positions:`, JSON.stringify(fixedPos.map(p => ({ gridId: p.gridId, damagePercent: p.damagePercent, isOnEnemyGrid: p.isOnEnemyGrid }))));
+    // Filter to only hit positions on the ENEMY grid (from attacker's perspective)
+    const enemyPositions = fixedPos.filter(p => p.isOnEnemyGrid);
+    console.log(`[executeAttack-fixed] Enemy grid positions only:`, JSON.stringify(enemyPositions.map(p => ({ gridId: p.gridId, damagePercent: p.damagePercent }))));
+    affectedPositions = enemyPositions.map(p => ({ gridId: p.gridId, damagePercent: p.damagePercent }));
   } else if (ability.targetArea) {
     // AOE with movable reticle - hits positions around selected target
     affectedPositions = getAffectedGridPositions(targetGridId, ability.targetArea, !attacker.isEnemy, ability.damageArea);
