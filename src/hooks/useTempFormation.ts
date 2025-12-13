@@ -7,10 +7,11 @@ import { checkDeployLimits, checkEncounterUnitLimit } from "@/lib/unitRestrictio
 
 interface UseTempFormationOptions {
   encounter?: Encounter | null;
+  initialUnits?: PartyUnit[];
 }
 
 export function useTempFormation(options: UseTempFormationOptions = {}) {
-  const [units, setUnits] = useState<PartyUnit[]>([]);
+  const [units, setUnits] = useState<PartyUnit[]>(options.initialUnits || []);
 
   const addUnit = useCallback((unitId: number, preferredGridId?: number): { success: boolean; error?: string } => {
     const unit = getUnitById(unitId);
