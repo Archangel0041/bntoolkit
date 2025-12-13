@@ -542,3 +542,260 @@ export function aiSelectAction(
   
   return { ability, targetGridId: target.gridId };
 }
+
+// Execute a random attack (for abilities with random: true in targetArea)
+// Each hit selects a weighted random tile from the entire grid
+export function executeRandomAttack(
+  attacker: LiveBattleUnit,
+  ability: AbilityInfo,
+  state: LiveBattleState,
+  environmentalDamageMods?: Record<string, number>
+): BattleAction[] {
+  const actions: BattleAction[] = [];
+  const allTargets = attacker.isEnemy ? state.friendlyUnits : state.enemyUnits;
+  const targetArea = ability.targetArea;
+  
+  if (!targetArea?.random || !targetArea.data || targetArea.data.length === 0) {
+    return actions;
+  }
+  
+  const abilityData = getAbilityById(ability.abilityId);
+  const abilityName = abilityData?.name || `Ability ${ability.abilityId}`;
+  
+  // All grid positions (0-13, excluding 10 which doesn't exist in 5x5x3 grid)
+  const allGridPositions = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13];
+  
+  // Total number of hits from targetArea data
+  const totalHits = targetArea.data.length;
+  
+  // Calculate total weight for weighted random selection
+  const totalWeight = targetArea.data.reduce((sum, pos) => sum + (pos.weight || 1), 0);
+  
+  // Track damage accumulated per grid position
+  const damageByPosition: Map<number, { 
+    armorDamage: number; 
+    hpDamage: number; 
+    hitCount: number;
+    crits: number;
+  }> = new Map();
+  
+  // Each hit is independently randomly targeted
+  for (let hitIndex = 0; hitIndex < totalHits; hitIndex++) {
+    // Get the damage percent and weight for this hit
+    const hitData = targetArea.data[hitIndex];
+    const damagePercent = hitData.damagePercent || 100;
+    
+    // Weighted random selection of grid position
+    let randomValue = Math.random() * totalWeight;
+    let selectedWeight = 0;
+    let selectedPositionIndex = 0;
+    
+    for (let i = 0; i < targetArea.data.length; i++) {
+      selectedWeight += targetArea.data[i].weight || 1;
+      if (randomValue <= selectedWeight) {
+        selectedPositionIndex = i;
+        break;
+      }
+    }
+    
+    // Pick a random grid position from the target grid
+    const targetGridId = allGridPositions[Math.floor(Math.random() * allGridPositions.length)];
+    
+    // Check if there's a unit at this position
+    const target = allTargets.find(u => u.gridId === targetGridId && !u.isDead);
+    
+    if (!target) {
+      // Miss - no unit at this tile (this is expected for random attacks)
+      continue;
+    }
+    
+    // Check if we can target this unit type
+    if (!canTargetUnit(target.unitId, ability.targets)) {
+      continue;
+    }
+    
+    const targetUnit = getUnitById(target.unitId);
+    const targetStats = targetUnit?.statsConfig?.stats?.[target.rank - 1];
+    const defense = targetStats?.defense || 0;
+    const dodgeChance = calculateDodgeChance(defense, ability.offense);
+    
+    // Calculate crit chance with bonuses
+    let critChance = ability.critPercent;
+    const targetTags = targetUnit?.identity?.tags || [];
+    for (const tag of targetTags) {
+      if (ability.critBonuses[tag]) {
+        critChance += ability.critBonuses[tag];
+      }
+    }
+    
+    // Roll dodge
+    if (rollDodge(dodgeChance)) {
+      actions.push({
+        type: "dodge",
+        attackerGridId: attacker.gridId,
+        targetGridId: target.gridId,
+        abilityId: ability.abilityId,
+        abilityName,
+        wasDodged: true,
+        message: `Attack dodged!`,
+      });
+      continue;
+    }
+    
+    // Roll base damage (1 hit per iteration)
+    const baseDamage = rollDamage(ability.minDamage, ability.maxDamage);
+    
+    // Apply damage percent modifier
+    const adjustedDamage = Math.floor(baseDamage * (damagePercent / 100));
+    
+    // Roll crit
+    const isCrit = rollCrit(critChance);
+    const critMultiplier = isCrit ? 2 : 1;
+    const finalBaseDamage = Math.floor(adjustedDamage * critMultiplier);
+    
+    // Calculate damage with armor
+    const result = calculateDamageWithArmor(
+      finalBaseDamage,
+      target.currentArmor,
+      targetStats?.armor_damage_mods,
+      targetStats?.damage_mods,
+      ability.damageType,
+      ability.armorPiercing,
+      environmentalDamageMods
+    );
+    
+    // Apply damage immediately
+    target.currentArmor = Math.max(0, target.currentArmor - result.armorDamage);
+    target.currentHp = Math.max(0, target.currentHp - result.hpDamage);
+    
+    // Track damage for this position
+    const existing = damageByPosition.get(targetGridId);
+    if (existing) {
+      existing.armorDamage += result.armorDamage;
+      existing.hpDamage += result.hpDamage;
+      existing.hitCount += 1;
+      if (isCrit) existing.crits += 1;
+    } else {
+      damageByPosition.set(targetGridId, {
+        armorDamage: result.armorDamage,
+        hpDamage: result.hpDamage,
+        hitCount: 1,
+        crits: isCrit ? 1 : 0,
+      });
+    }
+    
+    if (isCrit) {
+      actions.push({
+        type: "crit",
+        attackerGridId: attacker.gridId,
+        targetGridId: target.gridId,
+        abilityId: ability.abilityId,
+        wasCrit: true,
+        message: `Critical hit!`,
+      });
+    }
+    
+    // Check for death after each hit
+    if (target.currentHp <= 0 && !target.isDead) {
+      target.isDead = true;
+      actions.push({
+        type: "death",
+        targetGridId: target.gridId,
+        message: `Unit defeated!`,
+      });
+    }
+  }
+  
+  // Generate attack actions for each position that was hit
+  for (const [gridId, damage] of damageByPosition) {
+    const hitInfo = damage.hitCount > 1 ? ` (${damage.hitCount} hits)` : '';
+    actions.push({
+      type: "attack",
+      attackerGridId: attacker.gridId,
+      targetGridId: gridId,
+      abilityId: ability.abilityId,
+      abilityName,
+      damage: damage.armorDamage + damage.hpDamage,
+      armorDamage: damage.armorDamage,
+      hpDamage: damage.hpDamage,
+      message: `Dealt ${damage.hpDamage} HP damage${damage.armorDamage > 0 ? ` and ${damage.armorDamage} armor damage` : ''}${hitInfo}`,
+    });
+  }
+  
+  // Apply status effects to any hit targets
+  const immunities = new Map<number, number[]>();
+  for (const target of allTargets) {
+    const targetUnit = getUnitById(target.unitId);
+    immunities.set(target.unitId, targetUnit?.statsConfig?.status_effect_immunities || []);
+  }
+  
+  for (const [effectIdStr, chance] of Object.entries(ability.statusEffects)) {
+    const effectId = parseInt(effectIdStr);
+    const effect = getStatusEffect(effectId);
+    if (!effect) continue;
+    
+    for (const [gridId, damage] of damageByPosition) {
+      const target = allTargets.find(u => u.gridId === gridId && !u.isDead);
+      if (!target) continue;
+      
+      const targetImmunities = immunities.get(target.unitId) || [];
+      if (targetImmunities.includes(effect.family)) continue;
+      
+      // Apply status effect (chance per unit hit, not per individual hit)
+      if (rollStatusEffect(chance)) {
+        let dotDamage = 0;
+        if (effect.dot_ability_damage_mult || effect.dot_bonus_damage) {
+          const avgDamage = Math.floor((ability.minDamage + ability.maxDamage) / 2);
+          dotDamage = Math.floor(avgDamage * (effect.dot_ability_damage_mult || 0) + (effect.dot_bonus_damage || 0));
+        }
+        
+        const isStun = effect.stun_block_action === true;
+        
+        const existingEffect = target.activeStatusEffects.find(e => e.effectId === effectId);
+        if (existingEffect) {
+          existingEffect.remainingDuration = effect.duration;
+        } else {
+          target.activeStatusEffects.push({
+            effectId,
+            remainingDuration: effect.duration,
+            dotDamage,
+            dotDamageType: effect.dot_damage_type || null,
+            isStun,
+          });
+        }
+        
+        actions.push({
+          type: "status_applied",
+          targetGridId: target.gridId,
+          statusEffectId: effectId,
+          message: `Status effect applied for ${effect.duration} turns`,
+        });
+      }
+    }
+  }
+  
+  // Set cooldowns
+  if (ability.cooldown > 0) {
+    attacker.abilityCooldowns[ability.abilityId] = ability.cooldown;
+  }
+  if (ability.globalCooldown > 0) {
+    attacker.globalCooldown = ability.globalCooldown;
+  }
+  
+  // Consume ammo
+  if (ability.weaponMaxAmmo !== -1 && ability.ammoRequired > 0) {
+    const currentAmmo = attacker.weaponAmmo[ability.weaponName] ?? 0;
+    attacker.weaponAmmo[ability.weaponName] = Math.max(0, currentAmmo - ability.ammoRequired);
+    
+    if (attacker.weaponAmmo[ability.weaponName] === 0 && ability.weaponReloadTime > 0) {
+      attacker.weaponReloadCooldown[ability.weaponName] = ability.weaponReloadTime;
+    }
+  }
+  
+  return actions;
+}
+
+// Check if ability uses random targeting
+export function isRandomAttack(ability: AbilityInfo): boolean {
+  return ability.targetArea?.random === true;
+}
