@@ -34,6 +34,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   const { t } = useLanguage();
   const [battleState, setBattleState] = useState<LiveBattleState | null>(null);
   const [selectedUnitGridId, setSelectedUnitGridId] = useState<number | null>(null);
+  const [selectedUnitIsEnemy, setSelectedUnitIsEnemy] = useState<boolean>(false);
   const [selectedAbilityId, setSelectedAbilityId] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -51,16 +52,17 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     console.log("Battle initialized, friendly units:", state.friendlyUnits.map(u => ({ unitId: u.unitId, gridId: u.gridId })));
     setBattleState(state);
     setSelectedUnitGridId(null);
+    setSelectedUnitIsEnemy(false);
     setSelectedAbilityId(null);
     setIsProcessing(false);
   }, [friendlyParty, waves, startingWave]);
 
-  // Get currently selected unit
+  // Get currently selected unit - use both gridId AND isEnemy to find the right unit
   const selectedUnit = useMemo(() => {
     if (!battleState || selectedUnitGridId === null) return null;
-    const allUnits = [...battleState.friendlyUnits, ...battleState.enemyUnits];
-    return allUnits.find(u => u.gridId === selectedUnitGridId && !u.isDead) || null;
-  }, [battleState, selectedUnitGridId]);
+    const units = selectedUnitIsEnemy ? battleState.enemyUnits : battleState.friendlyUnits;
+    return units.find(u => u.gridId === selectedUnitGridId && !u.isDead) || null;
+  }, [battleState, selectedUnitGridId, selectedUnitIsEnemy]);
 
   // Get available abilities for selected unit
   const availableAbilities = useMemo<AbilityInfo[]>(() => {
@@ -437,9 +439,18 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     setIsProcessing(false);
   }, [battleState, selectedUnit, selectedAbility, validTargets, isProcessing, environmentalDamageMods, t]);
 
+  // Helper to select a unit by grid and enemy flag
+  const selectUnit = useCallback((gridId: number, isEnemy: boolean) => {
+    setSelectedUnitGridId(gridId);
+    setSelectedUnitIsEnemy(isEnemy);
+    setSelectedAbilityId(null);
+  }, []);
 
-  // Execute one enemy's turn - 1 enemy, 1 ability, 1 action per call
-  // Uses battleState.currentEnemyIndex to track which enemy is acting
+  // Execute enemy turn - NEW SIMPLER APPROACH:
+  // 1. Gather ALL available abilities from ALL alive enemies
+  // 2. Pick ONE random ability from the pool
+  // 3. Execute it
+  // 4. Return control to player
   const executeEnemyTurn = useCallback(() => {
     if (!battleState || battleState.isPlayerTurn || battleState.isBattleOver || isProcessing) return;
 
@@ -452,37 +463,85 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       }
 
       const allActions: BattleAction[] = [];
-      const enemyIdx = prev.currentEnemyIndex;
 
-      // Process status effects only at the start of enemy phase (first enemy of the turn)
-      if (enemyIdx === 0) {
-        const statusActions = processStatusEffects([...prev.friendlyUnits, ...prev.enemyUnits]);
-        allActions.push(...statusActions);
+      // Process status effects at start of enemy phase
+      const statusActions = processStatusEffects([...prev.friendlyUnits, ...prev.enemyUnits]);
+      allActions.push(...statusActions);
 
-        // Check for deaths from status effects
-        const endCheckAfterStatus = checkBattleEnd(prev);
-        if (endCheckAfterStatus.isOver) {
-          const turn: BattleTurn = {
-            turnNumber: prev.currentTurn,
-            isPlayerTurn: false,
-            actions: allActions,
-          };
-          setTimeout(() => setIsProcessing(false), 0);
-          return {
-            ...prev,
-            currentEnemyIndex: 0,
-            battleLog: [...prev.battleLog, turn],
-            isBattleOver: true,
-            isPlayerVictory: endCheckAfterStatus.playerWon,
-          };
+      // Check for deaths from status effects
+      const endCheckAfterStatus = checkBattleEnd(prev);
+      if (endCheckAfterStatus.isOver) {
+        const turn: BattleTurn = {
+          turnNumber: prev.currentTurn,
+          isPlayerTurn: false,
+          actions: allActions,
+        };
+        setTimeout(() => setIsProcessing(false), 0);
+        return {
+          ...prev,
+          currentEnemyIndex: 0,
+          battleLog: [...prev.battleLog, turn],
+          isBattleOver: true,
+          isPlayerVictory: endCheckAfterStatus.playerWon,
+        };
+      }
+
+      // Get all alive, non-stunned enemies
+      const aliveEnemies = prev.enemyUnits.filter(e => !e.isDead);
+      const activeEnemies = aliveEnemies.filter(e => !e.activeStatusEffects.some(s => s.isStun));
+      
+      // Log stunned enemies
+      for (const enemy of aliveEnemies) {
+        if (enemy.activeStatusEffects.some(s => s.isStun)) {
+          const enemyUnit = getUnitById(enemy.unitId);
+          const enemyName = enemyUnit ? t(enemyUnit.identity.name) : `Enemy ${enemy.unitId}`;
+          allActions.push({
+            type: "skip",
+            attackerGridId: enemy.gridId,
+            attackerName: enemyName,
+            message: `${enemyName} is stunned and cannot act`,
+          });
         }
       }
 
-      // Get alive enemies
-      const aliveEnemies = prev.enemyUnits.filter(e => !e.isDead);
+      // Build a pool of all available abilities from all active enemies
+      // Each entry: { enemy, ability, validTargets }
+      type AbilityPoolEntry = {
+        enemy: LiveBattleUnit;
+        ability: AbilityInfo;
+        validTargets: LiveBattleUnit[];
+      };
       
-      if (aliveEnemies.length === 0 || enemyIdx >= aliveEnemies.length) {
-        // All enemies have acted or none alive - reduce cooldowns and switch to player turn
+      const abilityPool: AbilityPoolEntry[] = [];
+      
+      for (const enemy of activeEnemies) {
+        // Get abilities that are not on cooldown and have ammo
+        const abilities = getAvailableAbilities(enemy, prev.enemyUnits, prev.friendlyUnits);
+        
+        for (const ability of abilities) {
+          const targets = getValidTargets(enemy, ability, prev.enemyUnits, prev.friendlyUnits);
+          if (targets.length > 0) {
+            abilityPool.push({ enemy, ability, validTargets: targets });
+          }
+        }
+      }
+
+      console.log(`[executeEnemyTurn] Built ability pool with ${abilityPool.length} entries from ${activeEnemies.length} active enemies`);
+
+      // If no abilities available, end enemy turn
+      if (abilityPool.length === 0) {
+        // Log that no enemies could attack
+        for (const enemy of activeEnemies) {
+          const enemyUnit = getUnitById(enemy.unitId);
+          const enemyName = enemyUnit ? t(enemyUnit.identity.name) : `Enemy ${enemy.unitId}`;
+          allActions.push({
+            type: "skip",
+            attackerGridId: enemy.gridId,
+            attackerName: enemyName,
+            message: `${enemyName} has no valid targets`,
+          });
+        }
+
         reduceCooldowns(prev.enemyUnits);
         
         const turn: BattleTurn = {
@@ -505,91 +564,29 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         };
       }
 
-      // Get the current enemy to act
-      const enemy = aliveEnemies[enemyIdx];
+      // Pick ONE random ability from the pool
+      const selected = abilityPool[Math.floor(Math.random() * abilityPool.length)];
+      const { enemy, ability, validTargets: targets } = selected;
+      
+      // Pick random target
+      const target = targets[Math.floor(Math.random() * targets.length)];
+      
       const enemyUnit = getUnitById(enemy.unitId);
       const enemyName = enemyUnit ? t(enemyUnit.identity.name) : `Enemy ${enemy.unitId}`;
+      const abilityData = getAbilityById(ability.abilityId);
+      const localizedAbilityName = abilityData ? t(abilityData.name) : `Ability ${ability.abilityId}`;
       
-      console.log(`[executeEnemyTurn] Enemy ${enemyIdx}/${aliveEnemies.length}: ${enemyName} (grid ${enemy.gridId})`);
+      console.log(`[executeEnemyTurn] ${enemyName} using ${localizedAbilityName} on grid ${target.gridId}`);
       
-      // Check if stunned
-      if (enemy.activeStatusEffects.some(e => e.isStun)) {
-        allActions.push({
-          type: "skip",
-          attackerGridId: enemy.gridId,
-          attackerName: enemyName,
-          message: `${enemyName} is stunned and cannot act`,
-        });
-        
-        const turn: BattleTurn = {
-          turnNumber: prev.currentTurn,
-          isPlayerTurn: false,
-          actions: allActions,
-        };
-        
-        setTimeout(() => setIsProcessing(false), 0);
-        
-        return {
-          ...prev,
-          currentEnemyIndex: enemyIdx + 1,
-          battleLog: [...prev.battleLog, turn],
-        };
-      }
-      
-      // Get available abilities and pick one randomly
-      const action = aiSelectAction(enemy, prev);
-      
-      if (!action) {
-        // No valid action, this enemy passes
-        console.log(`[executeEnemyTurn] ${enemyName} has no valid action`);
-        allActions.push({
-          type: "skip",
-          attackerGridId: enemy.gridId,
-          attackerName: enemyName,
-          message: `${enemyName} has no valid targets`,
-        });
-        
-        const turn: BattleTurn = {
-          turnNumber: prev.currentTurn,
-          isPlayerTurn: false,
-          actions: allActions,
-        };
-        
-        setTimeout(() => setIsProcessing(false), 0);
-        
-        return {
-          ...prev,
-          currentEnemyIndex: enemyIdx + 1,
-          battleLog: [...prev.battleLog, turn],
-        };
-      }
-      
-      // Get localized ability name
-      const abilityData = getAbilityById(action.ability.abilityId);
-      const localizedAbilityName = abilityData ? t(abilityData.name) : `Ability ${action.ability.abilityId}`;
-      
-      console.log(`[executeEnemyTurn] ${enemyName} using ${localizedAbilityName} on grid ${action.targetGridId}`);
-      
-      // Execute the attack - this modifies units in place
+      // Execute the attack
       let attackActions: BattleAction[];
-      if (isRandomAttack(action.ability)) {
-        attackActions = executeRandomAttack(
-          enemy,
-          action.ability,
-          prev,
-          environmentalDamageMods
-        );
+      if (isRandomAttack(ability)) {
+        attackActions = executeRandomAttack(enemy, ability, prev, environmentalDamageMods);
       } else {
-        attackActions = executeAttack(
-          enemy,
-          action.ability,
-          action.targetGridId,
-          prev,
-          environmentalDamageMods
-        );
+        attackActions = executeAttack(enemy, ability, target.gridId, prev, environmentalDamageMods);
       }
       
-      // Add attacker name to all attack actions and localize ability name
+      // Add attacker name and localized ability name
       attackActions = attackActions.map(a => ({
         ...a,
         attackerName: enemyName,
@@ -597,6 +594,9 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       }));
       
       allActions.push(...attackActions);
+
+      // Reduce cooldowns for all enemies after their phase
+      reduceCooldowns(prev.enemyUnits);
 
       // Check if battle ended
       const endCheck = checkBattleEnd(prev);
@@ -611,7 +611,9 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       
       return {
         ...prev,
-        currentEnemyIndex: enemyIdx + 1,
+        currentTurn: prev.currentTurn + 1,
+        isPlayerTurn: true,
+        currentEnemyIndex: 0,
         battleLog: [...prev.battleLog, turn],
         isBattleOver: endCheck.isOver,
         isPlayerVictory: endCheck.playerWon,
@@ -691,9 +693,10 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     battleState,
     selectedUnit,
     selectedUnitGridId,
-    setSelectedUnitGridId,
-    selectedAbilityId,
+    selectedUnitIsEnemy,
+    selectUnit,
     setSelectedAbilityId,
+    selectedAbilityId,
     availableAbilities,
     selectedAbility,
     validTargets,
