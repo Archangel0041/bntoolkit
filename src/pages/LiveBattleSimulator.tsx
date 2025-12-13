@@ -91,21 +91,15 @@ const LiveBattleSimulator = () => {
     }
   }, [battleState?.enemyUnits, checkWaveAdvance, advanceWave, isProcessing]);
 
-  // Track the current turn number to prevent duplicate enemy turn execution
-  const lastEnemyTurnProcessedRef = useRef<number>(-1);
-
   // Auto-execute enemy turn when it's their turn
   useEffect(() => {
+    console.log('[LiveBattle useEffect] isPlayerTurn:', battleState?.isPlayerTurn, 'isProcessing:', isProcessing, 'isBattleOver:', battleState?.isBattleOver);
+    
     if (battleState && !battleState.isPlayerTurn && !battleState.isBattleOver && !isProcessing) {
-      // Only execute if we haven't already processed this turn
-      if (lastEnemyTurnProcessedRef.current >= battleState.currentTurn) {
-        return;
-      }
-      
-      // Mark this turn as being processed
-      lastEnemyTurnProcessedRef.current = battleState.currentTurn;
+      console.log('[LiveBattle useEffect] Scheduling enemy turn');
       
       const timer = setTimeout(() => {
+        console.log('[LiveBattle useEffect] Executing enemy turn');
         executeEnemyTurn();
       }, 1000);
       
@@ -113,7 +107,7 @@ const LiveBattleSimulator = () => {
         clearTimeout(timer);
       };
     }
-  }, [battleState?.isPlayerTurn, battleState?.isBattleOver, battleState?.currentTurn, isProcessing, executeEnemyTurn]);
+  }, [battleState?.isPlayerTurn, battleState?.isBattleOver, isProcessing, executeEnemyTurn]);
 
   const handleLoadParty = () => {
     if (selectedParty) {
