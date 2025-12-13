@@ -206,43 +206,44 @@ export function getAvailableAbilities(
     // Check if there's at least one valid target
     const targets = unit.isEnemy ? allFriendlies : allEnemies;
     const aliveTargets = targets.filter(t => !t.isDead);
-    console.log(`[getAvailableAbilities] Ability ${ability.abilityId}: ${aliveTargets.length} alive targets to check`);
     
+    // For Contact line of fire, only target units in the closest row
+    if (ability.lineOfFire === 0) { // Contact
+      let minRow = Infinity;
+      for (const target of aliveTargets) {
+        const range = calculateRange(unit.gridId, target.gridId, unit.isEnemy);
+        if (range >= ability.minRange && range <= ability.maxRange) {
+          if (canTargetUnit(target.unitId, ability.targets)) {
+            const coords = GRID_ID_TO_COORDS[target.gridId];
+            if (coords && coords.y < minRow) {
+              minRow = coords.y;
+            }
+          }
+        }
+      }
+      if (minRow === Infinity) {
+        console.log(`[getAvailableAbilities] Ability ${ability.abilityId} (Contact) has no valid targets`);
+        return false;
+      }
+      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} (Contact) has targets in row ${minRow}`);
+      return true;
+    }
+    
+    // For other line of fire types, check blocking
     const blockingUnits = getBlockingUnits(
       aliveTargets.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
-      true // Always use EncounterUnit format (grid_id) since we're mapping with grid_id
+      true
     );
-
-    // For single target abilities, check if any target is valid
+    
     for (const target of aliveTargets) {
-      // Check tag targeting
-      if (!canTargetUnit(target.unitId, ability.targets)) {
-        console.log(`[getAvailableAbilities] Target ${target.unitId} not valid for ability tags`);
-        continue;
-      }
-      
-      // Check range
+      if (!canTargetUnit(target.unitId, ability.targets)) continue;
       const range = calculateRange(unit.gridId, target.gridId, unit.isEnemy);
-      if (range < ability.minRange || range > ability.maxRange) {
-        console.log(`[getAvailableAbilities] Target ${target.unitId} out of range (range=${range}, min=${ability.minRange}, max=${ability.maxRange})`);
-        continue;
+      if (range < ability.minRange || range > ability.maxRange) continue;
+      const blockCheck = checkLineOfFire(unit.gridId, target.gridId, ability.lineOfFire, unit.isEnemy, blockingUnits);
+      if (!blockCheck.isBlocked) {
+        console.log(`[getAvailableAbilities] Ability ${ability.abilityId} has valid target ${target.unitId}`);
+        return true;
       }
-      
-      // Check line of fire
-      const blockCheck = checkLineOfFire(
-        unit.gridId,
-        target.gridId,
-        ability.lineOfFire,
-        unit.isEnemy,
-        blockingUnits
-      );
-      if (blockCheck.isBlocked) {
-        console.log(`[getAvailableAbilities] Target ${target.unitId} is blocked`);
-        continue;
-      }
-      
-      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} has valid target ${target.unitId}`);
-      return true; // At least one valid target
     }
     
     console.log(`[getAvailableAbilities] Ability ${ability.abilityId} has no valid targets`);
@@ -270,6 +271,35 @@ export function getValidTargets(
     true // Always use EncounterUnit format (grid_id) since we're mapping with grid_id
   );
 
+  // For Contact line of fire, only target units in the closest row with valid targets
+  if (ability.lineOfFire === 0) { // Contact
+    // Find the minimum row (y) that has valid targets in range
+    let minRow = Infinity;
+    for (const target of aliveTargets) {
+      const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy);
+      if (range >= ability.minRange && range <= ability.maxRange) {
+        if (canTargetUnit(target.unitId, ability.targets)) {
+          const coords = GRID_ID_TO_COORDS[target.gridId];
+          if (coords && coords.y < minRow) {
+            minRow = coords.y;
+          }
+        }
+      }
+    }
+    
+    // Only return targets in that minimum row
+    if (minRow !== Infinity) {
+      return aliveTargets.filter(target => {
+        const coords = GRID_ID_TO_COORDS[target.gridId];
+        if (!coords || coords.y !== minRow) return false;
+        if (!canTargetUnit(target.unitId, ability.targets)) return false;
+        const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy);
+        return range >= ability.minRange && range <= ability.maxRange;
+      });
+    }
+    return [];
+  }
+
   return aliveTargets.filter(target => {
     // Check tag targeting
     if (!canTargetUnit(target.unitId, ability.targets)) return false;
@@ -286,6 +316,11 @@ export function getValidTargets(
       attacker.isEnemy,
       blockingUnits
     );
+    
+    // Debug logging for blocking
+    console.log(`[getValidTargets] Attacker grid ${attacker.gridId} -> Target grid ${target.gridId}, ` +
+      `lineOfFire: ${ability.lineOfFire}, blocked: ${blockCheck.isBlocked}, ` +
+      `reason: ${blockCheck.reason || 'none'}, blockedBy: ${blockCheck.blockedBy?.unitId || 'none'}`);
     
     return !blockCheck.isBlocked;
   });

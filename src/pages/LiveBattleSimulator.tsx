@@ -55,6 +55,7 @@ const LiveBattleSimulator = () => {
     selectUnit,
     selectedAbilityId,
     setSelectedAbilityId,
+    allAbilities,
     availableAbilities,
     selectedAbility,
     validTargets,
@@ -370,7 +371,7 @@ const LiveBattleSimulator = () => {
                       </div>
                       {!selectedUnit.isEnemy && battleState.isPlayerTurn && (
                         <LiveAbilitySelector
-                          abilities={availableAbilities}
+                          abilities={allAbilities}
                           selectedAbilityId={selectedAbilityId}
                           onSelectAbility={setSelectedAbilityId}
                           cooldowns={selectedUnit.abilityCooldowns}

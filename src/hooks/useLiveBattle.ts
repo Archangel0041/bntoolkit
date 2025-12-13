@@ -65,7 +65,13 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     return units.find(u => u.gridId === selectedUnitGridId && !u.isDead) || null;
   }, [battleState, selectedUnitGridId, selectedUnitIsEnemy]);
 
-  // Get available abilities for selected unit
+  // Get ALL abilities for selected unit (regardless of cooldown/ammo)
+  const allAbilities = useMemo<AbilityInfo[]>(() => {
+    if (!selectedUnit) return [];
+    return getUnitAbilities(selectedUnit.unitId, selectedUnit.rank);
+  }, [selectedUnit]);
+
+  // Get available abilities for selected unit (respecting cooldowns/ammo)
   const availableAbilities = useMemo<AbilityInfo[]>(() => {
     if (!battleState || !selectedUnit) return [];
     return getAvailableAbilities(
@@ -75,11 +81,11 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     );
   }, [battleState, selectedUnit]);
 
-  // Get selected ability
+  // Get selected ability (from all abilities, not just available)
   const selectedAbility = useMemo(() => {
     if (!selectedAbilityId) return null;
-    return availableAbilities.find(a => a.abilityId === selectedAbilityId) || null;
-  }, [selectedAbilityId, availableAbilities]);
+    return allAbilities.find(a => a.abilityId === selectedAbilityId) || null;
+  }, [selectedAbilityId, allAbilities]);
 
   // State for reticle position (for AOE abilities)
   const [enemyReticleGridId, setEnemyReticleGridId] = useState<number>(7);
@@ -746,6 +752,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     selectUnit,
     setSelectedAbilityId,
     selectedAbilityId,
+    allAbilities,
     availableAbilities,
     selectedAbility,
     validTargets,
