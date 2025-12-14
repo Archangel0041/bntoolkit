@@ -70,47 +70,52 @@ export function calculateDamageWithArmor(
   statusEffectArmorDamageMods?: Record<string, number>,
   bypassArmorDueToStun?: boolean
 ): DamageResult {
-  // Apply environmental damage modifier first (affects all damage)
+  // Get environmental damage modifier - this modifies resistances, not damage directly
   const envMod = environmentalDamageMods ? getEnvironmentalDamageModifier(environmentalDamageMods, damageType) : 1;
-  
-  // Apply status effect damage modifier (from freeze, shatter, etc.)
+
+  // Apply status effect damage modifier (from freeze, shatter, etc.) - this is a direct multiplier
   const statusMod = statusEffectDamageMods ? getEnvironmentalDamageModifier(statusEffectDamageMods, damageType) : 1;
-  
-  const combinedMod = envMod * statusMod;
-  const modifiedDamage = Math.floor(rawDamage * combinedMod);
-  
+
+  // Only apply status effect modifiers as direct multipliers, not environmental mods
+  const modifiedDamage = Math.floor(rawDamage * statusMod);
+
   // If bypassing armor due to stun (Active armor units), all damage goes to HP
   if (bypassArmorDueToStun && armorHp > 0) {
-    const hpMod = getDamageModifier(hpDamageMods, damageType);
+    const baseHpMod = getDamageModifier(hpDamageMods, damageType);
+    // Environmental modifiers affect resistances
+    const hpMod = baseHpMod * envMod;
     const hpDamage = Math.floor(modifiedDamage * hpMod);
     return {
       rawDamage: modifiedDamage,
       armorDamage: 0,
       hpDamage,
       armorRemaining: armorHp, // Armor is bypassed, not damaged
-      effectiveMultiplier: hpMod * combinedMod,
+      effectiveMultiplier: hpMod * statusMod,
     };
   }
-  
+
   // If no armor, damage goes straight to HP
   if (armorHp <= 0) {
-    const hpMod = getDamageModifier(hpDamageMods, damageType);
+    const baseHpMod = getDamageModifier(hpDamageMods, damageType);
+    // Environmental modifiers affect resistances
+    const hpMod = baseHpMod * envMod;
     const hpDamage = Math.floor(modifiedDamage * hpMod);
     return {
       rawDamage: modifiedDamage,
       armorDamage: 0,
       hpDamage,
       armorRemaining: 0,
-      effectiveMultiplier: hpMod * combinedMod,
+      effectiveMultiplier: hpMod * statusMod,
     };
   }
 
   // Apply status effect armor damage modifier (from freeze, shatter, etc.)
   const statusArmorMod = statusEffectArmorDamageMods ? getEnvironmentalDamageModifier(statusEffectArmorDamageMods, damageType) : 1;
 
-  // Calculate armor effectiveness - combine base armor mods with status effect armor mods
+  // Calculate armor effectiveness - combine base armor mods with status effect armor mods and environmental mods
   const baseArmorMod = getDamageModifier(armorDamageMods, damageType);
-  const armorMod = baseArmorMod * statusArmorMod;
+  // Environmental modifiers affect armor resistances too
+  const armorMod = baseArmorMod * statusArmorMod * envMod;
   
   // Armor piercing: percentage of damage that bypasses armor entirely
   const piercingDamage = Math.floor(modifiedDamage * armorPiercingPercent);
@@ -137,15 +142,17 @@ export function calculateDamageWithArmor(
   }
   
   // Apply HP damage modifier to the HP portion
-  const hpMod = getDamageModifier(hpDamageMods, damageType);
+  const baseHpMod = getDamageModifier(hpDamageMods, damageType);
+  // Environmental modifiers affect resistances
+  const hpMod = baseHpMod * envMod;
   const hpDamage = Math.floor(damageToHp * hpMod);
-  
+
   return {
     rawDamage: modifiedDamage,
     armorDamage,
     hpDamage,
     armorRemaining: Math.max(0, armorRemaining),
-    effectiveMultiplier: hpMod * combinedMod,
+    effectiveMultiplier: hpMod * statusMod,
   };
 }
 

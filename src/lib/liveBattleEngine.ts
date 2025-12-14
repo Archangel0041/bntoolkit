@@ -665,22 +665,17 @@ export function executeAttack(
       const adjustedChance = Math.floor(chance * (pos.damagePercent / 100));
       
       if (rollStatusEffect(adjustedChance)) {
-        // Calculate base DoT damage: (actualDamageDealt + dot_bonus_damage) * envMod * dot_ability_damage_mult
-        // Resistance is applied when DoT actually ticks based on target's armor state
+        // Calculate base DoT damage: (actualDamageDealt + dot_bonus_damage) * dot_ability_damage_mult
+        // Environmental modifiers will be applied via resistances when DoT ticks, not to base damage
         const actualDamageDealt = totalHpDamage + totalArmorDamage;
         const dotBonusDamage = effect.dot_bonus_damage ?? 0;
         const dotAbilityDamageMult = effect.dot_ability_damage_mult ?? 1;
-        
+
         let dotDamage = actualDamageDealt + dotBonusDamage;
-        
-        // Apply environmental damage mods for the DoT's damage type
-        if (environmentalDamageMods && effect.dot_damage_type !== undefined) {
-          const envMod = environmentalDamageMods[effect.dot_damage_type.toString()];
-          if (envMod !== undefined) {
-            dotDamage = Math.floor(dotDamage * envMod);
-          }
-        }
-        
+
+        // Environmental modifiers are NO LONGER applied to base DoT damage
+        // They will be applied via resistances when the DoT actually ticks
+
         // Apply ability damage multiplier
         dotDamage = Math.floor(dotDamage * dotAbilityDamageMult);
         
@@ -996,26 +991,25 @@ export function processStatusEffects(
         // If dot_diminishing is true: use formula (d-t+1)/d
         // Otherwise: no decay (multiplier = 1)
         let decayMultiplier = 1;
-        
+
         if (effect.dotDiminishing) {
           const d = effect.originalDuration;
           const t = effect.currentTurn;
           decayMultiplier = (d - t + 1) / d;
         }
-        
-        // Environmental mods are already baked into originalDotDamage when the effect was applied
-        // Only apply the decay multiplier here, no environmental mods
+
+        // Apply decay multiplier to base DoT damage
         const rawDotDamage = Math.floor(effect.originalDotDamage * decayMultiplier);
-        
+
         // Get status effect damage mods from other active effects (like freeze/shatter)
         const statusDamageMods = getStatusEffectDamageMods(unit);
         const statusArmorDamageMods = getStatusEffectArmorDamageMods(unit);
-        
+
         // Check if armor should be bypassed (active armor units when stunned)
         const bypassArmor = hasArmorBypassingStun(unit, unitStats?.armor_def_style === 1 ? 'active' : 'passive');
-        
-        // Calculate damage with armor and resistances, but NO environmental mods
-        // Environmental mods were already applied when calculating the initial DoT base damage
+
+        // Calculate damage with armor and resistances
+        // Environmental modifiers are applied via resistances (not to base damage)
         const damageResult = calculateDamageWithArmor(
           rawDotDamage,
           unit.currentArmor,
@@ -1023,7 +1017,7 @@ export function processStatusEffects(
           unitStats?.damage_mods,
           effect.dotDamageType,
           0, // DOT has no armor piercing
-          undefined, // No environmental mods - already baked into originalDotDamage
+          environmentalDamageMods, // Environmental mods affect resistances when DOT ticks
           statusDamageMods,
           statusArmorDamageMods,
           bypassArmor
