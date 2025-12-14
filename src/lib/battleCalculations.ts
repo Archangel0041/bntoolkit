@@ -404,7 +404,7 @@ function getUnitStatsAtRank(unitId: number, rank: number): UnitStats | undefined
 // abilityCrit: The ability's base critical_hit_percent
 // critBonuses: Tag-based critical bonuses from the ability
 // targetUnitId: The target unit to check tags against
-function calculateCritChance(
+export function calculateCritChance(
   unitBaseCrit: number,
   abilityCrit: number,
   critBonuses: Record<number, number>,

@@ -6,6 +6,7 @@ import { UnitImage } from "@/components/units/UnitImage";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skull, Zap, Crosshair, Shuffle, ShieldOff } from "lucide-react";
 import { getStatusEffectDisplayName, getStatusEffectColor, getEffectIconUrl } from "@/lib/statusEffects";
+import { DamageBreakdown } from "@/components/battle/DamageBreakdown";
 import type { LiveBattleUnit } from "@/types/liveBattle";
 import type { DamagePreview, TargetArea, DamageAreaPosition, StatusEffectPreview } from "@/types/battleSimulator";
 import { ENEMY_GRID_LAYOUT, FRIENDLY_GRID_LAYOUT, GRID_ID_TO_COORDS, COORDS_TO_GRID_ID, getAffectedGridPositions } from "@/types/battleSimulator";
@@ -619,7 +620,7 @@ export function LiveBattleGrid({
                         return (
                           <div key={i} className="flex items-center gap-2 text-xs">
                             {iconUrl && <img src={iconUrl} alt="" className="w-3 h-3" />}
-                            <span 
+                            <span
                               className="font-medium"
                               style={{ color: effect.color }}
                             >
@@ -638,6 +639,15 @@ export function LiveBattleGrid({
                         );
                       })}
                     </div>
+                  )}
+
+                  {/* Damage Breakdown - Show for max damage with breakdown */}
+                  {damagePreview.maxDamage.breakdown && (
+                    <DamageBreakdown
+                      damageResult={damagePreview.maxDamage}
+                      damageType={damagePreview.damageType}
+                      label="Max Damage Breakdown"
+                    />
                   )}
                 </div>
               )}

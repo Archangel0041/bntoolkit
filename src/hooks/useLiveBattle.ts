@@ -14,7 +14,7 @@ import {
   collapseGrid,
   calculateTurnSummary,
 } from "@/lib/liveBattleEngine";
-import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTargetUnit } from "@/lib/battleCalculations";
+import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTargetUnit, calculateCritChance } from "@/lib/battleCalculations";
 import { getBlockingUnits, checkLineOfFire, calculateRange, findFrontmostUnblockedPosition, getTargetingInfo } from "@/lib/battleTargeting";
 import { getStatusEffect, getStatusEffectDisplayName, getStatusEffectColor, getEffectDisplayNameTranslated } from "@/lib/statusEffects";
 import { getUnitById } from "@/lib/units";
@@ -262,15 +262,14 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         const canTarget = canTargetUnit(target.unitId, selectedAbility.targets);
         const defense = targetStats?.defense || 0;
         const dodgeChance = calculateDodgeChance(defense, selectedAbility.offense);
-        
-        // Calculate crit chance with bonuses
-        let critChance = selectedAbility.critPercent;
-        const targetTags = targetUnit?.identity?.tags || [];
-        for (const tag of targetTags) {
-          if (selectedAbility.critBonuses[tag]) {
-            critChance += selectedAbility.critBonuses[tag];
-          }
-        }
+
+        // Calculate crit chance with bonuses (includes unit base crit + ability crit + tag bonuses with hierarchy)
+        const critChance = calculateCritChance(
+          selectedAbility.unitBaseCrit,
+          selectedAbility.critPercent,
+          selectedAbility.critBonuses,
+          target.unitId
+        );
         
         // Check range (not applicable for random attacks)
         const range = calculateRange(selectedUnit.gridId, target.gridId, false);
@@ -298,9 +297,13 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           targetStats?.damage_mods,
           selectedAbility.damageType,
           selectedAbility.armorPiercing,
-          environmentalDamageMods
+          environmentalDamageMods,
+          undefined,
+          undefined,
+          undefined,
+          true // Include breakdown for damage previews
         );
-        
+
         const maxResult = calculateDamageWithArmor(
           adjustedMaxDamage,
           target.currentArmor,
@@ -308,7 +311,11 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           targetStats?.damage_mods,
           selectedAbility.damageType,
           selectedAbility.armorPiercing,
-          environmentalDamageMods
+          environmentalDamageMods,
+          undefined,
+          undefined,
+          undefined,
+          true // Include breakdown for damage previews
         );
         
         // Calculate effective shots for this tile
