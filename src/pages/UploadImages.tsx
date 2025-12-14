@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,10 +21,12 @@ import {
   listEncounterIcons,
   listMissionIcons
 } from "@/lib/resourceImages";
-import { Upload, CheckCircle, XCircle, FolderOpen, Users, Swords, Shield, Zap, Coins, Gift, Image, Map, Target, FileJson } from "lucide-react";
+import { Upload, CheckCircle, XCircle, FolderOpen, Users, Swords, Shield, Zap, Coins, Gift, Image, Map, Target, FileJson, Lock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/contexts/AuthContext";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 type UploadType = "units" | "abilities" | "damage" | "status" | "resources" | "eventRewards" | "menuBackgrounds" | "encounters" | "missions";
 
@@ -44,6 +47,8 @@ const UPLOAD_CONFIG: Record<UploadType, {
 };
 
 export default function UploadImages() {
+  const { user, canUpload, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [isUploading, setIsUploading] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, fileName: "" });
   const [results, setResults] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
@@ -55,6 +60,52 @@ export default function UploadImages() {
   const [activeTab, setActiveTab] = useState<UploadType>("units");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  // Show access denied for users without upload permission
+  if (!authLoading && user && !canUpload) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-8">
+          <Alert variant="destructive">
+            <Lock className="h-4 w-4" />
+            <AlertTitle>Access Denied</AlertTitle>
+            <AlertDescription>
+              You don't have upload permissions. Please contact an admin to request access.
+            </AlertDescription>
+          </Alert>
+          <div className="mt-4">
+            <Button variant="outline" onClick={() => navigate('/')}>
+              Back to Home
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Redirect to auth if not logged in
+  if (!authLoading && !user) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-8">
+          <Alert>
+            <Lock className="h-4 w-4" />
+            <AlertTitle>Authentication Required</AlertTitle>
+            <AlertDescription>
+              Please sign in with an account that has upload permissions.
+            </AlertDescription>
+          </Alert>
+          <div className="mt-4">
+            <Button onClick={() => navigate('/auth')}>
+              Sign In
+            </Button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
