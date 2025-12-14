@@ -1,7 +1,7 @@
 import { getUnitById } from "@/lib/units";
 import { UnitTag, DamageType } from "@/data/gameEnums";
 import { getAbilityById } from "@/lib/abilities";
-import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTargetUnit, getDamageModifier } from "@/lib/battleCalculations";
+import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTargetUnit, getDamageModifier, calculateCritChance } from "@/lib/battleCalculations";
 import { getBlockingUnits, checkLineOfFire, calculateRange } from "@/lib/battleTargeting";
 import { getStatusEffect, getEffectDisplayNameTranslated } from "@/lib/statusEffects";
 import { unitMatchesTargets } from "@/lib/tagHierarchy";
@@ -541,14 +541,13 @@ export function executeAttack(
     const stunDodgePenalty = isStunned ? 20 : 0; // Stunned units have reduced dodge
     const effectiveDodgeChance = Math.max(0, calculateDodgeChance(defense, ability.offense) - stunDodgePenalty);
     
-    // Calculate crit chance with bonuses
-    let critChance = ability.critPercent;
-    const targetTags = targetUnit?.identity?.tags || [];
-    for (const tag of targetTags) {
-      if (ability.critBonuses[tag]) {
-        critChance += ability.critBonuses[tag];
-      }
-    }
+    // Calculate crit chance with bonuses (includes unit base crit + ability crit + tag bonuses with hierarchy)
+    const critChance = calculateCritChance(
+      ability.unitBaseCrit,
+      ability.critPercent,
+      ability.critBonuses,
+      target.unitId
+    );
     
     // Roll dodge
     if (rollDodge(effectiveDodgeChance)) {
@@ -883,7 +882,14 @@ export function executeRandomAttack(
       }
       
       const baseDamage = rollDamage(ability.minDamage, ability.maxDamage);
-      const isCrit = rollCrit(ability.critPercent);
+      // Calculate crit chance with tag bonuses and unit base crit
+      const critChance = calculateCritChance(
+        ability.unitBaseCrit,
+        ability.critPercent,
+        ability.critBonuses,
+        target.unitId
+      );
+      const isCrit = rollCrit(critChance);
       const finalDamage = isCrit ? Math.floor(baseDamage * 2) : baseDamage;
       
       if (isCrit) {
