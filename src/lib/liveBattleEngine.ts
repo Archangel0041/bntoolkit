@@ -485,7 +485,23 @@ export function executeAttack(
   const isAoeOrSplashAttack = isSingleSelectionWithSplash ||
                                (ability.targetArea && ability.targetArea.targetType === 2);
 
-  let reticleChecked = false; // Track if we've validated reticle blocking for AOE/splash attacks
+  // For AOE/splash attacks, validate reticle blocking once BEFORE processing targets
+  if (isAoeOrSplashAttack) {
+    const reticleBlockCheck = checkLineOfFire(
+      attacker.gridId,
+      targetGridId,
+      ability.lineOfFire,
+      attacker.isEnemy,
+      blockingUnits
+    );
+
+    console.log(`[executeAttack-reticle] AOE/Splash attack - checking reticle blocking at grid ${targetGridId}, isBlocked: ${reticleBlockCheck.isBlocked}, reason: ${reticleBlockCheck.reason || 'none'}`);
+
+    if (reticleBlockCheck.isBlocked) {
+      console.log(`[executeAttack] AOE/Splash attack blocked - reticle at grid ${targetGridId} is blocked by unit ${reticleBlockCheck.blockedBy?.unitId}`);
+      return actions; // Entire AOE/splash attack is blocked
+    }
+  }
 
   for (const pos of affectedPositions) {
     const target = allTargets.find(u => u.gridId === pos.gridId && !u.isDead);
@@ -497,35 +513,21 @@ export function executeAttack(
       continue;
     }
 
-    // Determine which position to check for blocking:
-    // - AOE/splash: check reticle position (targetGridId)
-    // - Non-AOE: check each individual target position (target.gridId)
-    const blockingCheckGridId = isAoeOrSplashAttack ? targetGridId : target.gridId;
-
-    // For AOE/splash, only check once; for non-AOE, check every position
-    if (!isAoeOrSplashAttack || !reticleChecked) {
-      if (isAoeOrSplashAttack) {
-        reticleChecked = true;
-      }
-
+    // For non-AOE attacks, check blocking for each individual target
+    if (!isAoeOrSplashAttack) {
       const blockCheck = checkLineOfFire(
         attacker.gridId,
-        blockingCheckGridId,
+        target.gridId,
         ability.lineOfFire,
         attacker.isEnemy,
         blockingUnits
       );
 
-      console.log(`[executeAttack-blocking] Attacker grid ${attacker.gridId} -> Check grid ${blockingCheckGridId}, lineOfFire: ${ability.lineOfFire}, isAoeOrSplash: ${isAoeOrSplashAttack}, isBlocked: ${blockCheck.isBlocked}, reason: ${blockCheck.reason || 'none'}, blockedBy: ${blockCheck.blockedBy?.unitId || 'none'}`);
+      console.log(`[executeAttack-blocking] Attacker grid ${attacker.gridId} -> Target grid ${target.gridId}, lineOfFire: ${ability.lineOfFire}, isBlocked: ${blockCheck.isBlocked}, reason: ${blockCheck.reason || 'none'}, blockedBy: ${blockCheck.blockedBy?.unitId || 'none'}`);
 
       if (blockCheck.isBlocked) {
-        if (isAoeOrSplashAttack) {
-          console.log(`[executeAttack] AOE/Splash attack blocked - reticle at grid ${blockingCheckGridId} is blocked by unit ${blockCheck.blockedBy?.unitId}`);
-          return actions; // Entire AOE/splash attack is blocked
-        } else {
-          console.log(`[executeAttack] Skipping target at grid ${blockingCheckGridId} - blocked by unit ${blockCheck.blockedBy?.unitId}`);
-          continue; // Skip this individual target
-        }
+        console.log(`[executeAttack] Skipping target at grid ${target.gridId} - blocked by unit ${blockCheck.blockedBy?.unitId}`);
+        continue; // Skip this individual target
       }
     }
     
