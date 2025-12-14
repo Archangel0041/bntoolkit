@@ -184,7 +184,9 @@ function hasEnoughAmmo(unit: LiveBattleUnit, ability: AbilityInfo): boolean {
 export function getAvailableAbilities(
   unit: LiveBattleUnit,
   allEnemies: LiveBattleUnit[],
-  allFriendlies: LiveBattleUnit[]
+  allFriendlies: LiveBattleUnit[],
+  friendlyCollapsedRows?: Set<number>,
+  enemyCollapsedRows?: Set<number>
 ): AbilityInfo[] {
   const abilities = getUnitAbilities(unit.unitId, unit.rank);
   console.log(`[getAvailableAbilities] Unit ${unit.unitId} has ${abilities.length} total abilities`);
@@ -216,12 +218,16 @@ export function getAvailableAbilities(
     const targets = unit.isEnemy ? allFriendlies : allEnemies;
     const aliveTargets = targets.filter(t => !t.isDead);
     
+    // Determine which collapsed rows to use based on who is attacking
+    const attackerCollapsedRows = unit.isEnemy ? enemyCollapsedRows : friendlyCollapsedRows;
+    const targetCollapsedRows = unit.isEnemy ? friendlyCollapsedRows : enemyCollapsedRows;
+
     // For Contact line of fire, check if there's at least one valid target at the closest range
     if (ability.lineOfFire === 0) { // Contact
       // Find the minimum range that has valid targetable units
       let closestRange = Infinity;
       for (const target of aliveTargets) {
-        const range = calculateRange(unit.gridId, target.gridId, unit.isEnemy);
+        const range = calculateRange(unit.gridId, target.gridId, unit.isEnemy, attackerCollapsedRows, targetCollapsedRows);
         if (range >= ability.minRange && range <= ability.maxRange) {
           if (canTargetUnit(target.unitId, ability.targets)) {
             if (range < closestRange) {
@@ -237,16 +243,16 @@ export function getAvailableAbilities(
       console.log(`[getAvailableAbilities] Ability ${ability.abilityId} (Contact) has targets at range ${closestRange}`);
       return true;
     }
-    
+
     // For other line of fire types, check blocking
     const blockingUnits = getBlockingUnits(
       aliveTargets.map(u => ({ unit_id: u.unitId, grid_id: u.gridId })),
       true
     );
-    
+
     for (const target of aliveTargets) {
       if (!canTargetUnit(target.unitId, ability.targets)) continue;
-      const range = calculateRange(unit.gridId, target.gridId, unit.isEnemy);
+      const range = calculateRange(unit.gridId, target.gridId, unit.isEnemy, attackerCollapsedRows, targetCollapsedRows);
       if (range < ability.minRange || range > ability.maxRange) continue;
       const blockCheck = checkLineOfFire(unit.gridId, target.gridId, ability.lineOfFire, unit.isEnemy, blockingUnits);
       if (!blockCheck.isBlocked) {
@@ -268,11 +274,17 @@ export function getValidTargets(
   attacker: LiveBattleUnit,
   ability: AbilityInfo,
   allEnemies: LiveBattleUnit[],
-  allFriendlies: LiveBattleUnit[]
+  allFriendlies: LiveBattleUnit[],
+  friendlyCollapsedRows?: Set<number>,
+  enemyCollapsedRows?: Set<number>
 ): LiveBattleUnit[] {
   const targets = attacker.isEnemy ? allFriendlies : allEnemies;
   const aliveTargets = targets.filter(t => !t.isDead);
-  
+
+  // Determine which collapsed rows to use based on who is attacking
+  const attackerCollapsedRows = attacker.isEnemy ? enemyCollapsedRows : friendlyCollapsedRows;
+  const targetCollapsedRows = attacker.isEnemy ? friendlyCollapsedRows : enemyCollapsedRows;
+
   // Only alive units can block
   // Use grid_id format for EncounterUnit-style mapping (isEnemy=true uses grid_id)
   const blockingUnits = getBlockingUnits(
@@ -283,39 +295,39 @@ export function getValidTargets(
   // For Contact line of fire, target the closest unit in EACH column (not overall closest)
   if (ability.lineOfFire === 0) { // Contact
     console.log(`[getValidTargets-Contact] Attacker grid ${attacker.gridId}, isEnemy=${attacker.isEnemy}, abilityId=${ability.abilityId}`);
-    
+
     // Group targets by column (x coordinate), find closest in each column
     const columnClosest: Map<number, { target: LiveBattleUnit; range: number }> = new Map();
-    
+
     for (const target of aliveTargets) {
-      const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy);
+      const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy, attackerCollapsedRows, targetCollapsedRows);
       if (range < ability.minRange || range > ability.maxRange) continue;
       if (!canTargetUnit(target.unitId, ability.targets)) continue;
-      
+
       const coords = GRID_ID_TO_COORDS[target.gridId];
       if (!coords) continue;
-      
+
       const column = coords.x;
       const existing = columnClosest.get(column);
-      
+
       // Keep the closest unit in this column (smallest range)
       if (!existing || range < existing.range) {
         columnClosest.set(column, { target, range });
       }
     }
-    
+
     const validTargets = Array.from(columnClosest.values()).map(v => v.target);
-    console.log(`[getValidTargets-Contact] Returning ${validTargets.length} valid targets (closest per column):`, 
-      validTargets.map(t => ({ gridId: t.gridId, range: calculateRange(attacker.gridId, t.gridId, attacker.isEnemy) })));
+    console.log(`[getValidTargets-Contact] Returning ${validTargets.length} valid targets (closest per column):`,
+      validTargets.map(t => ({ gridId: t.gridId, range: calculateRange(attacker.gridId, t.gridId, attacker.isEnemy, attackerCollapsedRows, targetCollapsedRows) })));
     return validTargets;
   }
 
   return aliveTargets.filter(target => {
     // Check tag targeting
     if (!canTargetUnit(target.unitId, ability.targets)) return false;
-    
+
     // Check range
-    const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy);
+    const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy, attackerCollapsedRows, targetCollapsedRows);
     if (range < ability.minRange || range > ability.maxRange) return false;
     
     // Check line of fire
@@ -338,20 +350,24 @@ export function getValidTargets(
 
 // Detect collapsed rows - rows where no alive units exist
 // Returns a Set of collapsed row indices (0=front, 1=middle, 2=back)
-// Rows collapse from front to back: if row 0 is empty, it collapses. 
+// Rows collapse from front to back: if row 0 is empty, it collapses.
 // Row 1 only collapses if row 0 is also empty or collapsed.
-export function detectCollapsedRows(units: LiveBattleUnit[]): Set<number> {
+// IMPORTANT: Only one new row can collapse per turn to prevent instant multi-row collapse
+export function detectCollapsedRows(units: LiveBattleUnit[], previousCollapsedRows: Set<number> = new Set()): Set<number> {
   const aliveUnits = units.filter(u => !u.isDead);
-  const collapsedRows = new Set<number>();
-  
+  const collapsedRows = new Set(previousCollapsedRows); // Start with previous collapsed rows
+
   // Check each row from front (0) to back (2)
   for (let row = 0; row <= 2; row++) {
+    // Skip if this row is already collapsed
+    if (collapsedRows.has(row)) continue;
+
     const unitsInRow = aliveUnits.filter(u => {
       const coords = GRID_ID_TO_COORDS[u.gridId];
       return coords?.y === row;
     });
-    
-    // A row is collapsed if:
+
+    // A row is eligible to collapse if:
     // 1. It has no alive units
     // 2. All rows in front of it are also collapsed (cascading collapse from front)
     if (unitsInRow.length === 0) {
@@ -363,20 +379,23 @@ export function detectCollapsedRows(units: LiveBattleUnit[]): Set<number> {
           break;
         }
       }
-      
+
       // Only collapse this row if it's the front row or all previous rows are collapsed
       if (row === 0 || allPreviousCollapsed) {
         collapsedRows.add(row);
+        // CRITICAL: Only collapse one new row per turn
+        // Return immediately after adding the first new collapsed row
+        break;
       }
     }
   }
-  
+
   return collapsedRows;
 }
 
 // Legacy function kept for backwards compatibility, now just updates collapsed rows state
-export function collapseGrid(units: LiveBattleUnit[]): Set<number> {
-  return detectCollapsedRows(units);
+export function collapseGrid(units: LiveBattleUnit[], previousCollapsedRows?: Set<number>): Set<number> {
+  return detectCollapsedRows(units, previousCollapsedRows);
 }
 
 // Execute an attack and return the actions
@@ -458,31 +477,58 @@ export function executeAttack(
   
   const totalShots = ability.shotsPerAttack * ability.attacksPerUse;
   console.log(`[executeAttack] Ability ${ability.abilityId}: shotsPerAttack=${ability.shotsPerAttack}, attacksPerUse=${ability.attacksPerUse}, totalShots=${totalShots}, isFixed=${ability.isFixed}, isSingleTarget=${ability.isSingleTarget}, lineOfFire=${ability.lineOfFire}, affectedPositions=${affectedPositions.length}`);
-  
+
+  // Determine if this is an AOE or splash attack that should check reticle blocking instead of per-position
+  // For these attacks, blocking is checked once for the reticle/primary target, not each affected position
+  // target_type: 2 = movable reticle AOE (like column attacks) - check reticle blocking
+  // target_type: 1 = fixed pattern (like turrets) - check blocking per position
+  const isAoeOrSplashAttack = isSingleSelectionWithSplash ||
+                               (ability.targetArea && ability.targetArea.targetType === 2);
+
+  // For AOE/splash attacks, validate reticle blocking once BEFORE processing targets
+  if (isAoeOrSplashAttack) {
+    const reticleBlockCheck = checkLineOfFire(
+      attacker.gridId,
+      targetGridId,
+      ability.lineOfFire,
+      attacker.isEnemy,
+      blockingUnits
+    );
+
+    console.log(`[executeAttack-reticle] AOE/Splash attack - checking reticle blocking at grid ${targetGridId}, isBlocked: ${reticleBlockCheck.isBlocked}, reason: ${reticleBlockCheck.reason || 'none'}`);
+
+    if (reticleBlockCheck.isBlocked) {
+      console.log(`[executeAttack] AOE/Splash attack blocked - reticle at grid ${targetGridId} is blocked by unit ${reticleBlockCheck.blockedBy?.unitId}`);
+      return actions; // Entire AOE/splash attack is blocked
+    }
+  }
+
   for (const pos of affectedPositions) {
     const target = allTargets.find(u => u.gridId === pos.gridId && !u.isDead);
     if (!target) continue;
-    
+
     // **CRITICAL**: Validate that target can be targeted by this ability (tag validation)
     if (!canTargetUnit(target.unitId, ability.targets)) {
       console.log(`[executeAttack] Skipping target at grid ${target.gridId} - unit ${target.unitId} cannot be targeted by ability (tag mismatch)`);
       continue;
     }
-    
-    // Validate line of fire blocking for all attacks (single target AND area attacks)
-    const blockCheck = checkLineOfFire(
-      attacker.gridId,
-      target.gridId,
-      ability.lineOfFire,
-      attacker.isEnemy,
-      blockingUnits
-    );
-    
-    console.log(`[executeAttack-blocking] Attacker grid ${attacker.gridId} -> Target grid ${target.gridId}, lineOfFire: ${ability.lineOfFire}, isSingleTarget: ${ability.isSingleTarget}, isBlocked: ${blockCheck.isBlocked}, reason: ${blockCheck.reason || 'none'}, blockedBy: ${blockCheck.blockedBy?.unitId || 'none'}`);
-    
-    if (blockCheck.isBlocked) {
-      console.log(`[executeAttack] Skipping target at grid ${target.gridId} - blocked by unit ${blockCheck.blockedBy?.unitId}`);
-      continue; // Skip this target, it's blocked
+
+    // For non-AOE attacks, check blocking for each individual target
+    if (!isAoeOrSplashAttack) {
+      const blockCheck = checkLineOfFire(
+        attacker.gridId,
+        target.gridId,
+        ability.lineOfFire,
+        attacker.isEnemy,
+        blockingUnits
+      );
+
+      console.log(`[executeAttack-blocking] Attacker grid ${attacker.gridId} -> Target grid ${target.gridId}, lineOfFire: ${ability.lineOfFire}, isBlocked: ${blockCheck.isBlocked}, reason: ${blockCheck.reason || 'none'}, blockedBy: ${blockCheck.blockedBy?.unitId || 'none'}`);
+
+      if (blockCheck.isBlocked) {
+        console.log(`[executeAttack] Skipping target at grid ${target.gridId} - blocked by unit ${blockCheck.blockedBy?.unitId}`);
+        continue; // Skip this individual target
+      }
     }
     
     const targetUnit = getUnitById(target.unitId);
@@ -1159,19 +1205,32 @@ export function aiSelectAction(
   console.log(`[AI] ${unitName} - Current ability cooldowns:`, unit.abilityCooldowns);
   console.log(`[AI] ${unitName} - Current weapon global cooldowns:`, unit.weaponGlobalCooldown);
   
-  const availableAbilities = getAvailableAbilities(unit, state.enemyUnits, state.friendlyUnits);
-  
+  const availableAbilities = getAvailableAbilities(
+    unit,
+    state.enemyUnits,
+    state.friendlyUnits,
+    state.friendlyCollapsedRows,
+    state.enemyCollapsedRows
+  );
+
   console.log(`[AI] ${unitName} (grid ${unit.gridId}): ${availableAbilities.length} available abilities after filtering`);
-  
+
   if (availableAbilities.length === 0) {
     console.log(`[AI] ${unitName}: No available abilities`);
     return null;
   }
-  
+
   const ability = availableAbilities[Math.floor(Math.random() * availableAbilities.length)];
   console.log(`[AI] ${unitName}: Selected ability ${ability.abilityId} (weapon: ${ability.weaponName})`);
-  
-  const validTargets = getValidTargets(unit, ability, state.enemyUnits, state.friendlyUnits);
+
+  const validTargets = getValidTargets(
+    unit,
+    ability,
+    state.enemyUnits,
+    state.friendlyUnits,
+    state.friendlyCollapsedRows,
+    state.enemyCollapsedRows
+  );
   console.log(`[AI] ${unitName}: ${validTargets.length} valid targets`);
   
   if (validTargets.length === 0) {
