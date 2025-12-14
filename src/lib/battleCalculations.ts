@@ -58,6 +58,7 @@ function getEnvironmentalDamageModifier(envMods: Record<string, number>, damageT
 // statusEffectDamageMods: Optional damage modifiers from target's active status effects (e.g., Freeze, Shatter)
 // statusEffectArmorDamageMods: Optional armor damage modifiers from target's active status effects
 // bypassArmorDueToStun: If true, all damage bypasses armor (for Active armor units when stunned)
+// includeBreakdown: If true, include detailed calculation breakdown in the result
 export function calculateDamageWithArmor(
   rawDamage: number,
   armorHp: number,
@@ -68,7 +69,8 @@ export function calculateDamageWithArmor(
   environmentalDamageMods?: Record<string, number>,
   statusEffectDamageMods?: Record<string, number>,
   statusEffectArmorDamageMods?: Record<string, number>,
-  bypassArmorDueToStun?: boolean
+  bypassArmorDueToStun?: boolean,
+  includeBreakdown?: boolean
 ): DamageResult {
   // Get base resistance modifiers
   const baseHpMod = getDamageModifier(hpDamageMods, damageType);
@@ -95,6 +97,23 @@ export function calculateDamageWithArmor(
       hpDamage,
       armorRemaining: armorHp, // Armor is bypassed, not damaged
       effectiveMultiplier: hpMod,
+      breakdown: includeBreakdown ? {
+        baseDamage: rawDamage,
+        powerBonus: 0,
+        baseHpMod,
+        baseArmorMod,
+        envMod,
+        statusHpMod,
+        statusArmorMod,
+        finalHpMod: hpMod,
+        finalArmorMod: armorMod,
+        piercingDamage: rawDamage,
+        armorableDamage: 0,
+        effectiveArmorCapacity: 0,
+        armorAbsorbed: 0,
+        overflowToHp: rawDamage,
+        bypassedArmor: true,
+      } : undefined,
     };
   }
 
@@ -107,6 +126,23 @@ export function calculateDamageWithArmor(
       hpDamage,
       armorRemaining: 0,
       effectiveMultiplier: hpMod,
+      breakdown: includeBreakdown ? {
+        baseDamage: rawDamage,
+        powerBonus: 0,
+        baseHpMod,
+        baseArmorMod,
+        envMod,
+        statusHpMod,
+        statusArmorMod,
+        finalHpMod: hpMod,
+        finalArmorMod: armorMod,
+        piercingDamage: 0,
+        armorableDamage: rawDamage,
+        effectiveArmorCapacity: 0,
+        armorAbsorbed: 0,
+        overflowToHp: rawDamage,
+        bypassedArmor: false,
+      } : undefined,
     };
   }
 
@@ -121,17 +157,21 @@ export function calculateDamageWithArmor(
   let armorDamage = 0;
   let damageToHp = piercingDamage;
   let armorRemaining = armorHp;
+  let armorAbsorbed = 0;
+  let overflowDamage = 0;
 
   if (armorableDamage <= effectiveArmorCapacity) {
     // Armor absorbs all armorable damage
     armorDamage = Math.floor(armorableDamage * armorMod);
     armorRemaining = armorHp - armorDamage;
+    armorAbsorbed = armorableDamage;
   } else {
     // Armor is depleted, remainder goes to HP
     armorDamage = armorHp;
     armorRemaining = 0;
-    const overflowDamage = armorableDamage - effectiveArmorCapacity;
+    overflowDamage = armorableDamage - effectiveArmorCapacity;
     damageToHp += overflowDamage;
+    armorAbsorbed = effectiveArmorCapacity;
   }
 
   // Apply HP damage modifier to the HP portion (already calculated above)
@@ -143,6 +183,23 @@ export function calculateDamageWithArmor(
     hpDamage: finalHpDamage,
     armorRemaining: Math.max(0, armorRemaining),
     effectiveMultiplier: hpMod,
+    breakdown: includeBreakdown ? {
+      baseDamage: rawDamage,
+      powerBonus: 0,
+      baseHpMod,
+      baseArmorMod,
+      envMod,
+      statusHpMod,
+      statusArmorMod,
+      finalHpMod: hpMod,
+      finalArmorMod: armorMod,
+      piercingDamage,
+      armorableDamage,
+      effectiveArmorCapacity,
+      armorAbsorbed,
+      overflowToHp: overflowDamage + piercingDamage,
+      bypassedArmor: false,
+    } : undefined,
   };
 }
 
@@ -364,7 +421,8 @@ export function calculateDamagePreviewsForEnemy(
   attackerGridId: number,
   enemyUnits: EncounterUnit[],
   enemyRankOverrides: Record<number, number> = {},
-  environmentalDamageMods?: Record<string, number>
+  environmentalDamageMods?: Record<string, number>,
+  includeBreakdown?: boolean
 ): DamagePreview[] {
   const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
   const blockingUnits = getBlockingUnits(enemyUnits, true);
@@ -404,9 +462,13 @@ export function calculateDamagePreviewsForEnemy(
         enemyStats?.damage_mods,
         attackerAbility.damageType,
         attackerAbility.armorPiercing,
-        environmentalDamageMods
+        environmentalDamageMods,
+        undefined,
+        undefined,
+        undefined,
+        includeBreakdown
       );
-      
+
       const maxResult = calculateDamageWithArmor(
         attackerAbility.maxDamage,
         armorHp,
@@ -414,7 +476,11 @@ export function calculateDamagePreviewsForEnemy(
         enemyStats?.damage_mods,
         attackerAbility.damageType,
         attackerAbility.armorPiercing,
-        environmentalDamageMods
+        environmentalDamageMods,
+        undefined,
+        undefined,
+        undefined,
+        includeBreakdown
       );
       
       // Calculate status effect previews
@@ -450,6 +516,7 @@ export function calculateDamagePreviewsForEnemy(
         blockedByUnitId: blockCheck.blockedBy?.unitId,
         ...blockerInfo,
         blockReason: blockCheck.reason,
+        damageType: attackerAbility.damageType,
       };
     });
 }
@@ -458,7 +525,8 @@ export function calculateDamagePreviewsForFriendly(
   attackerAbility: AbilityInfo,
   attackerGridId: number,
   friendlyUnits: PartyUnit[],
-  environmentalDamageMods?: Record<string, number>
+  environmentalDamageMods?: Record<string, number>,
+  includeBreakdown?: boolean
 ): DamagePreview[] {
   const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
   const blockingUnits = getBlockingUnits(friendlyUnits, false);
@@ -495,9 +563,13 @@ export function calculateDamagePreviewsForFriendly(
       stats?.damage_mods,
       attackerAbility.damageType,
       attackerAbility.armorPiercing,
-      environmentalDamageMods
+      environmentalDamageMods,
+      undefined,
+      undefined,
+      undefined,
+      includeBreakdown
     );
-    
+
     const maxResult = calculateDamageWithArmor(
       attackerAbility.maxDamage,
       armorHp,
@@ -505,7 +577,11 @@ export function calculateDamagePreviewsForFriendly(
       stats?.damage_mods,
       attackerAbility.damageType,
       attackerAbility.armorPiercing,
-      environmentalDamageMods
+      environmentalDamageMods,
+      undefined,
+      undefined,
+      undefined,
+      includeBreakdown
     );
     
     // Calculate status effect previews
@@ -541,6 +617,7 @@ export function calculateDamagePreviewsForFriendly(
       blockedByUnitId: blockCheck.blockedBy?.unitId,
       ...blockerInfo,
       blockReason: blockCheck.reason,
+      damageType: attackerAbility.damageType,
     };
   });
 }
@@ -552,7 +629,8 @@ export function calculateAoeDamagePreviewsForEnemy(
   enemyUnits: EncounterUnit[],
   reticleGridId: number,
   enemyRankOverrides: Record<number, number> = {},
-  environmentalDamageMods?: Record<string, number>
+  environmentalDamageMods?: Record<string, number>,
+  includeBreakdown?: boolean
 ): DamagePreview[] {
   const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
   const affectedPositions = getAffectedGridPositions(reticleGridId, attackerAbility.targetArea, true, attackerAbility.damageArea);
@@ -597,7 +675,7 @@ export function calculateAoeDamagePreviewsForEnemy(
       const damagePercent = damagePercentMap.get(enemyUnit.grid_id!) || 100;
       const adjustedMinDamage = Math.floor(attackerAbility.minDamage * (damagePercent / 100));
       const adjustedMaxDamage = Math.floor(attackerAbility.maxDamage * (damagePercent / 100));
-      
+
       const minResult = calculateDamageWithArmor(
         adjustedMinDamage,
         armorHp,
@@ -605,9 +683,13 @@ export function calculateAoeDamagePreviewsForEnemy(
         enemyStats?.damage_mods,
         attackerAbility.damageType,
         attackerAbility.armorPiercing,
-        environmentalDamageMods
+        environmentalDamageMods,
+        undefined,
+        undefined,
+        undefined,
+        includeBreakdown
       );
-      
+
       const maxResult = calculateDamageWithArmor(
         adjustedMaxDamage,
         armorHp,
@@ -615,7 +697,11 @@ export function calculateAoeDamagePreviewsForEnemy(
         enemyStats?.damage_mods,
         attackerAbility.damageType,
         attackerAbility.armorPiercing,
-        environmentalDamageMods
+        environmentalDamageMods,
+        undefined,
+        undefined,
+        undefined,
+        includeBreakdown
       );
       
       // Calculate status effect previews with adjusted damage
@@ -660,7 +746,8 @@ export function calculateAoeDamagePreviewsForFriendly(
   attackerGridId: number,
   friendlyUnits: PartyUnit[],
   reticleGridId: number,
-  environmentalDamageMods?: Record<string, number>
+  environmentalDamageMods?: Record<string, number>,
+  includeBreakdown?: boolean
 ): DamagePreview[] {
   const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
   const affectedPositions = getAffectedGridPositions(reticleGridId, attackerAbility.targetArea, false, attackerAbility.damageArea);
@@ -698,12 +785,12 @@ export function calculateAoeDamagePreviewsForFriendly(
         true,
         blockingUnits
       );
-      
+
       // Apply damage percent modifier
       const damagePercent = damagePercentMap.get(friendlyUnit.gridId) || 100;
       const adjustedMinDamage = Math.floor(attackerAbility.minDamage * (damagePercent / 100));
       const adjustedMaxDamage = Math.floor(attackerAbility.maxDamage * (damagePercent / 100));
-      
+
       const minResult = calculateDamageWithArmor(
         adjustedMinDamage,
         armorHp,
@@ -711,9 +798,13 @@ export function calculateAoeDamagePreviewsForFriendly(
         stats?.damage_mods,
         attackerAbility.damageType,
         attackerAbility.armorPiercing,
-        environmentalDamageMods
+        environmentalDamageMods,
+        undefined,
+        undefined,
+        undefined,
+        includeBreakdown
       );
-      
+
       const maxResult = calculateDamageWithArmor(
         adjustedMaxDamage,
         armorHp,
@@ -721,7 +812,11 @@ export function calculateAoeDamagePreviewsForFriendly(
         stats?.damage_mods,
         attackerAbility.damageType,
         attackerAbility.armorPiercing,
-        environmentalDamageMods
+        environmentalDamageMods,
+        undefined,
+        undefined,
+        undefined,
+        includeBreakdown
       );
       
       // Calculate status effect previews
@@ -768,7 +863,8 @@ export function calculateFixedDamagePreviewsForEnemy(
   enemyUnits: EncounterUnit[],
   fixedPositions: { gridId: number; damagePercent: number }[],
   enemyRankOverrides: Record<number, number> = {},
-  environmentalDamageMods?: Record<string, number>
+  environmentalDamageMods?: Record<string, number>,
+  includeBreakdown?: boolean
 ): DamagePreview[] {
   const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
   const blockingUnits = getBlockingUnits(enemyUnits, true);
@@ -811,7 +907,7 @@ export function calculateFixedDamagePreviewsForEnemy(
       const damagePercent = damagePercentMap.get(enemyUnit.grid_id!) || 100;
       const adjustedMinDamage = Math.floor(attackerAbility.minDamage * (damagePercent / 100));
       const adjustedMaxDamage = Math.floor(attackerAbility.maxDamage * (damagePercent / 100));
-      
+
       const minResult = calculateDamageWithArmor(
         adjustedMinDamage,
         armorHp,
@@ -819,9 +915,13 @@ export function calculateFixedDamagePreviewsForEnemy(
         enemyStats?.damage_mods,
         attackerAbility.damageType,
         attackerAbility.armorPiercing,
-        environmentalDamageMods
+        environmentalDamageMods,
+        undefined,
+        undefined,
+        undefined,
+        includeBreakdown
       );
-      
+
       const maxResult = calculateDamageWithArmor(
         adjustedMaxDamage,
         armorHp,
@@ -829,7 +929,11 @@ export function calculateFixedDamagePreviewsForEnemy(
         enemyStats?.damage_mods,
         attackerAbility.damageType,
         attackerAbility.armorPiercing,
-        environmentalDamageMods
+        environmentalDamageMods,
+        undefined,
+        undefined,
+        undefined,
+        includeBreakdown
       );
       
       // Calculate status effect previews with adjusted chance based on damagePercent
@@ -872,7 +976,8 @@ export function calculateFixedDamagePreviewsForFriendly(
   attackerGridId: number,
   friendlyUnits: PartyUnit[],
   fixedPositions: { gridId: number; damagePercent: number }[],
-  environmentalDamageMods?: Record<string, number>
+  environmentalDamageMods?: Record<string, number>,
+  includeBreakdown?: boolean
 ): DamagePreview[] {
   const totalShots = attackerAbility.shotsPerAttack * attackerAbility.attacksPerUse;
   const blockingUnits = getBlockingUnits(friendlyUnits, false);
@@ -909,12 +1014,12 @@ export function calculateFixedDamagePreviewsForFriendly(
         true,
         blockingUnits
       );
-      
+
       // Apply damage percent modifier
       const damagePercent = damagePercentMap.get(friendlyUnit.gridId) || 100;
       const adjustedMinDamage = Math.floor(attackerAbility.minDamage * (damagePercent / 100));
       const adjustedMaxDamage = Math.floor(attackerAbility.maxDamage * (damagePercent / 100));
-      
+
       const minResult = calculateDamageWithArmor(
         adjustedMinDamage,
         armorHp,
@@ -922,9 +1027,13 @@ export function calculateFixedDamagePreviewsForFriendly(
         stats?.damage_mods,
         attackerAbility.damageType,
         attackerAbility.armorPiercing,
-        environmentalDamageMods
+        environmentalDamageMods,
+        undefined,
+        undefined,
+        undefined,
+        includeBreakdown
       );
-      
+
       const maxResult = calculateDamageWithArmor(
         adjustedMaxDamage,
         armorHp,
@@ -932,7 +1041,11 @@ export function calculateFixedDamagePreviewsForFriendly(
         stats?.damage_mods,
         attackerAbility.damageType,
         attackerAbility.armorPiercing,
-        environmentalDamageMods
+        environmentalDamageMods,
+        undefined,
+        undefined,
+        undefined,
+        includeBreakdown
       );
       
       // Calculate status effect previews with adjusted chance

@@ -114,6 +114,24 @@ export interface DamageResult {
   hpDamage: number;
   armorRemaining: number;
   effectiveMultiplier: number;
+  // Breakdown details for damage calculation
+  breakdown?: {
+    baseDamage: number;
+    powerBonus: number;
+    baseHpMod: number;
+    baseArmorMod: number;
+    envMod: number;
+    statusHpMod: number;
+    statusArmorMod: number;
+    finalHpMod: number;
+    finalArmorMod: number;
+    piercingDamage: number;
+    armorableDamage: number;
+    effectiveArmorCapacity: number;
+    armorAbsorbed: number;
+    overflowToHp: number;
+    bypassedArmor: boolean;
+  };
 }
 
 export interface DamagePreview {
@@ -146,6 +164,8 @@ export interface DamagePreview {
   // Random attack info
   isRandomAttack?: boolean;
   expectedHits?: number;
+  // Damage type for breakdown display
+  damageType: number;
 }
 
 // Row mapping: preferred_row 1 = front (row 1), 2 = middle (row 2), 3 = back (row 3)
