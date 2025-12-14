@@ -8,6 +8,7 @@ import { Crosshair } from "lucide-react";
 import type { EncounterUnit } from "@/types/encounters";
 import type { PartyUnit, DamagePreview, SelectedUnit, TargetArea, DamageAreaPosition } from "@/types/battleSimulator";
 import { ENEMY_GRID_LAYOUT, FRIENDLY_GRID_LAYOUT, GRID_ID_TO_COORDS, COORDS_TO_GRID_ID, getAffectedGridPositions } from "@/types/battleSimulator";
+import { DamageBreakdown } from "@/components/battle/DamageBreakdown";
 
 interface BattleGridProps {
   isEnemy: boolean;
@@ -634,8 +635,8 @@ export function BattleGrid({
               {damagePreview.statusEffects.length > 0 && (
                 <div className="border-t pt-1.5 space-y-0.5">
                   {damagePreview.statusEffects.map(se => (
-                    <div 
-                      key={se.effectId} 
+                    <div
+                      key={se.effectId}
                       className={cn("flex justify-between text-[10px]", se.isImmune && "opacity-50")}
                     >
                       <span style={{ color: se.color }}>
@@ -649,6 +650,15 @@ export function BattleGrid({
                     </div>
                   ))}
                 </div>
+              )}
+
+              {/* Damage Breakdown - Show for max damage with breakdown */}
+              {damagePreview.maxDamage.breakdown && (
+                <DamageBreakdown
+                  damageResult={damagePreview.maxDamage}
+                  damageType={damagePreview.damageType}
+                  label="Max Damage Breakdown"
+                />
               )}
             </div>
           </TooltipContent>

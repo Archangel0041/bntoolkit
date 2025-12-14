@@ -183,22 +183,22 @@ const BattleSimulator = () => {
       // Enemy attacking friendly units
       if (selectedAbility.isSingleTarget) {
         // Single target: calculate for ALL friendly units (blocking will filter display)
-        return calculateDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units, environmentalDamageMods);
+        return calculateDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units, environmentalDamageMods, true);
       }
       if (selectedAbility.isFixed && fixedAttackPositions.friendlyGrid.length > 0) {
-        return calculateFixedDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units, fixedAttackPositions.friendlyGrid, environmentalDamageMods);
+        return calculateFixedDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units, fixedAttackPositions.friendlyGrid, environmentalDamageMods, true);
       }
-      return calculateAoeDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units, friendlyReticleGridId, environmentalDamageMods);
+      return calculateAoeDamagePreviewsForFriendly(selectedAbility, selectedUnit.gridId, tempFormation.units, friendlyReticleGridId, environmentalDamageMods, true);
     } else {
       // Friendly attacking enemy units
       if (selectedAbility.isSingleTarget) {
         // Single target: calculate for ALL enemy units (blocking will filter display)
-        return calculateDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, enemyRankOverrides, environmentalDamageMods);
+        return calculateDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, enemyRankOverrides, environmentalDamageMods, true);
       }
       if (selectedAbility.isFixed && fixedAttackPositions.enemyGrid.length > 0) {
-        return calculateFixedDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, fixedAttackPositions.enemyGrid, enemyRankOverrides, environmentalDamageMods);
+        return calculateFixedDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, fixedAttackPositions.enemyGrid, enemyRankOverrides, environmentalDamageMods, true);
       }
-      return calculateAoeDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, enemyReticleGridId, enemyRankOverrides, environmentalDamageMods);
+      return calculateAoeDamagePreviewsForEnemy(selectedAbility, selectedUnit.gridId, currentWaveUnits, enemyReticleGridId, enemyRankOverrides, environmentalDamageMods, true);
     }
   }, [selectedUnit, selectedAbility, tempFormation.units, currentWaveUnits, enemyRankOverrides, enemyReticleGridId, friendlyReticleGridId, fixedAttackPositions, environmentalDamageMods]);
 
