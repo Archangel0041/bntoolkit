@@ -270,6 +270,7 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
   const stats = unit.statsConfig?.stats?.[rank - 1];
   const power = stats?.power || 0;
   const accuracy = stats?.accuracy || 0;
+  const unitBaseCrit = stats?.critical || 0; // Unit's base critical hit chance stat
 
   const abilities: AbilityInfo[] = [];
 
@@ -360,6 +361,7 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
         globalCooldown: (ability.stats as any).global_cooldown || 0,
         armorPiercing: ability.stats.armor_piercing_percent,
         critPercent: ability.stats.critical_hit_percent,
+        unitBaseCrit: unitBaseCrit,
         critBonuses: (ability.stats as any).critical_bonuses || {},
         chargeTime: (ability.stats as any).charge_time || 0,
         suppressionMultiplier: (ability.stats as any).damage_distraction || 1,
@@ -397,22 +399,38 @@ function getUnitStatsAtRank(unitId: number, rank: number): UnitStats | undefined
   return unit?.statsConfig?.stats?.[rank - 1];
 }
 
-// Calculate crit chance based on base crit + tag-based bonuses
-function calculateCritChance(baseCrit: number, critBonuses: Record<number, number>, targetUnitId: number): number {
+// Calculate crit chance based on unit base crit + ability crit + tag-based bonuses
+// unitBaseCrit: The attacker unit's base critical stat from statsConfig
+// abilityCrit: The ability's base critical_hit_percent
+// critBonuses: Tag-based critical bonuses from the ability
+// targetUnitId: The target unit to check tags against
+function calculateCritChance(
+  unitBaseCrit: number,
+  abilityCrit: number,
+  critBonuses: Record<number, number>,
+  targetUnitId: number
+): number {
   const targetUnit = getUnitById(targetUnitId);
-  if (!targetUnit) return baseCrit;
-  
+
+  // Start with unit base crit + ability crit
+  let totalCrit = unitBaseCrit + abilityCrit;
+
+  if (!targetUnit) return totalCrit;
+
   // critBonuses are keyed by tag IDs - check if target has any matching tags
-  const unitTags = targetUnit.identity.tags;
-  let totalBonus = 0;
-  
-  for (const tag of unitTags) {
-    if (critBonuses[tag]) {
-      totalBonus += critBonuses[tag];
+  // Use tag hierarchy: if a bonus applies to a parent tag, it applies to all child tags
+  const targetTags = targetUnit.identity.tags;
+  let tagBonus = 0;
+
+  for (const [bonusTagStr, bonus] of Object.entries(critBonuses)) {
+    const bonusTag = parseInt(bonusTagStr);
+    // Check if target matches this bonus tag (directly or through hierarchy)
+    if (unitMatchesTargets(targetTags, [bonusTag])) {
+      tagBonus += bonus;
     }
   }
-  
-  return baseCrit + totalBonus;
+
+  return totalCrit + tagBonus;
 }
 
 // Calculate damage preview for all valid targets
@@ -436,7 +454,7 @@ export function calculateDamagePreviewsForEnemy(
       const canTarget = canTargetUnit(enemyUnit.unit_id, attackerAbility.targets);
       const defense = enemyStats?.defense || 0;
       const dodgeChance = calculateDodgeChance(defense, attackerAbility.offense);
-      const critChance = calculateCritChance(attackerAbility.critPercent, attackerAbility.critBonuses, enemyUnit.unit_id);
+      const critChance = calculateCritChance(attackerAbility.unitBaseCrit, attackerAbility.critPercent, attackerAbility.critBonuses, enemyUnit.unit_id);
 
       const armorHp = enemyStats?.armor_hp || 0;
       const hp = enemyStats?.hp || 0;
@@ -537,7 +555,7 @@ export function calculateDamagePreviewsForFriendly(
     const canTarget = canTargetUnit(friendlyUnit.unitId, attackerAbility.targets);
     const defense = stats?.defense || 0;
     const dodgeChance = calculateDodgeChance(defense, attackerAbility.offense);
-    const critChance = calculateCritChance(attackerAbility.critPercent, attackerAbility.critBonuses, friendlyUnit.unitId);
+    const critChance = calculateCritChance(attackerAbility.unitBaseCrit, attackerAbility.critPercent, attackerAbility.critBonuses, friendlyUnit.unitId);
 
     const armorHp = stats?.armor_hp || 0;
     const hp = stats?.hp || 0;
@@ -651,7 +669,7 @@ export function calculateAoeDamagePreviewsForEnemy(
       const canTarget = canTargetUnit(enemyUnit.unit_id, attackerAbility.targets);
       const defense = enemyStats?.defense || 0;
       const dodgeChance = calculateDodgeChance(defense, attackerAbility.offense);
-      const critChance = calculateCritChance(attackerAbility.critPercent, attackerAbility.critBonuses, enemyUnit.unit_id);
+      const critChance = calculateCritChance(attackerAbility.unitBaseCrit, attackerAbility.critPercent, attackerAbility.critBonuses, enemyUnit.unit_id);
 
       const armorHp = enemyStats?.armor_hp || 0;
       const hp = enemyStats?.hp || 0;
@@ -884,7 +902,7 @@ export function calculateFixedDamagePreviewsForEnemy(
       const canTarget = canTargetUnit(enemyUnit.unit_id, attackerAbility.targets);
       const defense = enemyStats?.defense || 0;
       const dodgeChance = calculateDodgeChance(defense, attackerAbility.offense);
-      const critChance = calculateCritChance(attackerAbility.critPercent, attackerAbility.critBonuses, enemyUnit.unit_id);
+      const critChance = calculateCritChance(attackerAbility.unitBaseCrit, attackerAbility.critPercent, attackerAbility.critBonuses, enemyUnit.unit_id);
 
       const armorHp = enemyStats?.armor_hp || 0;
       const hp = enemyStats?.hp || 0;
