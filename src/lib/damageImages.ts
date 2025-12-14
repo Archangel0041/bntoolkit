@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { validateFile, sanitizeFilename } from "./uploadValidation";
 
 const BUCKET_NAME = "damage-icons";
 
@@ -81,13 +82,23 @@ export async function uploadMultipleDamageImages(
   
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
+    
+    // Validate file before upload
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      results.failed++;
+      results.errors.push(validation.error || `Invalid file: ${file.name}`);
+      continue;
+    }
+    
     const iconName = file.name.replace(/\.(png|jpg|jpeg|webp|gif)$/i, "");
+    const sanitizedName = sanitizeFilename(`${iconName}.png`);
     
     onProgress?.(i + 1, files.length, file.name);
     
     const { error } = await supabase.storage
       .from(BUCKET_NAME)
-      .upload(`${iconName}.png`, file, { upsert: true });
+      .upload(sanitizedName, file, { upsert: true });
     
     if (error) {
       results.failed++;

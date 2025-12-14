@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { validateFile, sanitizeFilename } from "./uploadValidation";
 
 const RESOURCE_ICONS_BUCKET = "resource-icons";
 const EVENT_REWARD_ICONS_BUCKET = "event-reward-icons";
@@ -71,11 +72,21 @@ export async function uploadMultipleResourceIcons(
 
   for (let i = 0; i < total; i++) {
     const file = files[i];
+    
+    // Validate file before upload
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      failed++;
+      errors.push(validation.error || `Invalid file: ${file.name}`);
+      continue;
+    }
+    
+    const sanitizedName = sanitizeFilename(file.name);
     onProgress?.(i + 1, total, file.name);
 
     const { error } = await supabase.storage
       .from(RESOURCE_ICONS_BUCKET)
-      .upload(file.name, file, { upsert: true });
+      .upload(sanitizedName, file, { upsert: true });
 
     if (error) {
       failed++;
@@ -99,11 +110,21 @@ export async function uploadMultipleEventRewardIcons(
 
   for (let i = 0; i < total; i++) {
     const file = files[i];
+    
+    // Validate file before upload
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      failed++;
+      errors.push(validation.error || `Invalid file: ${file.name}`);
+      continue;
+    }
+    
+    const sanitizedName = sanitizeFilename(file.name);
     onProgress?.(i + 1, total, file.name);
 
     const { error } = await supabase.storage
       .from(EVENT_REWARD_ICONS_BUCKET)
-      .upload(file.name, file, { upsert: true });
+      .upload(sanitizedName, file, { upsert: true });
 
     if (error) {
       failed++;
@@ -127,11 +148,21 @@ export async function uploadMultipleMenuBackgrounds(
 
   for (let i = 0; i < total; i++) {
     const file = files[i];
+    
+    // Validate file before upload
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      failed++;
+      errors.push(validation.error || `Invalid file: ${file.name}`);
+      continue;
+    }
+    
+    const sanitizedName = sanitizeFilename(file.name);
     onProgress?.(i + 1, total, file.name);
 
     const { error } = await supabase.storage
       .from(MENU_BACKGROUNDS_BUCKET)
-      .upload(file.name, file, { upsert: true });
+      .upload(sanitizedName, file, { upsert: true });
 
     if (error) {
       failed++;
@@ -173,11 +204,21 @@ export async function uploadMultipleEncounterIcons(
 
   for (let i = 0; i < total; i++) {
     const file = files[i];
+    
+    // Validate file before upload
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      failed++;
+      errors.push(validation.error || `Invalid file: ${file.name}`);
+      continue;
+    }
+    
+    const sanitizedName = sanitizeFilename(file.name);
     onProgress?.(i + 1, total, file.name);
 
     const { error } = await supabase.storage
       .from(ENCOUNTER_ICONS_BUCKET)
-      .upload(file.name, file, { upsert: true });
+      .upload(sanitizedName, file, { upsert: true });
 
     if (error) {
       failed++;
@@ -201,11 +242,21 @@ export async function uploadMultipleMissionIcons(
 
   for (let i = 0; i < total; i++) {
     const file = files[i];
+    
+    // Validate file before upload
+    const validation = validateFile(file);
+    if (!validation.valid) {
+      failed++;
+      errors.push(validation.error || `Invalid file: ${file.name}`);
+      continue;
+    }
+    
+    const sanitizedName = sanitizeFilename(file.name);
     onProgress?.(i + 1, total, file.name);
 
     const { error } = await supabase.storage
       .from(MISSION_ICONS_BUCKET)
-      .upload(file.name, file, { upsert: true });
+      .upload(sanitizedName, file, { upsert: true });
 
     if (error) {
       failed++;
