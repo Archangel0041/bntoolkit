@@ -421,18 +421,18 @@ export function executeAttack(
   const attackerName = attackerUnit?.identity?.name || `Unit ${attacker.unitId}`;
   
   // Get affected positions (for AOE/fixed attacks)
-  let affectedPositions: { gridId: number; damagePercent: number }[];
-  
+  let affectedPositions: { gridId: number; damagePercent: number; hitCount?: number }[];
+
   // Check if this is a "single-selection with splash" ability:
   // - Has damageArea with non-center positions (splash)
   // - targetArea is either missing, or only has center position (no movable reticle)
   const hasNonCenterSplash = ability.damageArea?.some(d => d.x !== 0 || d.y !== 0) ?? false;
-  const targetAreaHasOnlyCenter = !ability.targetArea || 
-    (ability.targetArea.data.length === 1 && 
-     ability.targetArea.data[0].x === 0 && 
+  const targetAreaHasOnlyCenter = !ability.targetArea ||
+    (ability.targetArea.data.length === 1 &&
+     ability.targetArea.data[0].x === 0 &&
      ability.targetArea.data[0].y === 0);
   const isSingleSelectionWithSplash = hasNonCenterSplash && targetAreaHasOnlyCenter;
-  
+
   if (ability.isSingleTarget && !ability.damageArea) {
     // Pure single-target: only the selected target gets hit
     affectedPositions = [{ gridId: targetGridId, damagePercent: 100 }];
@@ -501,8 +501,11 @@ export function executeAttack(
         }
       }
 
-      // Update affectedPositions to only include positions that were randomly selected
-      affectedPositions = affectedPositions.filter(pos => hitCounts.has(pos.gridId));
+      // Update affectedPositions to only include positions that were randomly selected,
+      // and store the hit count for each position
+      affectedPositions = affectedPositions
+        .filter(pos => hitCounts.has(pos.gridId))
+        .map(pos => ({ ...pos, hitCount: hitCounts.get(pos.gridId) }));
     }
   } else {
     // Fallback: just the target
@@ -623,21 +626,24 @@ export function executeAttack(
     const bypassArmor = armorDefStyle === 2 && isStunned;
     
     // Roll damage for all shots
+    // For random attacks, use the hit count for this specific position
+    // For normal attacks, use totalShots
+    const shotsToApply = pos.hitCount ?? totalShots;
     let totalArmorDamage = 0;
     let totalHpDamage = 0;
-    
-    for (let shot = 0; shot < totalShots; shot++) {
+
+    for (let shot = 0; shot < shotsToApply; shot++) {
       // Roll base damage
       const baseDamage = rollDamage(ability.minDamage, ability.maxDamage);
-      
+
       // Apply damage percent modifier
       const adjustedDamage = Math.floor(baseDamage * (pos.damagePercent / 100));
-      
+
       // Roll crit
       const isCrit = rollCrit(critChance);
       const critMultiplier = isCrit ? 2 : 1;
       const finalBaseDamage = Math.floor(adjustedDamage * critMultiplier);
-      
+
       // Calculate damage with armor and status effect modifiers
       const result = calculateDamageWithArmor(
         finalBaseDamage,
@@ -651,14 +657,14 @@ export function executeAttack(
         Object.keys(statusArmorDamageMods).length > 0 ? statusArmorDamageMods : undefined,
         bypassArmor
       );
-      
+
       // Apply damage
       target.currentArmor = Math.max(0, target.currentArmor - result.armorDamage);
       target.currentHp = Math.max(0, target.currentHp - result.hpDamage);
-      
+
       totalArmorDamage += result.armorDamage;
       totalHpDamage += result.hpDamage;
-      
+
       if (isCrit) {
         actions.push({
           type: "crit",
