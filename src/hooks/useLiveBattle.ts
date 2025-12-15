@@ -95,7 +95,9 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
 
   // Update default reticle position when ability changes
   useEffect(() => {
-    if (!selectedAbility || !selectedUnit || !battleState || selectedAbility.isSingleTarget || selectedAbility.isFixed) return;
+    // Don't set reticle for: single target, fixed pattern, or random attacks
+    const isRandom = selectedAbility?.targetArea?.random === true;
+    if (!selectedAbility || !selectedUnit || !battleState || selectedAbility.isSingleTarget || selectedAbility.isFixed || isRandom) return;
     
     const targetUnits = selectedUnit.isEnemy 
       ? battleState.friendlyUnits 
@@ -146,7 +148,9 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
 
   // Calculate valid reticle positions
   const validReticlePositions = useMemo(() => {
-    if (!selectedUnit || !selectedAbility || !battleState || selectedAbility.isSingleTarget || selectedAbility.isFixed) {
+    // Don't show reticle for: single target, fixed pattern, or random attacks
+    const isRandom = selectedAbility?.targetArea?.random === true;
+    if (!selectedUnit || !selectedAbility || !battleState || selectedAbility.isSingleTarget || selectedAbility.isFixed || isRandom) {
       return undefined;
     }
     

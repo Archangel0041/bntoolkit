@@ -149,7 +149,9 @@ const BattleSimulator = () => {
 
   // Calculate valid reticle positions based on range and line of fire
   const validReticlePositions = useMemo(() => {
-    if (!selectedUnit || !selectedAbility || selectedAbility.isSingleTarget || selectedAbility.isFixed) {
+    // Don't show reticle for: single target, fixed pattern, or random attacks
+    const isRandom = selectedAbility?.targetArea?.random === true;
+    if (!selectedUnit || !selectedAbility || selectedAbility.isSingleTarget || selectedAbility.isFixed || isRandom) {
       return undefined;
     }
     
