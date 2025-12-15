@@ -65,11 +65,9 @@ export function checkLineOfFire(
     return { isBlocked: false };
   }
 
-  // Contact fire doesn't use blocking - it only hits the closest row
-  // The row constraint is handled in getValidTargets, not via blocking
-  if (lineOfFire === LineOfFire.Contact) {
-    return { isBlocked: false };
-  }
+  // Contact fire now checks blocking like other fire types
+  // This is critical for reticle-based abilities (target_type: 2) where the reticle
+  // can be placed beyond the front row, and blocking should still apply
 
   const attackerCoords = GRID_ID_TO_COORDS[attackerGridId];
   const targetCoords = GRID_ID_TO_COORDS[targetGridId];
@@ -105,10 +103,17 @@ export function checkLineOfFire(
   // If ANY unit blocks, the target is blocked (blocking propagates to all rows behind)
   for (const blockingUnit of unitsInColumn) {
     const blocking = blockingUnit.blocking;
-    
+
     switch (lineOfFire) {
-      // Contact is handled above (returns early with isBlocked: false)
-        
+      case LineOfFire.Contact:
+        // Contact fire: Blocked by ANY unit in the path
+        // Contact fire requires direct physical contact, so any unit presence blocks
+        return {
+          isBlocked: true,
+          blockedBy: blockingUnit,
+          reason: "Contact fire blocked by unit in path"
+        };
+
       case LineOfFire.Direct:
         // Direct: Can fire PAST None blocking units
         // Blocked by Partial, Full, God

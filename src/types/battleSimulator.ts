@@ -295,10 +295,13 @@ export function getAffectedGridPositions(
 
 // Get fixed attack pattern positions relative to attacker's grid position
 // Fixed attacks hit specific positions relative to the attacker - they can't be aimed
+// Now accounts for collapsed rows to calculate effective target rows
 export function getFixedAttackPositions(
   attackerGridId: number,
   targetArea: TargetArea | undefined,
-  isAttackerFriendly: boolean
+  isAttackerFriendly: boolean,
+  attackerCollapsedRows?: Set<number>,
+  targetCollapsedRows?: Set<number>
 ): { gridId: number; damagePercent: number; isOnEnemyGrid: boolean }[] {
   if (!targetArea || targetArea.data.length === 0) {
     return [];
@@ -354,10 +357,30 @@ export function getFixedAttackPositions(
         // Mirror the x coordinate so attacks align visually (left attacks left, right attacks right)
         const mirroredX = 4 - attackerCoords.x;
         const newX = mirroredX - pos.x; // Negate offset: pattern "left" (-1) should hit visual left (+1 in mirrored coords)
-        
+
         const rowsIntoEnemyGrid = rowsTowardEnemy - rowsOnFriendlySide - 1; // -1 for the gap between grids
-        const enemyY = rowsIntoEnemyGrid; // 0 = enemy front row
-        const coordKey = `${newX},${enemyY}`;
+
+        // Calculate effective enemy row accounting for collapsed rows
+        // If row 0 has collapsed, row 1 becomes the effective "front row"
+        let effectiveEnemyY = rowsIntoEnemyGrid;
+        if (targetCollapsedRows) {
+          // Count how many rows before the target row have collapsed
+          // These collapsed rows should be skipped
+          let collapsedBeforeTarget = 0;
+          for (let checkRow = 0; checkRow < rowsIntoEnemyGrid; checkRow++) {
+            if (targetCollapsedRows.has(checkRow)) {
+              collapsedBeforeTarget++;
+            }
+          }
+          effectiveEnemyY = rowsIntoEnemyGrid + collapsedBeforeTarget;
+
+          // Skip over the target row itself if it's collapsed
+          while (effectiveEnemyY <= 2 && targetCollapsedRows.has(effectiveEnemyY)) {
+            effectiveEnemyY++;
+          }
+        }
+
+        const coordKey = `${newX},${effectiveEnemyY}`;
         targetGridId = COORDS_TO_GRID_ID[coordKey];
         isOnEnemyGrid = true;
       }
@@ -378,10 +401,28 @@ export function getFixedAttackPositions(
         // Crossed to friendly grid - mirror x coordinate
         const mirroredX = 4 - attackerCoords.x;
         const newX = mirroredX - pos.x;
-        
+
         const rowsIntoFriendlyGrid = rowsTowardFriendly - rowsOnEnemySide - 1;
-        const friendlyY = rowsIntoFriendlyGrid;
-        const coordKey = `${newX},${friendlyY}`;
+
+        // Calculate effective friendly row accounting for collapsed rows
+        let effectiveFriendlyY = rowsIntoFriendlyGrid;
+        if (targetCollapsedRows) {
+          // Count how many rows before the target row have collapsed
+          let collapsedBeforeTarget = 0;
+          for (let checkRow = 0; checkRow < rowsIntoFriendlyGrid; checkRow++) {
+            if (targetCollapsedRows.has(checkRow)) {
+              collapsedBeforeTarget++;
+            }
+          }
+          effectiveFriendlyY = rowsIntoFriendlyGrid + collapsedBeforeTarget;
+
+          // Skip over the target row itself if it's collapsed
+          while (effectiveFriendlyY <= 2 && targetCollapsedRows.has(effectiveFriendlyY)) {
+            effectiveFriendlyY++;
+          }
+        }
+
+        const coordKey = `${newX},${effectiveFriendlyY}`;
         targetGridId = COORDS_TO_GRID_ID[coordKey];
         isOnEnemyGrid = false;
       }

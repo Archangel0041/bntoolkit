@@ -128,7 +128,9 @@ const BattleSimulator = () => {
     const positions = getFixedAttackPositions(
       selectedUnit.gridId,
       selectedAbility.targetArea,
-      !selectedUnit.isEnemy // isAttackerFriendly
+      !selectedUnit.isEnemy, // isAttackerFriendly
+      undefined, // No collapsed rows in static simulator
+      undefined  // No collapsed rows in static simulator
     );
 
     // Separate positions by which grid they're on

@@ -122,21 +122,27 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
 
   // Calculate fixed attack positions
   const fixedAttackPositions = useMemo(() => {
-    if (!selectedUnit || !selectedAbility?.isFixed || !selectedAbility.targetArea) {
+    if (!selectedUnit || !selectedAbility?.isFixed || !selectedAbility.targetArea || !battleState) {
       return { enemyGrid: [] as { gridId: number; damagePercent: number }[], friendlyGrid: [] as { gridId: number; damagePercent: number }[] };
     }
+
+    // Get collapsed rows for proper targeting
+    const attackerCollapsedRows = selectedUnit.isEnemy ? battleState.enemyCollapsedRows : battleState.friendlyCollapsedRows;
+    const targetCollapsedRows = selectedUnit.isEnemy ? battleState.friendlyCollapsedRows : battleState.enemyCollapsedRows;
 
     const positions = getFixedAttackPositions(
       selectedUnit.gridId,
       selectedAbility.targetArea,
-      !selectedUnit.isEnemy
+      !selectedUnit.isEnemy,
+      attackerCollapsedRows,
+      targetCollapsedRows
     );
 
     const enemyGrid = positions.filter(p => p.isOnEnemyGrid);
     const friendlyGrid = positions.filter(p => !p.isOnEnemyGrid);
 
     return { enemyGrid, friendlyGrid };
-  }, [selectedUnit, selectedAbility]);
+  }, [selectedUnit, selectedAbility, battleState]);
 
   // Calculate valid reticle positions
   const validReticlePositions = useMemo(() => {
