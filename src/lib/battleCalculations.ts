@@ -46,9 +46,10 @@ export function getDamageModifier(damageMods: DamageMods | undefined, damageType
 
 // Get environmental damage modifier from status effect stun_damage_mods
 // These are keyed by damage type number as string (e.g., "5" for Fire)
-function getEnvironmentalDamageModifier(envMods: Record<string, number>, damageType: number): number {
+// Returns undefined if the damage type is not present in the mods
+function getEnvironmentalDamageModifier(envMods: Record<string, number>, damageType: number): number | undefined {
   const mod = envMods[damageType.toString()];
-  if (mod === undefined) return 1;
+  if (mod === undefined) return undefined;
   // Environmental mods are typically stored as decimals (1.5 = 150% damage)
   return mod;
 }
@@ -76,17 +77,20 @@ export function calculateDamageWithArmor(
   const baseHpMod = getDamageModifier(hpDamageMods, damageType);
   const baseArmorMod = getDamageModifier(armorDamageMods, damageType);
 
-  // Get environmental damage modifier - this can replace base resistances
-  const envMod = environmentalDamageMods ? getEnvironmentalDamageModifier(environmentalDamageMods, damageType) : 0;
+  // Get environmental damage modifier - only if it explicitly modifies this damage type
+  const envMod = environmentalDamageMods ? getEnvironmentalDamageModifier(environmentalDamageMods, damageType) : undefined;
 
-  // Get status effect damage modifiers - these can also replace base resistances
-  const statusHpMod = statusEffectDamageMods ? getEnvironmentalDamageModifier(statusEffectDamageMods, damageType) : 0;
-  const statusArmorMod = statusEffectArmorDamageMods ? getEnvironmentalDamageModifier(statusEffectArmorDamageMods, damageType) : 0;
+  // Get status effect damage modifiers - only if they explicitly modify this damage type
+  const statusHpMod = statusEffectDamageMods ? getEnvironmentalDamageModifier(statusEffectDamageMods, damageType) : undefined;
+  const statusArmorMod = statusEffectArmorDamageMods ? getEnvironmentalDamageModifier(statusEffectArmorDamageMods, damageType) : undefined;
 
-  // Pick the highest modifier to override base resistances
-  // If no environmental or status mods, use base resistance
-  const hpMod = Math.max(baseHpMod, envMod, statusHpMod);
-  const armorMod = Math.max(baseArmorMod, envMod, statusArmorMod);
+  // Apply modifiers in priority order:
+  // 1. Status effect mods (highest priority - e.g., Freeze increases damage taken)
+  // 2. Environmental mods (medium priority - e.g., Firemod increases fire damage)
+  // 3. Base resistances (lowest priority - unit's innate resistance)
+  // Only override if the higher priority mod exists for this damage type
+  const hpMod = statusHpMod ?? envMod ?? baseHpMod;
+  const armorMod = statusArmorMod ?? envMod ?? baseArmorMod;
 
   // If bypassing armor due to stun (Active armor units), all damage goes to HP
   if (bypassArmorDueToStun && armorHp > 0) {
@@ -102,9 +106,9 @@ export function calculateDamageWithArmor(
         powerBonus: 0,
         baseHpMod,
         baseArmorMod,
-        envMod,
-        statusHpMod,
-        statusArmorMod,
+        envMod: envMod ?? 0,
+        statusHpMod: statusHpMod ?? 0,
+        statusArmorMod: statusArmorMod ?? 0,
         finalHpMod: hpMod,
         finalArmorMod: armorMod,
         piercingDamage: rawDamage,
@@ -131,9 +135,9 @@ export function calculateDamageWithArmor(
         powerBonus: 0,
         baseHpMod,
         baseArmorMod,
-        envMod,
-        statusHpMod,
-        statusArmorMod,
+        envMod: envMod ?? 0,
+        statusHpMod: statusHpMod ?? 0,
+        statusArmorMod: statusArmorMod ?? 0,
         finalHpMod: hpMod,
         finalArmorMod: armorMod,
         piercingDamage: 0,
@@ -188,9 +192,9 @@ export function calculateDamageWithArmor(
       powerBonus: 0,
       baseHpMod,
       baseArmorMod,
-      envMod,
-      statusHpMod,
-      statusArmorMod,
+      envMod: envMod ?? 0,
+      statusHpMod: statusHpMod ?? 0,
+      statusArmorMod: statusArmorMod ?? 0,
       finalHpMod: hpMod,
       finalArmorMod: armorMod,
       piercingDamage,

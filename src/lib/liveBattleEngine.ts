@@ -446,7 +446,16 @@ export function executeAttack(
     affectedPositions = getAffectedGridPositions(targetGridId, syntheticTargetArea, !attacker.isEnemy, ability.damageArea);
   } else if (ability.isFixed && ability.targetArea) {
     // Fixed AOE pattern (like Heavy Chem Tank cone) - hits all positions in pattern
-    const fixedPos = getFixedAttackPositions(attacker.gridId, ability.targetArea, !attacker.isEnemy);
+    // Pass collapsed rows so the pattern accounts for row collapse
+    const attackerCollapsedRows = attacker.isEnemy ? state.enemyCollapsedRows : state.friendlyCollapsedRows;
+    const targetCollapsedRows = attacker.isEnemy ? state.friendlyCollapsedRows : state.enemyCollapsedRows;
+    const fixedPos = getFixedAttackPositions(
+      attacker.gridId,
+      ability.targetArea,
+      !attacker.isEnemy,
+      attackerCollapsedRows,
+      targetCollapsedRows
+    );
     console.log(`[executeAttack-fixed] Attacker gridId=${attacker.gridId}, isEnemy=${attacker.isEnemy}, isAttackerFriendly=${!attacker.isEnemy}`);
     console.log(`[executeAttack-fixed] Raw positions:`, JSON.stringify(fixedPos.map(p => ({ gridId: p.gridId, damagePercent: p.damagePercent, isOnEnemyGrid: p.isOnEnemyGrid }))));
     // Filter to only hit positions on the ENEMY grid (from attacker's perspective)
