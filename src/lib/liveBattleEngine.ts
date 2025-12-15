@@ -465,11 +465,50 @@ export function executeAttack(
   } else if (ability.targetArea) {
     // AOE with movable reticle - hits positions around selected target
     affectedPositions = getAffectedGridPositions(targetGridId, ability.targetArea, !attacker.isEnemy, ability.damageArea);
+
+    // For reticle-based random attacks (target_type: 2 + random: true),
+    // randomly select hit positions based on weights
+    if (ability.targetArea.random && ability.targetArea.targetType === 2) {
+      const totalShots = ability.shotsPerAttack * ability.attacksPerUse;
+      const totalWeight = ability.targetArea.data.reduce((sum, pos) => sum + (pos.weight || 1), 0);
+
+      // Track hits per position
+      const hitCounts = new Map<number, number>();
+
+      // Randomly select hit positions based on weights
+      for (let i = 0; i < totalShots; i++) {
+        const roll = Math.random() * totalWeight;
+        let cumulative = 0;
+
+        for (const pos of ability.targetArea.data) {
+          cumulative += (pos.weight || 1);
+          if (roll < cumulative) {
+            // This position was selected - find its gridId in affectedPositions
+            // The position's x,y is relative to the reticle (targetGridId)
+            const targetCoords = GRID_ID_TO_COORDS[targetGridId];
+            if (targetCoords) {
+              const hitX = targetCoords.x + pos.x;
+              const hitY = targetCoords.y + pos.y;
+              const coordKey = `${hitX},${hitY}`;
+              const hitGridId = COORDS_TO_GRID_ID[coordKey];
+
+              if (hitGridId !== undefined) {
+                hitCounts.set(hitGridId, (hitCounts.get(hitGridId) || 0) + 1);
+              }
+            }
+            break;
+          }
+        }
+      }
+
+      // Update affectedPositions to only include positions that were randomly selected
+      affectedPositions = affectedPositions.filter(pos => hitCounts.has(pos.gridId));
+    }
   } else {
     // Fallback: just the target
     affectedPositions = [{ gridId: targetGridId, damagePercent: 100 }];
   }
-  
+
   // Deduplicate: each grid position should only be hit once per attack
   // If same position appears multiple times, take the highest damage percent
   const positionMap = new Map<number, number>();

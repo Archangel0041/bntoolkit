@@ -428,12 +428,14 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   const executePlayerAction = useCallback((targetGridId: number) => {
     if (!battleState || !selectedUnit || !selectedAbility || isProcessing) return;
     
-    // For random attacks, we don't need a specific target validation
+    // Distinguish between reticle-based random and grid-wide random attacks
     const isRandom = isRandomAttack(selectedAbility);
-    
+    const isReticleBased = selectedAbility.targetArea?.targetType === 2; // Reticle-based pattern
+    const isGridWideRandom = isRandom && !isReticleBased; // Random across entire grid (no reticle)
+
     // For AOE attacks (not single target, not fixed), validate against valid reticle positions
     const isAOE = !selectedAbility.isSingleTarget && !selectedAbility.isFixed;
-    
+
     // Recalculate valid targets fresh to ensure we're using current state
     const freshValidTargets = getValidTargets(
       selectedUnit,
@@ -443,15 +445,15 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       battleState.friendlyCollapsedRows,
       battleState.enemyCollapsedRows
     );
-    
-    console.log(`[executePlayerAction] Fresh valid targets for ability ${selectedAbility.abilityId}:`, 
+
+    console.log(`[executePlayerAction] Fresh valid targets for ability ${selectedAbility.abilityId}:`,
       freshValidTargets.map(t => t.gridId));
-    
+
     // Validate target based on attack type
-    if (isRandom) {
-      // Random attacks don't need target validation
+    if (isGridWideRandom) {
+      // Grid-wide random attacks don't need target validation (no reticle)
     } else if (isAOE && validReticlePositions) {
-      // AOE attacks can target any valid reticle position (including empty tiles)
+      // AOE attacks (including reticle-based random) can target any valid reticle position
       if (!validReticlePositions.has(targetGridId)) return;
     } else {
       // Single target and fixed attacks need a valid target unit
@@ -498,9 +500,15 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       const abilityData = getAbilityById(selectedAbility.abilityId);
       const localizedAbilityName = abilityData ? t(abilityData.name) : `Ability ${selectedAbility.abilityId}`;
 
-      // Execute the attack (random or normal) on cloned state
+      // Execute the attack on cloned state
+      // Grid-wide random attacks use executeRandomAttack (no reticle needed)
+      // All other attacks (including reticle-based random) use executeAttack with targetGridId
       let actions: BattleAction[];
-      if (isRandom) {
+      const isReticleBased = selectedAbility.targetArea?.targetType === 2;
+      const isGridWideRandom = isRandom && !isReticleBased;
+
+      if (isGridWideRandom) {
+        // Grid-wide random: randomly hits across entire battlefield (no reticle)
         actions = executeRandomAttack(
           clonedAttacker,
           selectedAbility,
@@ -508,6 +516,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           environmentalDamageMods
         );
       } else {
+        // All other attacks: single target, AOE, fixed, and reticle-based random
         actions = executeAttack(
           clonedAttacker,
           selectedAbility,
