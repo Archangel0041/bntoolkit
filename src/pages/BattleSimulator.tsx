@@ -245,13 +245,14 @@ const BattleSimulator = () => {
     }
     const name = prompt("Enter party name:");
     if (name) {
-      const newParty = createParty(name);
-      // Update the party with temp formation units
-      updateParty({
-        ...newParty,
-        units: [...tempFormation.units],
+      createParty(name).then((newParty) => {
+        // Update the party with temp formation units
+        updateParty({
+          ...newParty,
+          units: [...tempFormation.units],
+        });
+        toast.success(`Saved party: ${name}`);
       });
-      toast.success(`Saved party: ${name}`);
     }
   };
 
