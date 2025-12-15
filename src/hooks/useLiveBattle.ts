@@ -400,6 +400,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           blockReason: blockCheck.reason,
           isRandomAttack: isRandom,
           expectedHits: isRandom ? effectiveShots : undefined,
+          damageType: selectedAbility.damageType,
         };
       });
   }, [battleState, selectedUnit, selectedAbility, fixedAttackPositions, enemyReticleGridId, environmentalDamageMods]);

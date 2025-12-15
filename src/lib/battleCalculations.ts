@@ -755,6 +755,7 @@ export function calculateAoeDamagePreviewsForEnemy(
         blockedByUnitId: blockCheck.blockedBy?.unitId,
         ...blockerInfo,
         blockReason: blockCheck.reason,
+        damageType: attackerAbility.damageType,
       };
     });
 }
@@ -785,7 +786,7 @@ export function calculateAoeDamagePreviewsForFriendly(
       const canTarget = canTargetUnit(friendlyUnit.unitId, attackerAbility.targets);
       const defense = stats?.defense || 0;
       const dodgeChance = calculateDodgeChance(defense, attackerAbility.offense);
-      const critChance = calculateCritChance(attackerAbility.critPercent, attackerAbility.critBonuses, friendlyUnit.unitId);
+      const critChance = calculateCritChance(attackerAbility.unitBaseCrit, attackerAbility.critPercent, attackerAbility.critBonuses, friendlyUnit.unitId);
 
       const armorHp = stats?.armor_hp || 0;
       const hp = stats?.hp || 0;
@@ -870,6 +871,7 @@ export function calculateAoeDamagePreviewsForFriendly(
         blockedByUnitId: blockCheck.blockedBy?.unitId,
         ...blockerInfo,
         blockReason: blockCheck.reason,
+        damageType: attackerAbility.damageType,
       };
     });
 }
@@ -985,6 +987,7 @@ export function calculateFixedDamagePreviewsForEnemy(
         isBlocked: blockCheck.isBlocked,
         blockedByUnitId: blockCheck.blockedBy?.unitId,
         blockReason: blockCheck.reason,
+        damageType: attackerAbility.damageType,
       };
     });
 }
@@ -1014,7 +1017,7 @@ export function calculateFixedDamagePreviewsForFriendly(
       const canTarget = canTargetUnit(friendlyUnit.unitId, attackerAbility.targets);
       const defense = stats?.defense || 0;
       const dodgeChance = calculateDodgeChance(defense, attackerAbility.offense);
-      const critChance = calculateCritChance(attackerAbility.critPercent, attackerAbility.critBonuses, friendlyUnit.unitId);
+      const critChance = calculateCritChance(attackerAbility.unitBaseCrit, attackerAbility.critPercent, attackerAbility.critBonuses, friendlyUnit.unitId);
 
       const armorHp = stats?.armor_hp || 0;
       const hp = stats?.hp || 0;
@@ -1097,6 +1100,7 @@ export function calculateFixedDamagePreviewsForFriendly(
         isBlocked: blockCheck.isBlocked,
         blockedByUnitId: blockCheck.blockedBy?.unitId,
         blockReason: blockCheck.reason,
+        damageType: attackerAbility.damageType,
       };
     });
 }
