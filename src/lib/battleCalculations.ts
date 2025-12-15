@@ -283,8 +283,17 @@ export function getUnitAbilities(unitId: number, rank: number): AbilityInfo[] {
       const ability = getAbilityById(abilityId);
       if (!ability) return;
 
-      const minDamage = calculateDamageAtRank(weapon.stats.base_damage_min, power);
-      const maxDamage = calculateDamageAtRank(weapon.stats.base_damage_max, power);
+      // Calculate base damage at rank
+      const baseDamageMin = calculateDamageAtRank(weapon.stats.base_damage_min, power);
+      const baseDamageMax = calculateDamageAtRank(weapon.stats.base_damage_max, power);
+
+      // Apply damage multipliers from ability stats (damage_from_weapon, damage_from_unit)
+      const damageFromWeapon = (ability.stats as any).damage_from_weapon ?? 1.0;
+      const damageFromUnit = (ability.stats as any).damage_from_unit ?? 1.0;
+
+      const minDamage = Math.floor(baseDamageMin * damageFromWeapon * damageFromUnit);
+      const maxDamage = Math.floor(baseDamageMax * damageFromWeapon * damageFromUnit);
+
       const offense = ability.stats.attack + accuracy;
 
       // Parse target area data

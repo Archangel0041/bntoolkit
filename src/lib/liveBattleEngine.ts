@@ -629,20 +629,26 @@ export function executeAttack(
     // For random attacks, use the hit count for this specific position
     // For normal attacks, use totalShots
     const shotsToApply = pos.hitCount ?? totalShots;
+
+    console.log(`[executeAttack-damage] Target grid ${target.gridId}: shotsToApply=${shotsToApply}, hitCount=${pos.hitCount}, totalShots=${totalShots}, damagePercent=${pos.damagePercent}`);
+
     let totalArmorDamage = 0;
     let totalHpDamage = 0;
 
     for (let shot = 0; shot < shotsToApply; shot++) {
       // Roll base damage
       const baseDamage = rollDamage(ability.minDamage, ability.maxDamage);
+      console.log(`[executeAttack-damage] Shot ${shot + 1}/${shotsToApply}: baseDamage=${baseDamage} (min=${ability.minDamage}, max=${ability.maxDamage})`);
 
       // Apply damage percent modifier
       const adjustedDamage = Math.floor(baseDamage * (pos.damagePercent / 100));
+      console.log(`[executeAttack-damage] After damagePercent (${pos.damagePercent}%): adjustedDamage=${adjustedDamage}`);
 
       // Roll crit
       const isCrit = rollCrit(critChance);
       const critMultiplier = isCrit ? 2 : 1;
       const finalBaseDamage = Math.floor(adjustedDamage * critMultiplier);
+      console.log(`[executeAttack-damage] After crit (isCrit=${isCrit}, mult=${critMultiplier}): finalBaseDamage=${finalBaseDamage}`);
 
       // Calculate damage with armor and status effect modifiers
       const result = calculateDamageWithArmor(
@@ -657,6 +663,7 @@ export function executeAttack(
         Object.keys(statusArmorDamageMods).length > 0 ? statusArmorDamageMods : undefined,
         bypassArmor
       );
+      console.log(`[executeAttack-damage] After armor/mods: armorDmg=${result.armorDamage}, hpDmg=${result.hpDamage}`);
 
       // Apply damage
       target.currentArmor = Math.max(0, target.currentArmor - result.armorDamage);
@@ -679,6 +686,12 @@ export function executeAttack(
       }
     }
     
+    // Build message with hit count for positions hit multiple times or random attacks
+    let damageMessage = `Dealt ${totalHpDamage} HP damage${totalArmorDamage > 0 ? ` and ${totalArmorDamage} armor damage` : ''}`;
+    if (shotsToApply > 1 || pos.hitCount) {
+      damageMessage += ` (${shotsToApply} hit${shotsToApply > 1 ? 's' : ''})`;
+    }
+
     actions.push({
       type: "attack",
       attackerGridId: attacker.gridId,
@@ -690,7 +703,8 @@ export function executeAttack(
       damage: totalArmorDamage + totalHpDamage,
       armorDamage: totalArmorDamage,
       hpDamage: totalHpDamage,
-      message: `Dealt ${totalHpDamage} HP damage${totalArmorDamage > 0 ? ` and ${totalArmorDamage} armor damage` : ''}`,
+      hitCount: shotsToApply > 1 ? shotsToApply : undefined,
+      message: damageMessage,
     });
     
     // Check for death
