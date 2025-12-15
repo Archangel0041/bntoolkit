@@ -719,7 +719,8 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
 
       // 8. Execute attack and get actions
       let attackActions: BattleAction[];
-      if (isRandomAttack(ability)) {
+      const isGridWideRandom = isRandomAttack(ability) && ability.targetArea?.targetType !== 2;
+      if (isGridWideRandom) {
         attackActions = executeRandomAttack(enemy, ability, newState, environmentalDamageMods);
       } else {
         attackActions = executeAttack(enemy, ability, target.gridId, newState, environmentalDamageMods);
