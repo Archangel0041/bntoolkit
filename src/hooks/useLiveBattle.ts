@@ -711,8 +711,21 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     // IMPORTANT: Pass only ALIVE units to ability/target checks
     const abilityPool: { enemy: LiveBattleUnit; ability: AbilityInfo; targets: LiveBattleUnit[] }[] = [];
     for (const enemy of activeEnemies) {
-      for (const ability of getAvailableAbilities(enemy, aliveEnemies, aliveFriendlies, battleState.friendlyCollapsedRows, battleState.enemyCollapsedRows)) {
-        const targets = getValidTargets(enemy, ability, aliveEnemies, aliveFriendlies, battleState.friendlyCollapsedRows, battleState.enemyCollapsedRows);
+      for (const ability of getAvailableAbilities(
+        enemy,
+        aliveEnemies,
+        aliveFriendlies,
+        newState.friendlyCollapsedRows,
+        newState.enemyCollapsedRows
+      )) {
+        const targets = getValidTargets(
+          enemy,
+          ability,
+          aliveEnemies,
+          aliveFriendlies,
+          newState.friendlyCollapsedRows,
+          newState.enemyCollapsedRows
+        );
         if (targets.length > 0) {
           abilityPool.push({ enemy, ability, targets });
         }
@@ -730,6 +743,11 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
           attackerName: unit?.identity?.name || `Unit ${enemy.unitId}`,
           message: `No valid targets`,
         });
+      }
+
+      // Ensure the enemy turn always produces at least one log entry
+      if (actions.length === 0) {
+        actions.push({ type: "skip", message: "Enemy skipped turn" });
       }
     } else {
       // 7. Pick one random ability from pool
@@ -753,6 +771,11 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         abilityName: abilityData ? t(abilityData.name) : a.abilityName,
       }));
       actions.push(...attackActions);
+    }
+
+    // Ensure the enemy turn always produces at least one log entry
+    if (actions.length === 0) {
+      actions.push({ type: "skip", message: "Enemy skipped turn" });
     }
 
     // 9. Reduce cooldowns for all enemies
