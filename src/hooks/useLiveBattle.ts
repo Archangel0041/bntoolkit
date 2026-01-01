@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import {
   initializeBattle,
   getAvailableAbilities,
@@ -427,6 +428,27 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   // Execute player action
   const executePlayerAction = useCallback((targetGridId: number) => {
     if (!battleState || !selectedUnit || !selectedAbility || isProcessing) return;
+    
+    // Guard: Check if selected ability is actually available (respects cooldowns, ammo, charge time)
+    const currentAvailableAbilities = getAvailableAbilities(
+      selectedUnit,
+      battleState.enemyUnits,
+      battleState.friendlyUnits,
+      battleState.friendlyCollapsedRows,
+      battleState.enemyCollapsedRows
+    );
+    
+    if (!currentAvailableAbilities.some(a => a.abilityId === selectedAbility.abilityId)) {
+      // Check specifically for charge time issue to give helpful message
+      const chargeProgress = selectedUnit.abilityChargeProgress[selectedAbility.abilityId] ?? 0;
+      if (selectedAbility.chargeTime > 0 && chargeProgress < selectedAbility.chargeTime) {
+        const turnsLeft = selectedAbility.chargeTime - chargeProgress;
+        toast.error(`Ability is still charging (${turnsLeft} turn${turnsLeft > 1 ? 's' : ''} remaining)`);
+      } else {
+        toast.error("Ability is not available");
+      }
+      return;
+    }
     
     // For random attacks, we don't need a specific target validation
     const isRandom = isRandomAttack(selectedAbility);

@@ -89,6 +89,7 @@ interface LiveAbilitySelectorProps {
   weaponGlobalCooldowns: Record<string, number>;
   weaponAmmo?: Record<string, number>;
   weaponReloadCooldown?: Record<string, number>;
+  abilityChargeProgress?: Record<number, number>;
   disabled?: boolean;
   className?: string;
 }
@@ -101,6 +102,7 @@ export function LiveAbilitySelector({
   weaponGlobalCooldowns,
   weaponAmmo,
   weaponReloadCooldown,
+  abilityChargeProgress,
   disabled,
   className,
 }: LiveAbilitySelectorProps) {
@@ -121,6 +123,11 @@ export function LiveAbilitySelector({
           const isOnCooldown = abilityCooldown > 0 || weaponCooldown > 0;
           const isSelected = selectedAbilityId === ability.abilityId;
           
+          // Charge/prep time check
+          const chargeProgress = abilityChargeProgress?.[ability.abilityId] ?? 0;
+          const isCharging = ability.chargeTime > 0 && chargeProgress < ability.chargeTime;
+          const chargeTurnsLeft = ability.chargeTime > 0 ? Math.max(0, ability.chargeTime - chargeProgress) : 0;
+          
           // Ammo check
           const currentAmmo = weaponAmmo?.[ability.weaponName] ?? ability.weaponMaxAmmo;
           const isInfiniteAmmo = ability.weaponMaxAmmo === -1;
@@ -128,7 +135,7 @@ export function LiveAbilitySelector({
           const isReloading = (weaponReloadCooldown?.[ability.weaponName] ?? 0) > 0;
           const reloadTurns = weaponReloadCooldown?.[ability.weaponName] ?? 0;
           
-          const isDisabled = disabled || isOnCooldown || !hasEnoughAmmo || isReloading;
+          const isDisabled = disabled || isOnCooldown || !hasEnoughAmmo || isReloading || isCharging;
           const totalShots = ability.shotsPerAttack * ability.attacksPerUse;
           
           // Get targeting categories
@@ -217,7 +224,7 @@ export function LiveAbilitySelector({
                   </div>
                   
                   {/* Cooldown badge */}
-                  {isOnCooldown && (
+                  {isOnCooldown && !isCharging && (
                     <Badge
                       variant="secondary"
                       className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs"
@@ -225,8 +232,17 @@ export function LiveAbilitySelector({
                       {Math.max(abilityCooldown, weaponCooldown)}
                     </Badge>
                   )}
+                  {/* Charging/prep time badge */}
+                  {isCharging && (
+                    <Badge
+                      variant="secondary"
+                      className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs bg-orange-500 text-white"
+                    >
+                      {chargeTurnsLeft}
+                    </Badge>
+                  )}
                   {/* Reload badge */}
-                  {isReloading && (
+                  {isReloading && !isCharging && !isOnCooldown && (
                     <Badge
                       variant="secondary"
                       className="absolute -top-2 -right-2 h-5 w-5 p-0 flex items-center justify-center text-xs bg-blue-500"
@@ -344,9 +360,14 @@ export function LiveAbilitySelector({
                     </div>
                   )}
                   
-                  {/* Cooldown/reload status */}
-                  {(isOnCooldown || isReloading || !hasEnoughAmmo) && (
+                  {/* Cooldown/reload/charging status */}
+                  {(isOnCooldown || isReloading || !hasEnoughAmmo || isCharging) && (
                     <div className="pt-1 border-t space-y-0.5">
+                      {isCharging && (
+                        <p className="text-orange-500">
+                          Charging: {chargeTurnsLeft} turn{chargeTurnsLeft > 1 ? 's' : ''} remaining
+                        </p>
+                      )}
                       {isOnCooldown && (
                         <p className="text-yellow-500">
                           {weaponCooldown > 0 
