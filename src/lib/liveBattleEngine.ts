@@ -754,11 +754,7 @@ export function executeAttack(
   }
   console.log(`[executeAttack] Current weaponGlobalCooldowns AFTER setting:`, JSON.stringify(attacker.weaponGlobalCooldown));
   
-  // Reset charge progress for this ability after use (it needs to charge again)
-  if (ability.chargeTime > 0) {
-    attacker.abilityChargeProgress[ability.abilityId] = 0;
-    console.log(`[executeAttack] Reset charge progress for ability ${ability.abilityId} (chargeTime=${ability.chargeTime})`);
-  }
+  // Note: Charge/prep time is NOT reset after use - it only applies once at battle start
   
   // Consume ammo
   if (ability.weaponMaxAmmo !== -1 && ability.ammoRequired > 0) {
