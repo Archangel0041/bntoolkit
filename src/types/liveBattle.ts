@@ -22,6 +22,8 @@ export interface LiveBattleUnit {
   weaponReloadCooldown: Record<string, number>;
   // Status effects: effectId -> { duration, dotDamage, damageType }
   activeStatusEffects: ActiveStatusEffect[];
+  // Charge/prep time progress: abilityId -> turns charged (ability is ready when chargeProgress >= chargeTime)
+  abilityChargeProgress: Record<number, number>;
 }
 
 export interface ActiveStatusEffect {

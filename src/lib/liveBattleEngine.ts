@@ -105,6 +105,7 @@ export function createLiveBattleUnit(
     weaponAmmo,
     weaponReloadCooldown,
     activeStatusEffects: [],
+    abilityChargeProgress: {},
   };
 }
 
@@ -198,6 +199,16 @@ export function getAvailableAbilities(
     if (abilityCooldown > 0) {
       console.log(`[getAvailableAbilities] Ability ${ability.abilityId} is on cooldown (${abilityCooldown} turns remaining)`);
       return false;
+    }
+    
+    // Check charge time (prep time) - ability needs to charge before it can be used
+    if (ability.chargeTime > 0) {
+      const chargeProgress = unit.abilityChargeProgress[ability.abilityId] ?? 0;
+      console.log(`[getAvailableAbilities] Ability ${ability.abilityId} has chargeTime=${ability.chargeTime}, chargeProgress=${chargeProgress}`);
+      if (chargeProgress < ability.chargeTime) {
+        console.log(`[getAvailableAbilities] Ability ${ability.abilityId} is still charging (${chargeProgress}/${ability.chargeTime} turns)`);
+        return false;
+      }
     }
     
     // Check weapon global cooldown - blocks ALL abilities on this weapon
@@ -743,6 +754,12 @@ export function executeAttack(
   }
   console.log(`[executeAttack] Current weaponGlobalCooldowns AFTER setting:`, JSON.stringify(attacker.weaponGlobalCooldown));
   
+  // Reset charge progress for this ability after use (it needs to charge again)
+  if (ability.chargeTime > 0) {
+    attacker.abilityChargeProgress[ability.abilityId] = 0;
+    console.log(`[executeAttack] Reset charge progress for ability ${ability.abilityId} (chargeTime=${ability.chargeTime})`);
+  }
+  
   // Consume ammo
   if (ability.weaponMaxAmmo !== -1 && ability.ammoRequired > 0) {
     const currentAmmo = attacker.weaponAmmo[ability.weaponName] ?? 0;
@@ -1124,7 +1141,7 @@ export function calculateTurnSummary(actions: BattleAction[]): TurnSummary {
   return { totalDamage, totalHpDamage, totalArmorDamage, dodges, crits, statusEffectsApplied, kills };
 }
 
-// Reduce cooldowns at end of turn
+// Reduce cooldowns and increment charge progress at end of turn
 export function reduceCooldowns(units: LiveBattleUnit[]): void {
   for (const unit of units) {
     if (unit.isDead) continue;
@@ -1154,6 +1171,19 @@ export function reduceCooldowns(units: LiveBattleUnit[]): void {
           if (weapon) {
             unit.weaponAmmo[weaponName] = weapon.stats.ammo;
           }
+        }
+      }
+    }
+    
+    // Increment charge progress for abilities with charge time
+    const abilities = getUnitAbilities(unit.unitId, unit.rank);
+    for (const ability of abilities) {
+      if (ability.chargeTime > 0) {
+        const currentProgress = unit.abilityChargeProgress[ability.abilityId] ?? 0;
+        // Only increment if not already fully charged
+        if (currentProgress < ability.chargeTime) {
+          unit.abilityChargeProgress[ability.abilityId] = currentProgress + 1;
+          console.log(`[reduceCooldowns] Unit ${unit.unitId} ability ${ability.abilityId} charge progress: ${currentProgress + 1}/${ability.chargeTime}`);
         }
       }
     }
