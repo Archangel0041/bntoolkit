@@ -9,6 +9,7 @@ import {
   isRandomAttack,
   processStatusEffects,
   reduceCooldowns,
+  isUnitStunned,
   checkBattleEnd,
   aiSelectAction,
   createLiveBattleUnit,
@@ -41,6 +42,9 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   const [selectedUnitIsEnemy, setSelectedUnitIsEnemy] = useState<boolean>(false);
   const [selectedAbilityId, setSelectedAbilityId] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  // Track if the current player turn has had its start-of-turn processing done
+  const [playerTurnStartProcessed, setPlayerTurnStartProcessed] = useState(false);
+  
   // Get environmental damage mods
   const environmentalDamageMods = useMemo(() => {
     if (!encounter?.environmental_status_effect) return undefined;
@@ -58,7 +62,91 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     setSelectedUnitIsEnemy(false);
     setSelectedAbilityId(null);
     setIsProcessing(false);
+    // First turn is already ready - no DOT to process yet
+    setPlayerTurnStartProcessed(true);
   }, [friendlyParty, waves, startingWave]);
+
+  // Execute player turn start phase: DoT -> deaths -> collapse -> cooldowns
+  // Called automatically when player turn begins (after enemy turn ends)
+  const executePlayerTurnStart = useCallback(() => {
+    if (!battleState || !battleState.isPlayerTurn || battleState.isBattleOver || isProcessing) return;
+    if (playerTurnStartProcessed) return; // Already processed this turn
+    
+    console.log('[executePlayerTurnStart] Processing player turn start');
+    setIsProcessing(true);
+    
+    setBattleState(prev => {
+      if (!prev) return prev;
+      
+      // Deep clone state
+      const newState: LiveBattleState = {
+        ...prev,
+        friendlyUnits: prev.friendlyUnits.map(u => ({
+          ...u,
+          abilityCooldowns: { ...u.abilityCooldowns },
+          weaponGlobalCooldown: { ...u.weaponGlobalCooldown },
+          weaponAmmo: { ...u.weaponAmmo },
+          weaponReloadCooldown: { ...u.weaponReloadCooldown },
+          activeStatusEffects: u.activeStatusEffects.map(e => ({ ...e })),
+          abilityChargeProgress: { ...u.abilityChargeProgress },
+        })),
+        enemyUnits: prev.enemyUnits.map(u => ({
+          ...u,
+          abilityCooldowns: { ...u.abilityCooldowns },
+          weaponGlobalCooldown: { ...u.weaponGlobalCooldown },
+          weaponAmmo: { ...u.weaponAmmo },
+          weaponReloadCooldown: { ...u.weaponReloadCooldown },
+          activeStatusEffects: u.activeStatusEffects.map(e => ({ ...e })),
+          abilityChargeProgress: { ...u.abilityChargeProgress },
+        })),
+        friendlyCollapsedRows: new Set(prev.friendlyCollapsedRows),
+        enemyCollapsedRows: new Set(prev.enemyCollapsedRows),
+        battleLog: [...prev.battleLog],
+      };
+      
+      const actions: BattleAction[] = [];
+      
+      // 1. Collapse rows if needed
+      newState.friendlyCollapsedRows = collapseGrid(newState.friendlyUnits, newState.friendlyCollapsedRows);
+      newState.enemyCollapsedRows = collapseGrid(newState.enemyUnits, newState.enemyCollapsedRows);
+      
+      // 2. Process status effects (DoT damage)
+      actions.push(...processStatusEffects([...newState.friendlyUnits, ...newState.enemyUnits], environmentalDamageMods));
+      
+      // 3. Reduce cooldowns for player units (before action selection) - stunned units skip this
+      reduceCooldowns(newState.friendlyUnits);
+      
+      // 4. Check if battle ended from status effects
+      const endCheck = checkBattleEnd(newState);
+      
+      // If there were status effect actions, add them to the log
+      if (actions.length > 0) {
+        const turn: BattleTurn = {
+          turnNumber: newState.currentTurn,
+          isPlayerTurn: true,
+          actions,
+          summary: calculateTurnSummary(actions),
+        };
+        newState.battleLog = [...newState.battleLog, turn];
+      }
+      
+      return {
+        ...newState,
+        isBattleOver: endCheck.isOver,
+        isPlayerVictory: endCheck.playerWon,
+      };
+    });
+    
+    setPlayerTurnStartProcessed(true);
+    setIsProcessing(false);
+  }, [battleState, isProcessing, playerTurnStartProcessed, environmentalDamageMods]);
+
+  // Reset playerTurnStartProcessed when turn changes to enemy
+  useEffect(() => {
+    if (battleState && !battleState.isPlayerTurn) {
+      setPlayerTurnStartProcessed(false);
+    }
+  }, [battleState?.isPlayerTurn]);
 
   // Get currently selected unit - use both gridId AND isEnemy to find the right unit
   const selectedUnit = useMemo(() => {
@@ -566,8 +654,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       clonedState.friendlyCollapsedRows = collapseGrid(clonedState.friendlyUnits, clonedState.friendlyCollapsedRows);
       clonedState.enemyCollapsedRows = collapseGrid(clonedState.enemyUnits, clonedState.enemyCollapsedRows);
 
-      // Reduce cooldowns for player units
-      reduceCooldowns(clonedState.friendlyUnits);
+      // Cooldowns will be reduced at the START of next player turn, not here
 
       return {
         ...clonedState,
@@ -641,6 +728,9 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     newState.friendlyCollapsedRows = collapseGrid(newState.friendlyUnits, newState.friendlyCollapsedRows);
     newState.enemyCollapsedRows = collapseGrid(newState.enemyUnits, newState.enemyCollapsedRows);
     actions.push(...processStatusEffects([...newState.friendlyUnits, ...newState.enemyUnits], environmentalDamageMods));
+
+    // 2b. Reduce cooldowns for enemies (before ability selection) - stunned units skip this
+    reduceCooldowns(newState.enemyUnits);
 
     // 3. Check if battle ended from status effects
     let endCheck = checkBattleEnd(newState);
@@ -778,8 +868,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       actions.push({ type: "skip", message: "Enemy skipped turn" });
     }
 
-    // 9. Reduce cooldowns for all enemies
-    reduceCooldowns(newState.enemyUnits);
+    // Cooldowns already reduced at turn start (before ability selection)
 
     // 10. Check battle end
     endCheck = checkBattleEnd(newState);
@@ -869,7 +958,8 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         actions: [{ type: "skip", message: "Player skipped turn" }],
       };
 
-      reduceCooldowns(prev.friendlyUnits);
+      // Cooldowns are reduced at turn START, not when skipping
+      // (they were already reduced in executePlayerTurnStart)
 
       return {
         ...prev,
@@ -895,6 +985,8 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     isProcessing,
     startBattle,
     executePlayerAction,
+    executePlayerTurnStart,
+    playerTurnStartProcessed,
     executeEnemyTurn,
     advanceWave,
     skipTurn,

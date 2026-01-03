@@ -74,6 +74,8 @@ const LiveBattleSimulator = () => {
     isProcessing,
     startBattle,
     executePlayerAction,
+    executePlayerTurnStart,
+    playerTurnStartProcessed,
     executeEnemyTurn,
     advanceWave,
     skipTurn,
@@ -102,6 +104,20 @@ const LiveBattleSimulator = () => {
       return () => clearTimeout(timer);
     }
   }, [battleState?.enemyUnits, checkWaveAdvance, advanceWave, isProcessing]);
+
+  // Auto-execute player turn start when it becomes player's turn
+  useEffect(() => {
+    if (battleState && battleState.isPlayerTurn && !battleState.isBattleOver && !isProcessing && !playerTurnStartProcessed) {
+      console.log('[LiveBattle useEffect] Scheduling player turn start processing');
+      
+      const timer = setTimeout(() => {
+        console.log('[LiveBattle useEffect] Executing player turn start');
+        executePlayerTurnStart();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [battleState?.isPlayerTurn, battleState?.isBattleOver, isProcessing, playerTurnStartProcessed, executePlayerTurnStart]);
 
   // Auto-execute enemy turn when it's their turn
   useEffect(() => {
