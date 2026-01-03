@@ -1138,9 +1138,21 @@ export function calculateTurnSummary(actions: BattleAction[]): TurnSummary {
 }
 
 // Reduce cooldowns and increment charge progress at end of turn
+// Check if a unit is stunned/frozen/disabled (cannot act)
+export function isUnitStunned(unit: LiveBattleUnit): boolean {
+  return unit.activeStatusEffects.some(e => e.isStun);
+}
+
 export function reduceCooldowns(units: LiveBattleUnit[]): void {
   for (const unit of units) {
     if (unit.isDead) continue;
+    
+    // Check if unit is stunned - stunned units don't get cooldown reduction
+    const stunned = isUnitStunned(unit);
+    if (stunned) {
+      console.log(`[reduceCooldowns] Unit ${unit.unitId} is stunned, skipping cooldown reduction`);
+      continue;
+    }
     
     // Reduce ability cooldowns
     for (const abilityId of Object.keys(unit.abilityCooldowns)) {
