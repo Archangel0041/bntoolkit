@@ -60,3 +60,25 @@ export function unitMatchesTargets(unitTags: number[], abilityTargets: number[])
   const expandedTargets = expandTargetTags(abilityTargets);
   return relevantUnitTags.some(tag => expandedTargets.includes(tag));
 }
+
+// Get the reason why a unit is immune to an ability's targeting
+// Returns null if the unit is not immune, or a description of why it's immune
+export function getTargetingImmunityReason(unitTags: number[], abilityTargets: number[]): string | null {
+  if (abilityTargets.length === 0) return null; // No restrictions
+  
+  // Filter out excluded tags from unit's tags for matching purposes
+  const relevantUnitTags = unitTags.filter(tag => !EXCLUDED_TARGETING_TAGS.has(tag));
+  
+  // If after filtering, unit has no relevant tags, not immune
+  if (relevantUnitTags.length === 0) return null;
+  
+  const expandedTargets = expandTargetTags(abilityTargets);
+  const isImmune = !relevantUnitTags.some(tag => expandedTargets.includes(tag));
+  
+  if (!isImmune) return null;
+  
+  // Build the reason - ability requires certain tags that the unit doesn't have
+  // Import would cause circular dependency, so we just return tag numbers
+  // The caller can format with UnitTagLabels if needed
+  return `requires ${abilityTargets.join(", ")}`;
+}

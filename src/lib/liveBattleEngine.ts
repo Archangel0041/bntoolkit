@@ -1,7 +1,7 @@
 import { getUnitById } from "@/lib/units";
 import { UnitTag, DamageType } from "@/data/gameEnums";
 import { getAbilityById } from "@/lib/abilities";
-import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTargetUnit, getDamageModifier, calculateCritChance } from "@/lib/battleCalculations";
+import { getUnitAbilities, calculateDodgeChance, calculateDamageWithArmor, canTargetUnit, getUnitImmunityReason, getDamageModifier, calculateCritChance } from "@/lib/battleCalculations";
 import { getBlockingUnits, checkLineOfFire, calculateRange } from "@/lib/battleTargeting";
 import { getStatusEffect, getEffectDisplayNameTranslated } from "@/lib/statusEffects";
 import { unitMatchesTargets } from "@/lib/tagHierarchy";
@@ -532,9 +532,32 @@ export function executeAttack(
     if (!target) continue;
 
     // **CRITICAL**: Validate that target can be targeted by this ability (tag validation)
+    // For enemy attackers: skip immune units silently
+    // For player attackers: allow attack but log immunity
     if (!canTargetUnit(target.unitId, ability.targets)) {
-      console.log(`[executeAttack] Skipping target at grid ${target.gridId} - unit ${target.unitId} cannot be targeted by ability (tag mismatch)`);
-      continue;
+      const targetUnit = getUnitById(target.unitId);
+      const targetName = targetUnit?.identity?.name || `Unit ${target.unitId}`;
+      
+      if (attacker.isEnemy) {
+        // Enemies skip immune targets silently
+        console.log(`[executeAttack] Skipping target at grid ${target.gridId} - unit ${target.unitId} cannot be targeted by ability (tag mismatch)`);
+        continue;
+      } else {
+        // Players get an immunity log message
+        const immunityReason = getUnitImmunityReason(target.unitId, ability.targets) || "tag mismatch";
+        console.log(`[executeAttack] Target ${target.unitId} is immune: ${immunityReason}`);
+        actions.push({
+          type: "skip",
+          attackerGridId: attacker.gridId,
+          attackerName,
+          targetGridId: target.gridId,
+          targetName,
+          abilityId: ability.abilityId,
+          abilityName,
+          message: `${targetName} is immune (${immunityReason})`,
+        });
+        continue;
+      }
     }
 
     // For non-AOE attacks, check blocking for each individual target
@@ -867,19 +890,41 @@ export function executeRandomAttack(
     if (!target) continue;
     
     // **CRITICAL**: Validate that target can be targeted by this ability (tag validation)
+    // For enemy attackers: skip immune units silently (but log hit for random)
+    // For player attackers: show immunity message with reason
     if (!canTargetUnit(target.unitId, ability.targets)) {
-      console.log(`[executeRandomAttack] Skipping target at grid ${target.gridId} - unit ${target.unitId} cannot be targeted by ability (tag mismatch)`);
-      // Add to empty hits since it missed due to targeting restrictions
-      actions.push({
-        type: "skip",
-        attackerGridId: attacker.gridId,
-        attackerName,
-        targetGridId: gridId,
-        abilityId: ability.abilityId,
-        abilityName,
-        hitCount: hits,
-        message: `${hits} hit${hits > 1 ? 's' : ''} missed - cannot target this unit type`,
-      });
+      const targetUnit = getUnitById(target.unitId);
+      const targetName = targetUnit?.identity?.name || `Unit ${target.unitId}`;
+      
+      if (attacker.isEnemy) {
+        // Enemies skip immune targets with a generic message
+        console.log(`[executeRandomAttack] Skipping target at grid ${target.gridId} - unit ${target.unitId} cannot be targeted by ability (tag mismatch)`);
+        actions.push({
+          type: "skip",
+          attackerGridId: attacker.gridId,
+          attackerName,
+          targetGridId: gridId,
+          abilityId: ability.abilityId,
+          abilityName,
+          hitCount: hits,
+          message: `${hits} hit${hits > 1 ? 's' : ''} missed - cannot target this unit type`,
+        });
+      } else {
+        // Players get an immunity log message with reason
+        const immunityReason = getUnitImmunityReason(target.unitId, ability.targets) || "tag mismatch";
+        console.log(`[executeRandomAttack] Target ${target.unitId} is immune: ${immunityReason}`);
+        actions.push({
+          type: "skip",
+          attackerGridId: attacker.gridId,
+          attackerName,
+          targetGridId: gridId,
+          targetName,
+          abilityId: ability.abilityId,
+          abilityName,
+          hitCount: hits,
+          message: `${targetName} is immune (${immunityReason})`,
+        });
+      }
       continue;
     }
     

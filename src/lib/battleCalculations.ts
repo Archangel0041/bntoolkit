@@ -399,6 +399,30 @@ export function canTargetUnit(targetUnitId: number, abilityTargets: number[]): b
   return unitMatchesTargets(unitTags, abilityTargets);
 }
 
+// Get the reason why a unit is immune to an ability based on tags
+// Returns null if not immune, otherwise returns a formatted reason string
+export function getUnitImmunityReason(targetUnitId: number, abilityTargets: number[]): string | null {
+  if (abilityTargets.length === 0) return null; // No restrictions
+  
+  const targetUnit = getUnitById(targetUnitId);
+  if (!targetUnit) return null;
+
+  const unitTags = targetUnit.identity.tags;
+  
+  // Check if already matching (not immune)
+  if (unitMatchesTargets(unitTags, abilityTargets)) return null;
+  
+  // Import UnitTagLabels to format the reason
+  const { UnitTagLabels } = require("@/data/gameEnums");
+  
+  // Format ability target tags
+  const targetTagNames = abilityTargets
+    .map(tag => UnitTagLabels[tag] || `Tag ${tag}`)
+    .join(", ");
+  
+  return `ability targets ${targetTagNames}`;
+}
+
 // Get unit stats at a specific rank
 function getUnitStatsAtRank(unitId: number, rank: number): UnitStats | undefined {
   const unit = getUnitById(unitId);
