@@ -16,7 +16,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Search, Filter, X, Target, Zap, Flame, Shield } from "lucide-react";
 import { TargetCategories, TargetCategoryLabels } from "@/lib/unitAbilityFilters";
-import { DamageType, DamageTypeLabels } from "@/data/gameEnums";
+import { DamageType, DamageTypeLabels, UnitTagLabels } from "@/data/gameEnums";
 
 interface UnitFiltersProps {
   searchQuery: string;
@@ -161,7 +161,7 @@ export function UnitFilters({
           <PopoverContent className="w-80 max-h-80 overflow-auto" align="end">
             <div className="space-y-2">
               <h4 className="font-medium">Filter by Tags</h4>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 {allTags.map((tag) => (
                   <label
                     key={tag}
@@ -171,7 +171,7 @@ export function UnitFilters({
                       checked={selectedTags.includes(tag)}
                       onCheckedChange={() => toggleTag(tag)}
                     />
-                    #{tag}
+                    {UnitTagLabels[tag] || `Tag ${tag}`}
                   </label>
                 ))}
               </div>
@@ -312,7 +312,7 @@ export function UnitFilters({
               className="cursor-pointer"
               onClick={() => toggleTag(tag)}
             >
-              Tag #{tag}
+              {UnitTagLabels[tag] || `Tag ${tag}`}
               <X className="h-3 w-3 ml-1" />
             </Badge>
           ))}
