@@ -160,10 +160,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       return { error };
     } else {
+      // Use email OTP (6-digit code) instead of magic link
       const { error } = await supabase.auth.signInWithOtp({
         email: emailOrPhone,
         options: {
           shouldCreateUser: !!inviteCode, // Only create new users if invite code provided
+          emailRedirectTo: undefined, // Prevents magic link, forces OTP code
         }
       });
       return { error };
