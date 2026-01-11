@@ -281,13 +281,16 @@ export function getAvailableAbilities(
 }
 
 // Get valid targets for an ability
+// strictTagCheck: If true (for enemies), only allow targeting units that match ability's target tags
+//                 If false (for players), allow targeting any position within range/LoF
 export function getValidTargets(
   attacker: LiveBattleUnit,
   ability: AbilityInfo,
   allEnemies: LiveBattleUnit[],
   allFriendlies: LiveBattleUnit[],
   friendlyCollapsedRows?: Set<number>,
-  enemyCollapsedRows?: Set<number>
+  enemyCollapsedRows?: Set<number>,
+  strictTagCheck: boolean = true
 ): LiveBattleUnit[] {
   const targets = attacker.isEnemy ? allFriendlies : allEnemies;
   const aliveTargets = targets.filter(t => !t.isDead);
@@ -313,7 +316,8 @@ export function getValidTargets(
     for (const target of aliveTargets) {
       const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy, attackerCollapsedRows, targetCollapsedRows);
       if (range < ability.minRange || range > ability.maxRange) continue;
-      if (!canTargetUnit(target.unitId, ability.targets)) continue;
+      // Only check tag targeting if strictTagCheck is enabled (for enemies)
+      if (strictTagCheck && !canTargetUnit(target.unitId, ability.targets)) continue;
 
       const coords = GRID_ID_TO_COORDS[target.gridId];
       if (!coords) continue;
@@ -334,8 +338,8 @@ export function getValidTargets(
   }
 
   return aliveTargets.filter(target => {
-    // Check tag targeting
-    if (!canTargetUnit(target.unitId, ability.targets)) return false;
+    // Only check tag targeting if strictTagCheck is enabled (for enemies)
+    if (strictTagCheck && !canTargetUnit(target.unitId, ability.targets)) return false;
 
     // Check range
     const range = calculateRange(attacker.gridId, target.gridId, attacker.isEnemy, attackerCollapsedRows, targetCollapsedRows);
@@ -1270,13 +1274,15 @@ export function aiSelectAction(
   const ability = availableAbilities[Math.floor(Math.random() * availableAbilities.length)];
   console.log(`[AI] ${unitName}: Selected ability ${ability.abilityId} (weapon: ${ability.weaponName})`);
 
+  // AI uses strict targeting - must match ability's target tags
   const validTargets = getValidTargets(
     unit,
     ability,
     state.enemyUnits,
     state.friendlyUnits,
     state.friendlyCollapsedRows,
-    state.enemyCollapsedRows
+    state.enemyCollapsedRows,
+    true // AI requires valid target tags
   );
   console.log(`[AI] ${unitName}: ${validTargets.length} valid targets`);
   

@@ -14,6 +14,10 @@ const TAG_HIERARCHY: Record<number, number[]> = {
   8: [13],
 };
 
+// Tags that should be excluded from targeting consideration
+// Metal (26) - abilities don't need to specifically target Metal to hit metal units
+const EXCLUDED_TARGETING_TAGS = new Set([26]);
+
 // Get all descendant tags for a given tag (recursive)
 function getDescendantTags(tag: number, visited = new Set<number>()): number[] {
   if (visited.has(tag)) return [];
@@ -42,9 +46,17 @@ export function expandTargetTags(targetTags: number[]): number[] {
 }
 
 // Check if a unit's tags match any of the expanded target tags
+// Excludes certain tags (like Metal) from consideration
 export function unitMatchesTargets(unitTags: number[], abilityTargets: number[]): boolean {
   if (abilityTargets.length === 0) return true; // No restrictions
   
+  // Filter out excluded tags from unit's tags for matching purposes
+  const relevantUnitTags = unitTags.filter(tag => !EXCLUDED_TARGETING_TAGS.has(tag));
+  
+  // If after filtering, unit has no relevant tags, allow targeting
+  // (e.g., a pure Metal unit should still be targetable)
+  if (relevantUnitTags.length === 0) return true;
+  
   const expandedTargets = expandTargetTags(abilityTargets);
-  return unitTags.some(tag => expandedTargets.includes(tag));
+  return relevantUnitTags.some(tag => expandedTargets.includes(tag));
 }
