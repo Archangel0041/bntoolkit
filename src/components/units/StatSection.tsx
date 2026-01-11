@@ -45,25 +45,41 @@ export function StatRow({ label, value, highlight }: StatRowProps) {
   );
 }
 
+import { DamageMods } from "@/types/units";
+
+// All damage types from the game
+const ALL_DAMAGE_TYPES: Array<{ key: keyof DamageMods; label: string }> = [
+  { key: "piercing", label: "Piercing" },
+  { key: "cold", label: "Cold" },
+  { key: "crushing", label: "Crushing" },
+  { key: "explosive", label: "Explosive" },
+  { key: "fire", label: "Fire" },
+  { key: "torpedo", label: "Torpedo" },
+  { key: "depth_charge", label: "Depth Charge" },
+  { key: "melee", label: "Melee" },
+  { key: "projectile", label: "Projectile" },
+  { key: "shell", label: "Shell" },
+];
+
 interface DamageModsGridProps {
-  mods: { cold?: number; crushing?: number; explosive?: number; fire?: number; piercing?: number };
+  mods: DamageMods;
   title: string;
 }
 
 export function DamageModsGrid({ mods, title }: DamageModsGridProps) {
-  const elements: Array<{ key: keyof typeof mods; label: string }> = [
-    { key: "cold", label: "Cold" },
-    { key: "crushing", label: "Crushing" },
-    { key: "explosive", label: "Explosive" },
-    { key: "fire", label: "Fire" },
-    { key: "piercing", label: "Piercing" },
-  ];
+  // Only show damage types that have values defined
+  const definedElements = ALL_DAMAGE_TYPES.filter(({ key }) => mods[key] !== undefined);
+  
+  // If no elements are defined, show nothing
+  if (definedElements.length === 0) {
+    return null;
+  }
   
   return (
     <div>
       <h4 className="font-medium mb-2">{title}</h4>
       <div className="grid grid-cols-5 gap-2 text-center text-sm">
-        {elements.map(({ key, label }) => {
+        {definedElements.map(({ key, label }) => {
           const value = mods[key];
           const isResistant = value !== undefined && value < 1;
           const isVulnerable = value !== undefined && value > 1;
