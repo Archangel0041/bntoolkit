@@ -501,6 +501,7 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
   }, [battleState, selectedUnit, selectedAbility, fixedAttackPositions, enemyReticleGridId, environmentalDamageMods]);
 
   // Get valid targets for selected ability
+  // For player units, use relaxed targeting (strictTagCheck=false) - allow placing reticle anywhere in range/LoF
   const validTargets = useMemo<LiveBattleUnit[]>(() => {
     if (!battleState || !selectedUnit || !selectedAbility) return [];
     return getValidTargets(
@@ -509,7 +510,8 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
       battleState.enemyUnits,
       battleState.friendlyUnits,
       battleState.friendlyCollapsedRows,
-      battleState.enemyCollapsedRows
+      battleState.enemyCollapsedRows,
+      false // Players can target any position within range/LoF
     );
   }, [battleState, selectedUnit, selectedAbility]);
 
@@ -545,13 +547,15 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
     const isAOE = !selectedAbility.isSingleTarget && !selectedAbility.isFixed;
     
     // Recalculate valid targets fresh to ensure we're using current state
+    // Players use relaxed targeting (can place ability anywhere in range/LoF)
     const freshValidTargets = getValidTargets(
       selectedUnit,
       selectedAbility,
       battleState.enemyUnits,
       battleState.friendlyUnits,
       battleState.friendlyCollapsedRows,
-      battleState.enemyCollapsedRows
+      battleState.enemyCollapsedRows,
+      false // Players can target any position within range/LoF
     );
     
     console.log(`[executePlayerAction] Fresh valid targets for ability ${selectedAbility.abilityId}:`, 
@@ -808,13 +812,15 @@ export function useLiveBattle({ encounter, waves, friendlyParty, startingWave = 
         newState.friendlyCollapsedRows,
         newState.enemyCollapsedRows
       )) {
+        // Enemies use strict targeting - must match ability's target tags
         const targets = getValidTargets(
           enemy,
           ability,
           aliveEnemies,
           aliveFriendlies,
           newState.friendlyCollapsedRows,
-          newState.enemyCollapsedRows
+          newState.enemyCollapsedRows,
+          true // Enemies require valid target tags
         );
         if (targets.length > 0) {
           abilityPool.push({ enemy, ability, targets });
