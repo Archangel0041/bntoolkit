@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Shield, Upload, Trash2, ArrowLeft } from 'lucide-react';
+import { Shield, Upload, Trash2, ArrowLeft, UserPlus, Copy, Check } from 'lucide-react';
 import { Header } from '@/components/Header';
 
 type AppRole = 'admin' | 'uploader';
@@ -24,6 +26,10 @@ export default function Admin() {
   const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [inviteLoading, setInviteLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -158,6 +164,60 @@ export default function Admin() {
     setActionLoading(null);
   };
 
+  const createInviteCode = async () => {
+    if (!inviteEmail.trim()) {
+      toast({
+        title: 'Email required',
+        description: 'Please enter the email of the person you want to invite.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setInviteLoading(true);
+    
+    const { data, error } = await supabase
+      .rpc('create_invite_code', { intended_email_param: inviteEmail.trim() });
+    
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create invite code.',
+        variant: 'destructive',
+      });
+    } else {
+      setGeneratedCode(data);
+      toast({
+        title: 'Invite created!',
+        description: 'Copy the invite message below to send to your invitee.',
+      });
+    }
+    
+    setInviteLoading(false);
+  };
+
+  const getInviteMessage = () => {
+    if (!generatedCode) return '';
+    const signupUrl = `${window.location.origin}/auth?code=${generatedCode}`;
+    return `You have been invited to create an account on archangel04.com!\n\nYour invite code: ${generatedCode}\n\nSign up here: ${signupUrl}`;
+  };
+
+  const copyInviteMessage = async () => {
+    const message = getInviteMessage();
+    await navigator.clipboard.writeText(message);
+    setCopied(true);
+    toast({
+      title: 'Copied!',
+      description: 'Invite message copied to clipboard.',
+    });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const resetInviteForm = () => {
+    setInviteEmail('');
+    setGeneratedCode(null);
+  };
+
   if (authLoading || !isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -169,7 +229,7 @@ export default function Admin() {
   return (
     <div className="min-h-screen bg-background">
       <Header />
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-8 space-y-6">
         <div className="mb-6">
           <Button variant="ghost" onClick={() => navigate('/')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
@@ -177,6 +237,58 @@ export default function Admin() {
           </Button>
         </div>
 
+        {/* Invite User Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <UserPlus className="h-5 w-5" />
+              Invite New User
+            </CardTitle>
+            <CardDescription>
+              Generate a single-use invite code for a new user.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!generatedCode ? (
+              <div className="flex gap-4 items-end">
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="invite-email">Invitee Email</Label>
+                  <Input
+                    id="invite-email"
+                    type="email"
+                    placeholder="friend@example.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    disabled={inviteLoading}
+                  />
+                </div>
+                <Button onClick={createInviteCode} disabled={inviteLoading}>
+                  {inviteLoading ? 'Creating...' : 'Generate Invite'}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm font-medium mb-2">Invite Message:</p>
+                  <pre className="text-sm whitespace-pre-wrap text-muted-foreground">
+                    {getInviteMessage()}
+                  </pre>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={copyInviteMessage} variant="default">
+                    {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+                    {copied ? 'Copied!' : 'Copy Message'}
+                  </Button>
+                  <Button onClick={resetInviteForm} variant="outline">
+                    Create Another
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* User Management Card */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

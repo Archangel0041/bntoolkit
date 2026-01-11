@@ -35,11 +35,16 @@ export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Check if this is a password reset callback
+  // Check if this is a password reset callback or has invite code
   useEffect(() => {
     const mode = searchParams.get('mode');
+    const code = searchParams.get('code');
+    
     if (mode === 'reset') {
       setShowResetPassword(true);
+    }
+    if (code) {
+      setInviteCode(code);
     }
   }, [searchParams]);
 

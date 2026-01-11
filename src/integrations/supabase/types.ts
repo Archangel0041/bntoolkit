@@ -22,8 +22,10 @@ export type Database = {
           current_uses: number
           expires_at: string | null
           id: string
+          intended_email: string | null
           is_active: boolean
           max_uses: number
+          used_by: string | null
         }
         Insert: {
           code: string
@@ -32,8 +34,10 @@ export type Database = {
           current_uses?: number
           expires_at?: string | null
           id?: string
+          intended_email?: string | null
           is_active?: boolean
           max_uses?: number
+          used_by?: string | null
         }
         Update: {
           code?: string
@@ -42,8 +46,10 @@ export type Database = {
           current_uses?: number
           expires_at?: string | null
           id?: string
+          intended_email?: string | null
           is_active?: boolean
           max_uses?: number
+          used_by?: string | null
         }
         Relationships: []
       }
@@ -128,6 +134,10 @@ export type Database = {
     }
     Functions: {
       can_upload: { Args: { _user_id: string }; Returns: boolean }
+      create_invite_code: {
+        Args: { intended_email_param: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
