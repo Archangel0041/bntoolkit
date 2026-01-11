@@ -53,21 +53,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Validate invite code without consuming it
+  // Validate invite code without consuming it (via edge function)
   const validateInviteCode = async (code: string): Promise<boolean> => {
-    const { data, error } = await supabase
-      .rpc('validate_invite_code', { invite_code: code });
-    return !error && data === true;
+    try {
+      const { data, error } = await supabase.functions.invoke('invite-code', {
+        body: { action: 'validate', code }
+      });
+      if (error) {
+        console.error('Validate invite code error:', error);
+        return false;
+      }
+      return data?.valid === true;
+    } catch (err) {
+      console.error('Validate invite code exception:', err);
+      return false;
+    }
   };
 
-  // Consume invite code after successful account creation
+  // Consume invite code after successful account creation (via edge function)
   const consumeInviteCode = async (code: string): Promise<boolean> => {
-    const { data, error } = await supabase
-      .rpc('use_invite_code', { invite_code: code });
-    if (!error && data === true) {
-      setPendingInviteCode(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('invite-code', {
+        body: { action: 'consume', code }
+      });
+      if (error) {
+        console.error('Consume invite code error:', error);
+        return false;
+      }
+      if (data?.success) {
+        setPendingInviteCode(null);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error('Consume invite code exception:', err);
+      return false;
     }
-    return !error && data === true;
   };
 
   useEffect(() => {
@@ -83,8 +104,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const storedCode = localStorage.getItem('pendingInviteCode');
           if (storedCode) {
             setTimeout(async () => {
-              await supabase.rpc('use_invite_code', { invite_code: storedCode });
-              localStorage.removeItem('pendingInviteCode');
+              const { error } = await supabase.functions.invoke('invite-code', {
+                body: { action: 'consume', code: storedCode }
+              });
+              if (!error) {
+                localStorage.removeItem('pendingInviteCode');
+              }
             }, 0);
           }
         }
