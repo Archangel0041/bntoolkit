@@ -75,7 +75,9 @@ export function EncounterGrid({ units, showPlayerUnits, compact = false, backPat
         if (!ability) return null;
         const minDmg = calculateDamageAtRank(weapon.stats.base_damage_min, stats?.power || 0);
         const maxDmg = calculateDamageAtRank(weapon.stats.base_damage_max, stats?.power || 0);
-        const offense = ability.stats.attack + (stats?.accuracy || 0);
+        // Total attack = weapon base_atk + ability attack
+        const totalAttack = (weapon.stats.base_atk || 0) + ability.stats.attack;
+        const offense = totalAttack + (stats?.accuracy || 0);
         return { ability, minDmg, maxDmg, offense, weapon };
       }).filter(Boolean)
     ) : [];
