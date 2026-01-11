@@ -14,7 +14,7 @@ interface AuthContextType {
   pendingInviteCode: string | null;
   sendOtp: (emailOrPhone: string, inviteCode?: string) => Promise<{ error: Error | null }>;
   verifyOtp: (emailOrPhone: string, token: string) => Promise<{ error: Error | null }>;
-  signInWithGoogle: (inviteCode: string) => Promise<{ error: Error | null }>;
+  signInWithGoogle: (inviteCode?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshRoles: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
@@ -194,17 +194,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
-  const signInWithGoogle = async (inviteCode: string) => {
-    // First validate the invite code
-    const isValid = await validateInviteCode(inviteCode);
-    
-    if (!isValid) {
-      return { error: new Error('Invalid or expired invite code') };
+  const signInWithGoogle = async (inviteCode?: string) => {
+    // If invite code provided (for sign up), validate it first
+    if (inviteCode) {
+      const isValid = await validateInviteCode(inviteCode);
+      
+      if (!isValid) {
+        return { error: new Error('Invalid or expired invite code') };
+      }
+      
+      // Store the invite code to consume after OAuth callback
+      localStorage.setItem('pendingInviteCode', inviteCode);
+      setPendingInviteCode(inviteCode);
     }
-    
-    // Store the invite code to consume after OAuth callback
-    localStorage.setItem('pendingInviteCode', inviteCode);
-    setPendingInviteCode(inviteCode);
     
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
