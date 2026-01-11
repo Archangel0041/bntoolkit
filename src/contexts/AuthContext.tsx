@@ -12,8 +12,8 @@ interface AuthContextType {
   isAdmin: boolean;
   canUpload: boolean;
   pendingInviteCode: string | null;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, inviteCode: string) => Promise<{ error: Error | null }>;
+  sendOtp: (emailOrPhone: string, inviteCode?: string) => Promise<{ error: Error | null }>;
+  verifyOtp: (emailOrPhone: string, token: string) => Promise<{ error: Error | null }>;
   signInWithGoogle: (inviteCode: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   refreshRoles: () => Promise<void>;
@@ -114,38 +114,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
+  // Send OTP to email or phone
+  const sendOtp = async (emailOrPhone: string, inviteCode?: string) => {
+    // If invite code provided, validate it first (for new signups)
+    if (inviteCode) {
+      const isValid = await validateInviteCode(inviteCode);
+      if (!isValid) {
+        return { error: new Error('Invalid or expired invite code') };
+      }
+      // Store the invite code to consume after verification
+      localStorage.setItem('pendingInviteCode', inviteCode);
+      setPendingInviteCode(inviteCode);
+    }
+
+    const isPhone = emailOrPhone.startsWith('+');
+    
+    if (isPhone) {
+      const { error } = await supabase.auth.signInWithOtp({
+        phone: emailOrPhone,
+      });
+      return { error };
+    } else {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: emailOrPhone,
+        options: {
+          shouldCreateUser: !!inviteCode, // Only create new users if invite code provided
+        }
+      });
+      return { error };
+    }
   };
 
-  const signUp = async (email: string, password: string, inviteCode: string) => {
-    // First validate the invite code without consuming it
-    const isValid = await validateInviteCode(inviteCode);
+  // Verify OTP code
+  const verifyOtp = async (emailOrPhone: string, token: string) => {
+    const isPhone = emailOrPhone.startsWith('+');
     
-    if (!isValid) {
-      return { error: new Error('Invalid or expired invite code') };
+    let error;
+    if (isPhone) {
+      const result = await supabase.auth.verifyOtp({
+        phone: emailOrPhone,
+        token,
+        type: 'sms',
+      });
+      error = result.error;
+    } else {
+      const result = await supabase.auth.verifyOtp({
+        email: emailOrPhone,
+        token,
+        type: 'email',
+      });
+      error = result.error;
     }
-    
-    // Store the invite code to consume after email confirmation
-    localStorage.setItem('pendingInviteCode', inviteCode);
-    setPendingInviteCode(inviteCode);
-    
-    const redirectUrl = `${window.location.origin}/`;
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl
-      }
-    });
-    
-    // If signup failed, remove the pending code
-    if (error) {
-      localStorage.removeItem('pendingInviteCode');
-      setPendingInviteCode(null);
-    }
-    
+
     return { error };
   };
 
@@ -203,8 +223,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAdmin,
       canUpload,
       pendingInviteCode,
-      signIn,
-      signUp,
+      sendOtp,
+      verifyOtp,
       signInWithGoogle,
       signOut,
       refreshRoles,
