@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      invite_codes: {
+        Row: {
+          code: string
+          created_at: string
+          created_by: string | null
+          current_uses: number
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          max_uses: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          created_by?: string | null
+          current_uses?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          current_uses?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number
+        }
+        Relationships: []
+      }
       parties: {
         Row: {
           created_at: string
@@ -102,6 +135,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      use_invite_code: { Args: { invite_code: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "uploader"
