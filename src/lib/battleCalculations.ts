@@ -3,7 +3,7 @@ import { getAbilityById } from "@/lib/abilities";
 import { unitMatchesTargets } from "@/lib/tagHierarchy";
 import { getStatusEffect, getEffectDisplayNameTranslated, getEffectColor } from "@/lib/statusEffects";
 import { getBlockingUnits, checkLineOfFire, isTargetInRange, calculateRange, BlockingUnit } from "@/lib/battleTargeting";
-import { UnitBlockingLabels } from "@/data/gameEnums";
+import { UnitBlockingLabels, UnitTagLabels } from "@/data/gameEnums";
 import type { AbilityInfo, DamagePreview, DamageResult, PartyUnit, StatusEffectPreview, TargetArea } from "@/types/battleSimulator";
 import { DAMAGE_TYPE_MAP, getAffectedGridPositions, getFixedAttackPositions } from "@/types/battleSimulator";
 import type { EncounterUnit } from "@/types/encounters";
@@ -411,9 +411,6 @@ export function getUnitImmunityReason(targetUnitId: number, abilityTargets: numb
   
   // Check if already matching (not immune)
   if (unitMatchesTargets(unitTags, abilityTargets)) return null;
-  
-  // Import UnitTagLabels to format the reason
-  const { UnitTagLabels } = require("@/data/gameEnums");
   
   // Format ability target tags
   const targetTagNames = abilityTargets
