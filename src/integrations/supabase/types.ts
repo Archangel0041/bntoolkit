@@ -146,6 +146,7 @@ export type Database = {
         Returns: boolean
       }
       use_invite_code: { Args: { invite_code: string }; Returns: boolean }
+      validate_invite_code: { Args: { invite_code: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "uploader"
