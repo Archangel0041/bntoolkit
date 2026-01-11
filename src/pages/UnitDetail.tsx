@@ -329,8 +329,11 @@ export default function UnitDetail() {
                     const minDamage = calculateDamageAtRank(weapon.stats.base_damage_min, currentPower);
                     const maxDamage = calculateDamageAtRank(weapon.stats.base_damage_max, currentPower);
                     
-                    // Calculate offense = ability attack + unit accuracy
-                    const offense = ability.stats.attack + (stats?.accuracy || 0);
+                    // Total attack = weapon base_atk + ability attack
+                    const weaponBaseAtk = weapon.stats.base_atk || 0;
+                    const totalAttack = weaponBaseAtk + ability.stats.attack;
+                    // Calculate offense = total attack + unit accuracy
+                    const offense = totalAttack + (stats?.accuracy || 0);
                     
                     return (
                       <div key={`${weaponKey}-${abilId}`} className="p-4 bg-muted/50 rounded-lg">
@@ -370,7 +373,7 @@ export default function UnitDetail() {
                             highlight 
                           />
                           <StatRow label="Offense" value={offense} highlight />
-                          <StatRow label="Attack" value={ability.stats.attack} />
+                          <StatRow label="Attack" value={`${totalAttack} (${weaponBaseAtk}+${ability.stats.attack})`} />
                           <StatRow label="Crit %" value={`${ability.stats.critical_hit_percent}%`} />
                           <StatRow label="Cooldown" value={ability.stats.ability_cooldown} />
                           <StatRow label="Ammo Required" value={ability.stats.ammo_required} />
