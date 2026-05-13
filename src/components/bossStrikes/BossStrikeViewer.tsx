@@ -12,6 +12,7 @@ import { getUnitById } from "@/lib/units";
 import { getEventRewardIconUrl, getEncounterIconUrl } from "@/lib/resourceImages";
 import { getBossStrikeBackgroundById, getBossStrikeNameById } from "@/lib/bossStrikeImages";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 import type { BossStrike, TierInfo } from "@/types/bossStrike";
 import bsPointsIcon from "@/assets/bs_points_icon.png";
 
