@@ -1,7 +1,7 @@
 import { LanguageSelector } from "./LanguageSelector";
 import { ThemeToggle } from "./ThemeToggle";
 import { Link } from "react-router-dom";
-import { Sword, Upload, Shield, LogIn, LogOut, User } from "lucide-react";
+import { Sword, Upload, Shield, LogIn, LogOut, User, Settings as SettingsIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "./ui/button";
 import {
@@ -52,6 +52,13 @@ export function Header() {
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem disabled>
                       <span className="text-muted-foreground">{user.email}</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link to="/settings">
+                        <SettingsIcon className="h-4 w-4 mr-2" />
+                        Settings
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => signOut()}>
