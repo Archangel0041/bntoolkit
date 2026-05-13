@@ -15,6 +15,7 @@ import LiveBattleSimulator from "./pages/LiveBattleSimulator";
 import UploadImages from "./pages/UploadImages";
 import Auth from "./pages/Auth";
 import Admin from "./pages/Admin";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
                   <Route path="/upload" element={<UploadImages />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/admin" element={<Admin />} />
+                  <Route path="/settings" element={<Settings />} />
                   
                   {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                   <Route path="*" element={<NotFound />} />

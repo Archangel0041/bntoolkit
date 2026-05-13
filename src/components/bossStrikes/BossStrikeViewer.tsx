@@ -12,6 +12,7 @@ import { getUnitById } from "@/lib/units";
 import { getEventRewardIconUrl, getEncounterIconUrl } from "@/lib/resourceImages";
 import { getBossStrikeBackgroundById, getBossStrikeNameById } from "@/lib/bossStrikeImages";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useUserPreferences } from "@/hooks/useUserPreferences";
 import type { BossStrike, TierInfo } from "@/types/bossStrike";
 import bsPointsIcon from "@/assets/bs_points_icon.png";
 
@@ -213,13 +214,22 @@ function EncounterListSection({
     });
   }, [tierInfo]);
 
-  // Default to level 46-50 if available, otherwise first available
+  const { prefs } = useUserPreferences();
+
+  // Default to the range matching the user's current level, else highest available
   useMemo(() => {
     if (levelRanges.length > 0 && !selectedLevel) {
-      const defaultLevel = levelRanges.find(r => r === "46-50") || levelRanges[levelRanges.length - 1];
+      const userLevel = prefs.level;
+      const matching = levelRanges.find(r => {
+        const [minStr, maxStr] = r.split('-');
+        const min = parseInt(minStr);
+        const max = parseInt(maxStr);
+        return userLevel >= min && userLevel <= max;
+      });
+      const defaultLevel = matching || levelRanges[levelRanges.length - 1];
       setSelectedLevel(defaultLevel);
     }
-  }, [levelRanges, selectedLevel]);
+  }, [levelRanges, selectedLevel, prefs.level]);
 
   // Get encounters grouped by tier for selected level, collapsing identical tiers
   const collapsedTierGroups = useMemo(() => {
